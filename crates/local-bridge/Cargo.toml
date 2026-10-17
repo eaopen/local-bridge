@@ -1,0 +1,13 @@
+[package]
+name = "local-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Small cross-platform enterprise local capability bridge with MCP stdio adapter"
+
+[dependencies]
+local-bridge-core = { path = "../local-bridge-core" }
+anyhow.workspace = true
+serde_json.workspace = true
