@@ -16,7 +16,7 @@
   or command options, never installs a model CLI automatically, and never opens
   an HTTP listener. It starts only `pi` and `opencode` from the user's PATH.
 - Default Agent workspace is separate from the current enterprise directory.
-  OpenCode uses the built-in plan agent, with shell/edit/external access requiring
+  OpenCode uses the built-in build agent, with shell/edit/external access requiring
   user confirmation in runtime config; Pi uses `--no-tools`. These are not
   guarantees that a third-party CLI or installed extension cannot access data.
   Use only trusted, up-to-date binaries and review third-party plugins.
