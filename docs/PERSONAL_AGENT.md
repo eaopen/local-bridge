@@ -58,7 +58,7 @@ current enterprise directory. A provided `--dir` must already exist.
 
 - Pi runs with **`--no-tools`**: built-in local file-write/shell tools are
   disabled. Review any installed extensions.
-- OpenCode uses the built-in **plan** agent and asks before Bash/edit/external
+- OpenCode uses the built-in **build** agent and asks before Bash/edit/external
   directory actions. CLI extensions and model responses are still external
   software and services.
 - **Free API tier is not a universal no-billing guarantee**: eligibility,
