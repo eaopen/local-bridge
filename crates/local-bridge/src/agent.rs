@@ -70,8 +70,6 @@ fn parse_free_models(output: &str) -> Vec<String> {
         .collect()
 }
 
-
-
 /// Model IDs are supplied by the official installed OpenCode CLI, not a
 /// third-party proxy. A bounded local subprocess is never exposed through MCP.
 fn free_models() -> Result<Vec<String>> {
