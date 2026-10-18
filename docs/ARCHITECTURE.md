@@ -19,7 +19,10 @@ CLI in a user-controlled workspace. This is separate from the trust boundary
 of CloudFile and enterprise Channels; there is **no AI execution capability in
 MCP**. Model access and authentication remain in the vendor CLIs. No remote
 script execution, shell delegation through manifests or background server is added.
-This launcher is not a full agent/chat runtime.
+Pi chat and OpenCode coding can share an explicit user-selected folder but not
+credentials, sessions, memories or privileges. The chosen free-tier models
+require provider authorization and may be restricted by quotas, region or
+project billing settings. This launcher is not a full agent/chat runtime.
 
 See [Personal Agent starter](PERSONAL_AGENT.md) for exact commands.
 

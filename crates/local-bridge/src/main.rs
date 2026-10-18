@@ -49,7 +49,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | agent [doctor|models|opencode|pi] | validate-channel <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | agent [chat|code|doctor|models] | validate-channel <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

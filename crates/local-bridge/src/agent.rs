@@ -7,23 +7,23 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 const CATALOG_TIMEOUT: Duration = Duration::from_secs(15);
-const PREFERRED_MODELS: &[&str] = &[
-    "opencode/mimo-v2.6-flash-free",
-    "opencode/mimo-v2.5-free",
-    "opencode/nemotron-3.5-lightning-free",
-];
+// Preset one reasonable free-tier model per mode; never select a random candidate.
+const DEFAULT_PI_PROVIDER: &str = "google";
+const DEFAULT_PI_MODEL: &str = "gemini-3.5-flash-lite";
+const DEFAULT_CODE_MODEL: &str = "opencode/deepseek-v4.1-flash-free";
 
 fn usage() {
     println!(
-        "Local Bridge Personal Agent (local, opt-in)\n\
+        "Local Bridge Personal Agent\n\
          Commands:\n\
-           agent                  OpenCode free-model terminal chat\n\
-           agent doctor           Check Pi / OpenCode installation\n\
-           agent models           Show OpenCode free-model candidates\n\
-           agent opencode [--model opencode/name-free] [--dir <path>]\n\
-           agent pi [--model provider/model] [--dir <path>]\n\
-         The default workspace is separate from your working directory.\n\
-         Free quotas may change. No automatic download, paid fallback or remote execution."
+           agent                  Chat with Pi (preset Gemini free-tier model)\n\
+           agent chat             Same as agent\n\
+           agent code             Code with OpenCode (preset free candidate)\n\
+           agent doctor           Check required CLIs\n\
+           agent models           Diagnose OpenCode free candidates\n\
+           agent [chat|code] --dir <existing-folder>\n\
+         Advanced: agent pi|opencode [--model provider/model] [--dir <folder>]\n\
+         The user supplies provider credentials once. No automatic paid fallback."
     );
 }
 
@@ -39,11 +39,11 @@ fn installed(program: &str) -> bool {
 
 fn install_guide() {
     eprintln!(
-        "Install official clients as your normal user:\n\
-         OpenCode https://opencode.ai/docs/\n\
-         Pi       https://pi.dev/\n\
-         Restart your terminal and run: local-bridge agent doctor\n\
-         Provider credentials stay with the official CLIs."
+        "Install Pi as your normal user: https://pi.dev/docs/latest/quickstart\n\
+         Optional coding mode: https://opencode.ai/docs/\n\
+         For Pi's default free tier, use a Google AI Studio API key on a project\n\
+         without paid billing: https://aistudio.google.com/api-keys\n\
+         In Pi, run /login google once. No model selection required."
     );
 }
 
@@ -68,15 +68,6 @@ fn parse_free_models(output: &str) -> Vec<String> {
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
-}
-
-fn choose_default(models: &[String]) -> Option<&str> {
-    for preferred in PREFERRED_MODELS {
-        if models.iter().any(|value| value == preferred) {
-            return Some(preferred);
-        }
-    }
-    models.first().map(String::as_str)
 }
 
 /// Model IDs are supplied by the official installed OpenCode CLI, not a
@@ -215,28 +206,26 @@ fn safe_opencode_config() -> Result<String> {
 }
 
 fn opencode_chat(selected: &Options) -> Result<()> {
+    let model = selected.model.as_deref().unwrap_or(DEFAULT_CODE_MODEL);
+    if !is_free_model(model) {
+        bail!("coding starter only accepts official OpenCode -free model IDs");
+    }
     let available = free_models()?;
-    let model = match &selected.model {
-        Some(model) if !is_free_model(model) => {
-            bail!("starter only allows official OpenCode model IDs ending in -free")
-        }
-        Some(model) if !available.contains(model) => {
-            bail!("model not in the current free catalog; run local-bridge agent models")
-        }
-        Some(model) => model.as_str(),
-        None => choose_default(&available).context(
-            "no -free models in current OpenCode catalog; try opencode models --refresh",
-        )?,
-    };
+    if !available.iter().any(|listed| listed == model) {
+        bail!(
+            "preset coding model {model} is not in the current OpenCode free catalog. \
+             No paid or random fallback. Use local-bridge agent models for diagnosis."
+        );
+    }
     let directory = workspace(selected.directory.as_deref())?;
     eprintln!(
-        "Local Bridge > OpenCode: {model}\nWorkspace: {}\n\
-         Messages may leave your device; provider quotas can change.\n\
+        "Local Bridge > OpenCode coding (build mode): {model}\nWorkspace: {}\n\
+         Free quotas and eligibility can change.\n\
          Shell/file writes require local confirmation. No MCP remote execution.",
         directory.display()
     );
     let status = Command::new("opencode")
-        .args(["--model", model, "--agent", "plan"])
+        .args(["--model", model, "--agent", "build"])
         .current_dir(directory)
         .env("OPENCODE_CONFIG_CONTENT", safe_opencode_config()?)
         .stdin(Stdio::inherit())
@@ -250,18 +239,35 @@ fn opencode_chat(selected: &Options) -> Result<()> {
     Ok(())
 }
 
+fn pi_args(custom_model: Option<&str>) -> Vec<&str> {
+    match custom_model {
+        Some(model) => vec!["--no-tools", "--model", model],
+        None => vec![
+            "--no-tools",
+            "--provider",
+            DEFAULT_PI_PROVIDER,
+            "--model",
+            DEFAULT_PI_MODEL,
+        ],
+    }
+}
+
 fn pi_chat(selected: &Options) -> Result<()> {
     let directory = workspace(selected.directory.as_deref())?;
+    let custom_model = selected.model.as_deref();
+    let shown_model = custom_model.unwrap_or("google/gemini-3.5-flash-lite");
     eprintln!(
-        "Local Bridge > Pi (chat-only, no tools)\nWorkspace: {}\n\
-         Use Pi /login for your own account. Model choice may be billable.",
+        "Local Bridge > Pi personal chat (no local tools)\n\
+         Model: {shown_model}\nWorkspace: {}\n\
+         On first use, enter your Google AI Studio free-tier key in Pi via /login google.\n\
+         Free tier depends on regional eligibility, quotas and project billing settings.",
         directory.display()
     );
-    let mut command = Command::new("pi");
-    command.arg("--no-tools");
-    if let Some(model) = selected.model.as_deref() {
-        command.args(["--model", model]);
+    if custom_model.is_some() {
+        eprintln!("Custom Pi model was explicitly requested; check its pricing.");
     }
+    let mut command = Command::new("pi");
+    command.args(pi_args(custom_model));
     let status = command
         .current_dir(directory)
         .stdin(Stdio::inherit())
@@ -276,20 +282,24 @@ fn pi_chat(selected: &Options) -> Result<()> {
 }
 
 fn doctor() {
-    let opencode = installed("opencode");
     let pi = installed("pi");
+    let opencode = installed("opencode");
     println!("Local Bridge Personal Agent");
-    println!("OpenCode installed: {opencode}");
-    println!("Pi installed:       {pi}");
-    println!("Start: local-bridge agent");
-    if !opencode || !pi {
+    println!("Pi installed (chat): {pi}");
+    println!("OpenCode installed (optional coding): {opencode}");
+    println!("Default chat: {DEFAULT_PI_PROVIDER}/{DEFAULT_PI_MODEL}");
+    println!("Default coding: {DEFAULT_CODE_MODEL}");
+    println!("No model picker. A free-tier Google API key is needed once for Pi.");
+    if !pi {
         install_guide();
+    } else if !opencode {
+        eprintln!("For optional coding mode: https://opencode.ai/docs/");
     }
 }
 
 pub fn run(args: &[String]) -> Result<()> {
     match args.split_first() {
-        None => opencode_chat(&Options::empty()),
+        None => pi_chat(&Options::empty()),
         Some((command, _)) if matches!(command.as_str(), "-h" | "--help" | "help") => {
             usage();
             Ok(())
@@ -309,8 +319,12 @@ pub fn run(args: &[String]) -> Result<()> {
             }
             Ok(())
         }
-        Some((command, rest)) if command == "opencode" => opencode_chat(&options(rest)?),
-        Some((command, rest)) if command == "pi" => pi_chat(&options(rest)?),
+        Some((command, rest)) if matches!(command.as_str(), "code" | "opencode") => {
+            opencode_chat(&options(rest)?)
+        }
+        Some((command, rest)) if matches!(command.as_str(), "chat" | "pi") => {
+            pi_chat(&options(rest)?)
+        }
         _ => {
             usage();
             bail!("unknown Personal Agent command")
@@ -331,11 +345,29 @@ mod tests {
              opencode/a-free --auto\n",
         );
         assert_eq!(models.len(), 2);
-        assert_eq!(
-            choose_default(&models),
-            Some("opencode/mimo-v2.6-flash-free")
-        );
+        assert_eq!(DEFAULT_CODE_MODEL, "opencode/deepseek-v4.1-flash-free");
+        assert_eq!(DEFAULT_PI_PROVIDER, "google");
+        assert_eq!(DEFAULT_PI_MODEL, "gemini-3.5-flash-lite");
         assert!(!is_free_model("opencode/mimo-v2.6-flash"));
+    }
+
+    #[test]
+    fn pi_defaults_are_fixed_and_do_not_enable_tools() {
+        assert_eq!(
+            pi_args(None),
+            vec![
+                "--no-tools",
+                "--provider",
+                "google",
+                "--model",
+                "gemini-3.5-flash-lite"
+            ]
+        );
+        assert_eq!(
+            pi_args(Some("custom/model")),
+            vec!["--no-tools", "--model", "custom/model"]
+        );
+        assert!(is_free_model(DEFAULT_CODE_MODEL));
     }
 
     #[test]
