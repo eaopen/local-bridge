@@ -241,6 +241,19 @@ fn opencode_chat(selected: &Options) -> Result<()> {
     Ok(())
 }
 
+fn pi_args(custom_model: Option<&str>) -> Vec<&str> {
+    match custom_model {
+        Some(model) => vec!["--no-tools", "--model", model],
+        None => vec![
+            "--no-tools",
+            "--provider",
+            DEFAULT_PI_PROVIDER,
+            "--model",
+            DEFAULT_PI_MODEL,
+        ],
+    }
+}
+
 fn pi_chat(selected: &Options) -> Result<()> {
     let directory = workspace(selected.directory.as_deref())?;
     let custom_model = selected.model.as_deref();
@@ -252,17 +265,11 @@ fn pi_chat(selected: &Options) -> Result<()> {
          Free tier depends on regional eligibility, quotas and project billing settings.",
         directory.display()
     );
-    let mut command = Command::new("pi");
-    command.arg("--no-tools");
-    match custom_model {
-        Some(model) => {
-            eprintln!("Custom Pi model was explicitly requested; check its pricing.");
-            command.args(["--model", model]);
-        }
-        None => {
-            command.args(["--provider", DEFAULT_PI_PROVIDER, "--model", DEFAULT_PI_MODEL]);
-        }
+    if custom_model.is_some() {
+        eprintln!("Custom Pi model was explicitly requested; check its pricing.");
     }
+    let mut command = Command::new("pi");
+    command.args(pi_args(custom_model));
     let status = command
         .current_dir(directory)
         .stdin(Stdio::inherit())
@@ -344,6 +351,25 @@ mod tests {
         assert_eq!(DEFAULT_PI_PROVIDER, "google");
         assert_eq!(DEFAULT_PI_MODEL, "gemini-3.5-flash-lite");
         assert!(!is_free_model("opencode/mimo-v2.6-flash"));
+    }
+
+    #[test]
+    fn pi_defaults_are_fixed_and_do_not_enable_tools() {
+        assert_eq!(
+            pi_args(None),
+            vec![
+                "--no-tools",
+                "--provider",
+                "google",
+                "--model",
+                "gemini-3.5-flash-lite"
+            ]
+        );
+        assert_eq!(
+            pi_args(Some("custom/model")),
+            vec!["--no-tools", "--model", "custom/model"]
+        );
+        assert!(is_free_model(DEFAULT_CODE_MODEL));
     }
 
     #[test]
