@@ -95,7 +95,7 @@ No billing switch, API key, model picker, or fallback is managed by Local Bridge
 OpenCode uses an official `opencode/deepseek-v4.1-flash-free` catalog entry; this
 may disappear or require authentication. The bridge fails visibly rather than
 silently changing to a paid/random model. Pi has no local tools enabled; OpenCode
-asks before shell/file modifications and is opt-in only.
+runs build mode with approval before shell/file modifications and is opt-in only.
 
 See [Personal Agent quick start](docs/PERSONAL_AGENT.md). Neither agent is exposed
 as an MCP tool or enterprise Channel.
