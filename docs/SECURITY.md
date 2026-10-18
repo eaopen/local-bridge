@@ -20,7 +20,15 @@
   user confirmation in runtime config; Pi uses `--no-tools`. These are not
   guarantees that a third-party CLI or installed extension cannot access data.
   Use only trusted, up-to-date binaries and review third-party plugins.
-- OpenCode's `-free` catalog listing is not a billing, quota or uptime guarantee.
+- **Pi is the default chat entry**, pinned to Google's Gemini 3.5 Flash-Lite
+  API model. Its free tier requires an eligible project and user API key;
+  account billing, region and quotas can change costs or access. Google's
+  free tier may use conversation inputs/outputs to improve its products.
+  No paid-model fallback. Do not send sensitive or enterprise data without
+  informed consent.
+- OpenCode is a separate, optional coding mode pinned to a known `-free`
+  model, rather than a random discovered default. The `-free` catalog listing
+  is not a billing, quota or uptime guarantee.
   The Bridge never falls back silently to a paid model or borrows credentials
   from a different client's private login state.
 - The optional `--dir` path is provided by the local user only. Data shared in
