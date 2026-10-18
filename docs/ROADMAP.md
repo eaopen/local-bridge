@@ -7,8 +7,12 @@
 - Cross-platform CI for Rust.
 
 **0.1.x — opt-in Personal Agent pilot (without changing enterprise/MCP boundaries)**
-- User-launched OpenCode free-model TUI with live model-ID discovery.
-- Optional Pi CLI launcher; no authentication emulation or credential storage.
+- **Pi as default** personal chat with a pinned Google Gemini free-tier model,
+  own Google AI Studio API key (no model picker).
+- OpenCode as optional coding mode with pinned -free model. Catalog discovery
+  remains for diagnostics, not a randomly selected user-facing fallback.
+- Both can share a user-selected working folder, but no automatic delegation.
+- No authentication emulation, credential reading or storage.
 - Separate default workspace, non-admin portable binary in CI, explicit tool gates.
 - Follow-up only with evidence: task approval UI, native capability binding and
   persistent user identity are **not** delivered in this iteration.
