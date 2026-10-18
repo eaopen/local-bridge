@@ -219,13 +219,13 @@ fn opencode_chat(selected: &Options) -> Result<()> {
     }
     let directory = workspace(selected.directory.as_deref())?;
     eprintln!(
-        "Local Bridge > OpenCode coding: {model}\nWorkspace: {}\n\
+        "Local Bridge > OpenCode coding (build mode): {model}\nWorkspace: {}\n\
          Free quotas and eligibility can change.\n\
          Shell/file writes require local confirmation. No MCP remote execution.",
         directory.display()
     );
     let status = Command::new("opencode")
-        .args(["--model", model, "--agent", "plan"])
+        .args(["--model", model, "--agent", "build"])
         .current_dir(directory)
         .env("OPENCODE_CONFIG_CONTENT", safe_opencode_config()?)
         .stdin(Stdio::inherit())
