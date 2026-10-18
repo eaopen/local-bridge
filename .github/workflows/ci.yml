@@ -27,14 +27,3 @@ jobs:
         run: cargo test --workspace --locked
       - name: Build
         run: cargo build --workspace --locked
-      - name: Build portable CLI
-        run: cargo build -p local-bridge --release --locked
-      - name: Upload portable CLI (preview build)
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-bridge-${{ runner.os }}-${{ runner.arch }}
-          path: |
-            target/release/local-bridge
-            target/release/local-bridge.exe
-          if-no-files-found: error
-          retention-days: 14

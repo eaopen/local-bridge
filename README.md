@@ -6,7 +6,7 @@
 
 [中文说明](#为什么需要-local-bridge) · [Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Roadmap](docs/ROADMAP.md)
 
-> Status: **0.1.0 read-only MCP scaffold + optional Personal Agent CLI starter**. NOT a production-ready file editor. CloudFile editing continues in the existing [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2). No automatic AI operations, remote script execution or enterprise Channel fetching are enabled by this repository yet.
+> Status: **0.1.0 architecture + runnable read-only MCP scaffold**. NOT a production-ready file editor. CloudFile editing continues in the existing [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2). No automatic AI operations, remote script execution or enterprise Channel fetching are enabled by this repository yet.
 
 ## 为什么需要 Local Bridge
 
@@ -41,12 +41,11 @@ AI Agent (MCP stdio)        Enterprise Web (browser/API)
 | `crates/local-bridge` | CLI and local MCP stdio endpoint | Read-only prototype |
 | CloudFile adapter | Connects installed Agent2 via a user-configured executable | Read-only `--component` probe |
 | Enterprise Channels | Server describes allowed navigation and built-in capabilities | Offline manifest validation only |
-| Personal Agent (opt-in) | Pi-first personal chat; OpenCode coding | Fixed free-tier defaults + no MCP execution |
 | File editing / Checkout | CloudFile’s actual file workflows | Continue in the existing Agent2 repo; **not yet bridged into MCP** |
 
 ## 构建及本地测试
 
-Requires Rust **1.90+**. The core/MCP bridge requires no Node.js, Python, Docker or model runtime. The optional Personal Agent launcher requires a user-installed OpenCode or Pi CLI.
+Requires Rust **1.90+**. No Node.js, Python, Docker or model runtime required at runtime.
 
 ```bash
 cargo test --workspace
@@ -71,34 +70,6 @@ cargo run -p local-bridge -- validate-channel examples/etech-channels.json
 ```
 
 Read [security boundaries](docs/SECURITY.md) before integrating Web or AI workloads. Schema validation alone never authenticates an enterprise server.
-
-## Personal Agent (optional, Pi first)
-
-**No model-choice step.** The standard entry launches **Pi** with a preselected
-Google Gemini 3.5 Flash-Lite free-tier model. Use OpenCode only for coding:
-
-```bash
-local-bridge agent doctor       # check installation
-local-bridge agent              # Pi personal chat, preset free-tier model
-local-bridge agent code         # OpenCode coding, preset -free model
-```
-
-Both run in a separate user workspace by default. To work in the same selected
-folder, pass `--dir /your/project` to both. There is no automatic agent-to-agent
-delegation, shared conversations or background subprocess orchestration yet.
-
-**First-use credential:** Pi's selected Google model needs your own **Google AI
-Studio API key** on a free-tier project (use `/login google` in Pi once). The
-free tier is region/quota limited; a key from a paid project can incur charges.
-No billing switch, API key, model picker, or fallback is managed by Local Bridge.
-
-OpenCode uses an official `opencode/deepseek-v4.1-flash-free` catalog entry; this
-may disappear or require authentication. The bridge fails visibly rather than
-silently changing to a paid/random model. Pi has no local tools enabled; OpenCode
-runs build mode with approval before shell/file modifications and is opt-in only.
-
-See [Personal Agent quick start](docs/PERSONAL_AGENT.md). Neither agent is exposed
-as an MCP tool or enterprise Channel.
 
 ## Existing repositories
 
