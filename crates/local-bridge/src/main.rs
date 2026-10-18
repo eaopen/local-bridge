@@ -1,3 +1,4 @@
+mod agent;
 mod cloudfile;
 mod mcp;
 
@@ -26,6 +27,7 @@ fn run() -> Result<()> {
             );
         }
         [x] if x == "mcp" => mcp::serve()?,
+        [command, rest @ ..] if command == "agent" => agent::run(rest)?,
         [command, filename] if command == "validate-channel" => {
             // File validation does not grant trust to a remote origin.
             let path = Path::new(filename);
@@ -47,7 +49,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | validate-channel <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | agent [doctor|models|opencode|pi] | validate-channel <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

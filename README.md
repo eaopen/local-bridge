@@ -6,7 +6,7 @@
 
 [中文说明](#为什么需要-local-bridge) · [Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Roadmap](docs/ROADMAP.md)
 
-> Status: **0.1.0 architecture + runnable read-only MCP scaffold**. NOT a production-ready file editor. CloudFile editing continues in the existing [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2). No automatic AI operations, remote script execution or enterprise Channel fetching are enabled by this repository yet.
+> Status: **0.1.0 read-only MCP scaffold + optional Personal Agent CLI starter**. NOT a production-ready file editor. CloudFile editing continues in the existing [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2). No automatic AI operations, remote script execution or enterprise Channel fetching are enabled by this repository yet.
 
 ## 为什么需要 Local Bridge
 
@@ -41,11 +41,12 @@ AI Agent (MCP stdio)        Enterprise Web (browser/API)
 | `crates/local-bridge` | CLI and local MCP stdio endpoint | Read-only prototype |
 | CloudFile adapter | Connects installed Agent2 via a user-configured executable | Read-only `--component` probe |
 | Enterprise Channels | Server describes allowed navigation and built-in capabilities | Offline manifest validation only |
+| Personal Agent (opt-in) | Launch the user's trusted OpenCode or Pi CLI | Free-model discovery + chat-only launcher, no MCP execution |
 | File editing / Checkout | CloudFile’s actual file workflows | Continue in the existing Agent2 repo; **not yet bridged into MCP** |
 
 ## 构建及本地测试
 
-Requires Rust **1.90+**. No Node.js, Python, Docker or model runtime required at runtime.
+Requires Rust **1.90+**. The core/MCP bridge requires no Node.js, Python, Docker or model runtime. The optional Personal Agent launcher requires a user-installed OpenCode or Pi CLI.
 
 ```bash
 cargo test --workspace
@@ -70,6 +71,19 @@ cargo run -p local-bridge -- validate-channel examples/etech-channels.json
 ```
 
 Read [security boundaries](docs/SECURITY.md) before integrating Web or AI workloads. Schema validation alone never authenticates an enterprise server.
+
+## Personal Agent (optional, local-first)
+
+The user may start with an existing OpenCode CLI and its currently listed `-free` models, or choose Pi with their own provider login. The bridge **does not** fetch executables or credentials, impersonate third-party clients, or expose Agent execution through MCP.
+
+```bash
+local-bridge agent doctor
+local-bridge agent models
+local-bridge agent                 # Official OpenCode free-model chat
+local-bridge agent pi              # Pi; its chosen provider may be paid
+```
+
+The launcher creates a separate user workspace and requires confirmation for OpenCode shell/file writes; Pi starts with all tools disabled. See [Personal Agent quick start](docs/PERSONAL_AGENT.md).
 
 ## Existing repositories
 
