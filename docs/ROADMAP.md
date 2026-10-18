@@ -6,6 +6,13 @@
 - CloudFile Agent2 identity adapter, no duplicated file-edit engine.
 - Cross-platform CI for Rust.
 
+**0.1.x — opt-in Personal Agent pilot (without changing enterprise/MCP boundaries)**
+- User-launched OpenCode free-model TUI with live model-ID discovery.
+- Optional Pi CLI launcher; no authentication emulation or credential storage.
+- Separate default workspace, non-admin portable binary in CI, explicit tool gates.
+- Follow-up only with evidence: task approval UI, native capability binding and
+  persistent user identity are **not** delivered in this iteration.
+
 **0.2 — CloudFile application**
 - Reuse CloudFile 2.3 durable file engine via authenticated local IPC.
 - Read task list and open user-authorized files; no raw paths to AI.
@@ -23,5 +30,5 @@
 - Linux desktop packaging and enterprise deployment policy.
 - Device/printing/CAD automation based on real customer use cases.
 
-Out of scope: competing AI model/chat UI, generalized RPA, filesystem driver,
+Out of scope: building a competing AI model/chat UI (the launcher reuses official CLIs), generalized RPA, filesystem driver,
 Seafile sync client, plugin marketplace, arbitrary remote scripts.
