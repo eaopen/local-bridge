@@ -91,7 +91,10 @@ fn free_models() -> Result<Vec<String>> {
         .context("OpenCode CLI not found; run local-bridge agent doctor")?;
     let deadline = Instant::now() + CATALOG_TIMEOUT;
     loop {
-        match child.try_wait().context("cannot poll OpenCode model catalog")? {
+        match child
+            .try_wait()
+            .context("cannot poll OpenCode model catalog")?
+        {
             Some(status) if status.success() => break,
             Some(status) => bail!("OpenCode model catalog failed: {status}"),
             None if Instant::now() >= deadline => {
@@ -102,7 +105,9 @@ fn free_models() -> Result<Vec<String>> {
             None => std::thread::sleep(Duration::from_millis(50)),
         }
     }
-    let output = child.wait_with_output().context("cannot read OpenCode model list")?;
+    let output = child
+        .wait_with_output()
+        .context("cannot read OpenCode model list")?;
     if output.stdout.len() > 256 * 1024 {
         bail!("OpenCode model catalog unexpectedly large");
     }
@@ -200,8 +205,9 @@ fn safe_config_override(mut config: Value) -> Result<Value> {
 
 fn safe_opencode_config() -> Result<String> {
     let config: Value = match std::env::var("OPENCODE_CONFIG_CONTENT") {
-        Ok(content) if !content.is_empty() => serde_json::from_str(&content)
-            .context("invalid OPENCODE_CONFIG_CONTENT")?,
+        Ok(content) if !content.is_empty() => {
+            serde_json::from_str(&content).context("invalid OPENCODE_CONFIG_CONTENT")?
+        }
         _ => json!({}),
     };
     serde_json::to_string(&safe_config_override(config)?)
@@ -325,7 +331,10 @@ mod tests {
              opencode/a-free --auto\n",
         );
         assert_eq!(models.len(), 2);
-        assert_eq!(choose_default(&models), Some("opencode/mimo-v2.6-flash-free"));
+        assert_eq!(
+            choose_default(&models),
+            Some("opencode/mimo-v2.6-flash-free")
+        );
         assert!(!is_free_model("opencode/mimo-v2.6-flash"));
     }
 
