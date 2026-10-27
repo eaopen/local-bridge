@@ -8,7 +8,7 @@
 
 [个人/企业/混合使用场景](docs/PRODUCT_POSITIONING_AND_USE_CASES.md) · [混合 Profile 与 SSO](docs/PROFILE_AUTH_AND_COLLABORATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Security](docs/SECURITY.md)
 
-> **当前实现：0.1.0 只读 MCP + 离线 Profile 校验原型。** 可信绑定、个人工作空间、Agent run、通讯双向连接和任务聚合尚未交付。CloudFile 本地文件编辑继续由 [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2) 负责，不由本仓接管。
+> **当前实现：0.1.0 核心及后续最小接线。** 已有只读 MCP Server、离线 Profile 校验、本机显式 Codex CLI run、Chrome Native Host/手动网页收件箱，以及用户注册的 MCP Client（已与独立 WeChat Provider 完成不涉及账号的协议联动）。**尚未交付**真实 Chrome/微信桌面实机验收、可信企业 SSO/Web 动作、PersonalProfile 运行时、双向通讯自动订阅、通用 BridgeTask 运行时或 CloudFile 文件编辑接管。现有文件编辑仍由 [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2) 负责。
 
 ## 为什么需要 Local Bridge
 
@@ -62,7 +62,7 @@ Personal Agent / MCP       Enterprise Web / CloudFile / Personal Apps
 | Component | Purpose | Current implementation |
 | --- | --- | --- |
 | `crates/local-bridge-core` | Channel schema, origin validation, capability allowlist | Tested |
-| `crates/local-bridge` | CLI and local MCP stdio endpoint | Read-only prototype |
+| `crates/local-bridge` | CLI、只读 MCP Server、本机 Codex、Native Host/Inbox、用户注册的 MCP Client | 基础能力已实现；真实 GUI/微信与 Web/SSO 联动仍未验收 |
 | CloudFile adapter | Connects installed Agent2 via a user-configured executable | Read-only `--component` probe |
 | Enterprise Channels | Server describes allowed navigation and built-in capabilities | Offline manifest validation only |
 | File editing / Checkout | CloudFile’s actual file workflows | Continue in the existing Agent2 repo; **not yet bridged into MCP** |
@@ -112,7 +112,9 @@ Read [security boundaries](docs/SECURITY.md) before integrating Web or AI worklo
 
 - [CloudFile Agent2 / 2.3](https://github.com/eaopen/cloudfile-local-agent2): first application’s file/checkout/commit engine; independently maintained.
 - [CloudFile](https://github.com/eaopen/cloudfile): CloudFile product family.
-- [CloudFile Chrome Extension](https://github.com/eaopen/cloudfile-chrome-extension): browser-native connection; no automatic takeover by this project.
+- [CloudFile Chrome Extension](https://github.com/eaopen/cloudfile-chrome-extension): browser-native file editing; no automatic takeover by this project.
+- [Local Tool Bridge Chrome Extension](https://github.com/eaopen/local-bridge-chrome-extension): independent generic Chrome MV3 extension; optional Native Messaging handoff.
+- [WeChat Provider](https://github.com/eaopen/wechat-provider): independently installed MCP/SQLite/UI automation provider; optional user-approved CLI integration.
 
 ## Product principles
 
