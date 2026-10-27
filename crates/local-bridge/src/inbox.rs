@@ -11,14 +11,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn data_root() -> Result<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        return env::var_os("LOCALAPPDATA")
+        env::var_os("LOCALAPPDATA")
             .or_else(|| env::var_os("APPDATA"))
             .map(|v| PathBuf::from(v).join("LocalBridge"))
             .context("LOCALAPPDATA is not set");
     }
     #[cfg(target_os = "macos")]
     {
-        return env::var_os("HOME")
+        env::var_os("HOME")
             .map(|v| PathBuf::from(v).join("Library/Application Support/LocalBridge"))
             .context("HOME is not set");
     }
