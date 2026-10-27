@@ -25,7 +25,8 @@ Local Bridge 提供一个 **最小、受控的本机执行接口**：
 
 - [ApplicationProfile V1](docs/APPLICATION_PROFILE_V1.md)：应用配置、可信来源、Dev/Prod、更新及稳定身份
 - [BridgeTask V1](docs/BRIDGE_TASK_V1.md)：统一文件/企业/AI 任务中心合同
-- [Capability / MCP / Pi V1](docs/CAPABILITY_AND_MCP_V1.md)：通用工具、Pi RPC、MCP 权限
+- [Capability / MCP V1](docs/CAPABILITY_AND_MCP_V1.md)：通用工具与 MCP 权限
+- [Agent Providers / Local Communications V1](docs/AI_AGENT_AND_LOCAL_COMMUNICATION_V1.md)：WorkBuddy / Codex / Pi 本地选择、微信优先通讯
 - [CloudFile → Bridge 迁移](docs/CLOUDFILE_TO_BRIDGE_MIGRATION.md)：并行开发不接管或破坏现有文件能力
 
 ```sh

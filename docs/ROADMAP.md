@@ -12,9 +12,10 @@
 - CloudFile Agent2 提供受信的只读任务摘要接口，Bridge 根据`profile_id`聚合任务；
 - Dev 与 Prod Chrome/Host/Journal/凭据完全隔离；不接管任何生产文件入口。
 
-**P2 · AI 与企业能力垂直切片**
+**P2 · 通用 Agent / 本地通讯 / 企业能力垂直切片**
 - 一个通用企业 Web/AI 通道（应用自己提供 Profile，不让 Bridge 依赖其业务模型）；
-- 可选 Pi RPC 与 Bridge MCP Client/Server 接入；先只读 MCP 任务/能力查询，写入工具要逐项业务授权；
+- 本机 Agent Provider 自动/手动选择：WorkBuddy（先 MCP/受信授权，再验证官方本地助理 Open API）、Codex App Server、Pi RPC 备选；Bridge MCP Client/Server 先只读任务/能力查询；
+- 本地通讯优先 Windows 微信用户确认分享；有 WorkBuddy 时可选官方微信助理绑定与 Bridge MCP；不代理个人微信任意收发；
 - 一个真实跨应用非文件任务映射到 BridgeTask，和文件任务共同展示。
 
 **P3 · CloudFile 受控文件转发**
