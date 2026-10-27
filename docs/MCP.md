@@ -36,3 +36,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 ```
 
 AI clients must be approved at the user or enterprise policy layer. Local stdio is not a substitute for file-specific authorization. All future sensitive operations must confirm that the user intended the action.
+
+## Unified Profile / task / Pi plan
+
+[Capability / MCP / Pi V1](CAPABILITY_AND_MCP_V1.md) defines the **planned** unified tool contract. This 0.1.0 MCP server still exposes **only** the two read-only tools listed above. Neither a declared ApplicationProfile channel nor a Pi process automatically enables future file or enterprise write tools.

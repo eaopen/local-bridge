@@ -1,5 +1,7 @@
 //! The small trust boundary shared by the core, MCP adapter and enterprise
 //! integrations. A remote Channel manifest is presentation, NOT code.
+pub mod profile;
+
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -130,8 +132,8 @@ mod tests {
     fn sample() -> ChannelManifest {
         ChannelManifest {
             schema: 1,
-            provider: "etech".into(),
-            origin: "http://10.9.8.162".into(),
+            provider: "sample".into(),
+            origin: "http://192.0.2.10".into(),
             expires_at: 5000,
             channels: vec![
                 Channel {
@@ -153,7 +155,7 @@ mod tests {
     }
     #[test]
     fn accepts_enterprise_http_and_https_without_implicit_downgrade() {
-        for url in ["http://10.9.8.162", "https://files.example.test:8443"] {
+        for url in ["http://192.0.2.10", "https://files.example.test:8443"] {
             let mut x = sample();
             x.origin = url.into();
             validate_manifest(&x, 4000).unwrap();

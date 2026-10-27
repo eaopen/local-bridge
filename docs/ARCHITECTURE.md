@@ -4,18 +4,24 @@
 
 Local Bridge is **not** another WorkBuddy/Claude/Copilot, an MCP gateway fleet, RPA suite or a SeaDrive replacement. It supplies deterministic desktop capabilities to authorized enterprise Web and AI clients.
 
+## Three-party boundary
+
+Any enterprise application publishes a **generic** ApplicationProfile and owns its business objects, authentication and business permissions. Local Bridge must not depend on the name, data model or private code of the application. CloudFile and Bridge may know each other as mutually integrated capabilities: Bridge routes a file task; CloudFile Agent owns its authorized file execution, Journal and checkout state. No existing application must migrate or change its production behavior to develop Bridge in parallel.
+
+Target contracts: [ApplicationProfile](APPLICATION_PROFILE_V1.md), [Tasks](BRIDGE_TASK_V1.md), [Capability/MCP](CAPABILITY_AND_MCP_V1.md), [nonbreaking migration](CLOUDFILE_TO_BRIDGE_MIGRATION.md).
+
 ## Components
 
 - **Rust Runtime**: one local capability registry, task gate, trusted clients, structured results, audit interfaces. Current repo starts with a small CLI; task supervisor and authorization are planned.
 - **MCP adapter**: stdio, no open network port by default. The adapter owns no file authorization. It invokes a local trusted runtime service, not shell text from the model.
 - **CloudFile application**: first adapter targets the **existing** cloudfile-local-agent2. The file module retains native Seafile protocol, authorization, checkout guard, Journal, CDC, upload receipt and rollback behavior. We do not fork it.
-- **Enterprise Channels**: the enterprise server supplies declarative labels, Web route, requested capability IDs and UI metadata. Runtime only shows entries backed by trusted modules. It does not download programs.
+- **Application Profiles / Enterprise Channels**: the enterprise server supplies declarative labels, Web route, requested capability IDs and UI metadata. Runtime only shows entries backed by trusted modules. It does not download programs.
 - **AI**: external MCP clients are optional. Core must function with no installed AI.
 
 ## Integration boundaries
 
 ```text
-enterprise CloudFile/Etech API: identity, roles, object permissions, versions
+enterprise application API + CloudFile Hub/Server: existing authorization
                        |
      native browser/short-lived authorization + eventual enterprise channel config
                        |

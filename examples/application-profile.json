@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "profile_id": "sample-app-prod",
+  "provider": "sample-app",
+  "environment": "prod",
+  "revision": 1,
+  "expires_at": 1999999999,
+  "application": {
+    "id": "sample-app",
+    "name": "Sample Enterprise App",
+    "logo_url": "https://assets.example.test/logo.png"
+  },
+  "origin": "https://app.example.test",
+  "services": {
+    "files": "https://files.example.test",
+    "ai": "https://app.example.test/ai"
+  },
+  "channels": [
+    {
+      "id": "files",
+      "title": "Files",
+      "kind": "native",
+      "module": "cloudfile",
+      "capabilities": [
+        "cloudfile.status"
+      ],
+      "enabled": true
+    },
+    {
+      "id": "ai",
+      "title": "Enterprise AI",
+      "kind": "web",
+      "entry": "/ai",
+      "capabilities": [],
+      "enabled": true
+    },
+    {
+      "id": "pi",
+      "title": "Local Pi",
+      "kind": "native",
+      "module": "pi",
+      "capabilities": [
+        "ai.local.chat"
+      ],
+      "enabled": false,
+      "optional": true
+    }
+  ],
+  "update": {
+    "track": "stable",
+    "source_id": "trusted-stable"
+  }
+}
