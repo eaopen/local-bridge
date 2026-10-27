@@ -3,6 +3,7 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
+use local_bridge::{inbox, native};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::{
     validate_manifest, visible_channels, ChannelManifest, AVAILABLE_CAPABILITIES,
@@ -28,6 +29,23 @@ fn run() -> Result<()> {
             );
         }
         [x] if x == "mcp" => mcp::serve()?,
+        [x, action, id] if x == "native-host" && action == "install" => {
+            println!("{}", native::install_host(id, false)?);
+        }
+        [x, action, id, flag]
+            if x == "native-host" && action == "install" && flag == "--replace" =>
+        {
+            println!("{}", native::install_host(id, true)?);
+        }
+        [x, action] if x == "inbox" && action == "list" => {
+            println!("{}", inbox::list()?);
+        }
+        [x, action, id] if x == "inbox" && action == "read" => {
+            println!("{}", inbox::read(id)?);
+        }
+        [x, action, id] if x == "inbox" && action == "delete" => {
+            println!("{}", inbox::delete(id)?);
+        }
         [agent, provider, prompt] if agent == "agent" && provider == "codex" => {
             let input = if prompt == "-" {
                 agent::prompt_from_stdin()?
@@ -74,7 +92,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | agent codex <prompt|-> | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | agent codex <prompt|-> | inbox list|read <id>|delete <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
