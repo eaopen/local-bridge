@@ -174,9 +174,7 @@ pub fn validate_profile_shape(profile: &ApplicationProfile) -> Result<()> {
                 }
             }
             ProfileChannelKind::Native => {
-                if channel.entry.is_some()
-                    || !channel.module.as_deref().is_some_and(identifier)
-                {
+                if channel.entry.is_some() || !channel.module.as_deref().is_some_and(identifier) {
                     bail!("native channel requires a known module ID only");
                 }
             }
