@@ -1,0 +1,71 @@
+name: WeChat Provider MCP integration smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/wechat-mcp-smoke.yml
+      - crates/local-bridge/src/mcp_provider.rs
+
+jobs:
+  mcp-transport:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Local Bridge
+        uses: actions/checkout@v4
+      - name: Checkout independent WeChat Provider
+        uses: actions/checkout@v4
+        with:
+          repository: eaopen/wechat-provider
+          ref: dev
+          path: wechat-provider
+      - name: Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rust runtime
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+      - name: Install standalone WeChat MCP provider
+        run: python -m pip install -e ./wechat-provider
+      - name: Build only the Local Bridge CLI
+        run: cargo build --locked -p local-bridge --bin local-bridge
+      - name: MCP handshake / tool discover / read-only search (no WeChat account)
+        shell: bash
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/bridge-data
+          WECHAT_PROVIDER_DB: ${{ runner.temp }}/wechat-provider-test.db
+        run: |
+          set -euo pipefail
+          BRIDGE="./target/debug/local-bridge"
+          PROVIDER="$(command -v wechat-provider)"
+          "$BRIDGE" provider add wechat "$PROVIDER" serve
+          "$BRIDGE" provider list > providers.json
+          "$BRIDGE" provider tools wechat > tools.json
+          "$BRIDGE" provider call wechat wechat_status '{}' > status.json
+          "$BRIDGE" provider call wechat wechat_search '{"query":"no-saved-chat","limit":3}' > search.json
+          if "$BRIDGE" provider call wechat arbitrary_executable '{}' >/dev/null 2>&1; then
+            echo "Unexpected arbitrary provider tool execution" >&2
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          def load(name):
+              with open(name, encoding="utf-8") as f:
+                  return json.load(f)
+          providers = load("providers.json")["providers"]
+          tools = load("tools.json")
+          status = load("status.json")
+          search = load("search.json")
+          assert any(p["id"] == "wechat" for p in providers)
+          assert tools["state"] == "mcp_responding_not_app_login_verified"
+          expected = {"wechat_status", "wechat_list_chats", "wechat_get_messages",
+                      "wechat_search", "wechat_send_message", "wechat_get_send_status"}
+          assert set(tools["tools"]) == expected, tools
+          assert status["ok"] is True and status["result"].get("isError") is False
+          assert search["ok"] is True and search["result"].get("isError") is False
+          print("PASS: actual independent Python MCP provider connects to Local Bridge.")
+          print("NOTE: no GUI, no WeChat login, no message send or delivery verified.")
+          PY
+          "$BRIDGE" provider remove wechat > /dev/null
