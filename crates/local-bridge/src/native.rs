@@ -193,10 +193,8 @@ pub fn install_host(extension_id: &str, replace: bool) -> Result<Value> {
         "allowed_origins":[format!("chrome-extension://{extension_id}/")]
     });
     let data = serde_json::to_vec_pretty(&manifest)?;
-    if manifest_path.exists() {
-        if fs::read(&manifest_path)? != data && !replace {
-            bail!("Native host manifest exists with different settings; use --replace to opt in to updating it");
-        }
+    if manifest_path.exists() && fs::read(&manifest_path)? != data && !replace {
+        bail!("Native host manifest exists with different settings; use --replace to opt in to updating it");
     }
     fs::write(&manifest_path, data).context("cannot write Chrome host manifest")?;
 
