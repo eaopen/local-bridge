@@ -43,8 +43,9 @@ fn inbox_dir() -> Result<PathBuf> {
 fn valid_id(id: &str) -> bool {
     id.len() >= 12
         && id.len() <= 96
-        && id.starts_with("ctx-")
-        && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+        && id
+            .strip_prefix("ctx-")
+            .is_some_and(|tail| tail.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-'))
 }
 
 fn ensure_private_dir(dir: &Path) -> Result<()> {
