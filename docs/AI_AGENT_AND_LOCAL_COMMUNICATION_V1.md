@@ -1,6 +1,6 @@
 # Generic Local Bridge — Agent Providers, MCP and Local Communications V1
 
-状态：**统一架构/合同，尚非已交付功能**。Bridge 0.1 目前只有只读 MCP `bridge.status`、`cloudfile.status` 和离线 Profile 结构校验。本文只定义跨厂商接入，不默认要求安装任何模型或 Agent，不改现有 CloudFile 文件引擎。
+状态：**整体仍是规划合同，但若干独立切片已落地**。Bridge 当前已有只读 MCP Server（`bridge.status`、`cloudfile.status`）、离线 Profile 校验、显式 Codex CLI run、Chrome 手动收件箱，以及可由本机用户主动注册并调用的通用 MCP Client。后者与独立 [WeChat Provider](https://github.com/eaopen/wechat-provider) 的六工具声明、`wechat_status` 和空索引 `wechat_search` 已完成无账号的跨进程 CI 验证。**未完成**可信企业 Web/SSO、自动聊天事件订阅、微信桌面真实收发验收、通用 AgentAdapter/任务中心。本文不要求安装任何特定模型/Agent，不改 CloudFile 文件引擎。
 
 参考：[ApplicationProfile V1](APPLICATION_PROFILE_V1.md)、[BridgeTask V1](BRIDGE_TASK_V1.md)、[Capability/MCP V1](CAPABILITY_AND_MCP_V1.md)、[CloudFile 迁移边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
 
@@ -57,7 +57,7 @@
 ## 3. MCP 双向接入
 
 - **Bridge 作为 MCP Server**：向被批准的 WorkBuddy/Codex/Pi 提供 `bridge.status`、`cloudfile.status`（现有），后续添加 `bridge.task.list`、受控文件能力、通用企业动作。工具不能无条件获得浏览器 Cookie、工作副本路径、企业密钥。优先 `stdio`，不监听公开 TCP。
-- **Bridge 作为 MCP Client/适配器**：仅在有明确业务需求、可信服务及用户授权时调用企业/外部 MCP；不复制各种厂商的工具总线，也不将多个远端服务器所有工具无筛选暴露给任意本地模型。
+- **Bridge 作为 MCP Client/适配器（已实现最小 CLI V1）**：本机用户通过 `provider add/tools/call/remove` 注册已安装的固定 stdio Provider 并显式调用真实 MCP 工具。与 WeChat Provider 的协议集成见 [本机 MCP Provider 接入](LOCAL_MCP_PROVIDER_V1.md) 与 [无账号真实进程烟测](WECHAT_PROVIDER_MCP_SMOKE.md)。**尚不**把注册的读取/发送工具自动透传给本机 Agent、Chrome 网页或未授权 MCP 客户端。未来工具级授权以用户实际需求为准，不复制各厂商工具总线。
 - **AI 与文件权限**：企业上下文和权限由业务应用提供，CloudFile 文件 ACL/写入仍由 CloudFile 服务端终判。AI 生成的参数与人工输入使用同一执行授权入口。
 - **任务关系**：每一次 Provider Agent run 产生至多一个主 `BridgeTask`；对话消息不是独立任务。`owner_module` 可以是 `ai.workbuddy` / `ai.codex` / `ai.pi`，实例任务 ID 映射但不替换原会话 ID。
 

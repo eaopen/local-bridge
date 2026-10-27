@@ -42,5 +42,5 @@ local-bridge provider call wechat wechat_get_send_status '{"task_id":"<the-origi
 ## 验收与剩余事项
 
 - Rust CI 应通过 Linux、macOS 和 Windows 的 fmt、Clippy、unit/build，独立检验本机配置与 JSON-RPC 结果约束。
-- 跨进程实际 MCP handshake 与真实 WeChat 登录/读取/发送，需分别在目标设备运行后确认。WeChat 4.x 用户界面和上游 GUI 库兼容并非由本 PR 的 mock 保证。
+- **已验证：**独立 Python WeChat Provider 与 Rust Bridge 的跨进程 MCP handshake、六工具声明、`wechat_status`、空数据库 `wechat_search` 和未知工具拒绝；见 [实际 CI 记录](https://github.com/eaopen/local-bridge/actions/runs/40563141307) 与 [测试方法](WECHAT_PROVIDER_MCP_SMOKE.md)。**仍未验证：**Windows/macOS 已登录微信账号的真实 GUI 会话读取、发送对象身份与送达情况。
 - 下一步再做用户显式启用的**工具级 Agent 授权与状态交接**，不要直接把所有六个 WeChat 工具无筛选交给网页或模型。
