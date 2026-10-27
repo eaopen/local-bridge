@@ -82,6 +82,7 @@ Example Channel configuration (not authenticated or automatically fetched):
 
 ```bash
 cargo run -p local-bridge -- validate-channel examples/enterprise-channels.json
+# 旧 ChannelManifest 示例带短期 expires_at，有效期过后需更新到当前时间起 7 天内
 ```
 
 Read [security boundaries](docs/SECURITY.md) before integrating Web or AI workloads. Schema validation alone never authenticates an enterprise server.

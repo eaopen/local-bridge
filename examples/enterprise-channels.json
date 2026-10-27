@@ -2,7 +2,7 @@
   "schema": 1,
   "provider": "sample-app",
   "origin": "https://app.example.test",
-  "expires_at": 1999999999,
+  "expires_at": 1793491140,
   "channels": [
     {
       "id": "cloudfile-status",
