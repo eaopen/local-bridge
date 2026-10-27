@@ -35,12 +35,23 @@
       "enabled": true
     },
     {
-      "id": "pi",
-      "title": "Local Pi",
+      "id": "local-agent",
+      "title": "Local Agent",
       "kind": "native",
-      "module": "pi",
+      "module": "ai.agent",
       "capabilities": [
-        "ai.local.chat"
+        "ai.agent.run"
+      ],
+      "enabled": false,
+      "optional": true
+    },
+    {
+      "id": "local-communications",
+      "title": "Local Communications",
+      "kind": "native",
+      "module": "communication.local",
+      "capabilities": [
+        "communication.prepare"
       ],
       "enabled": false,
       "optional": true

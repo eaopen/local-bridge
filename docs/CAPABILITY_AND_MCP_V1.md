@@ -71,3 +71,7 @@ Pi MCP Client → `local-bridge mcp` (stdio) → 注册的 Bridge/CloudFile 工�
 - 变更能力定义只增加小范围合同测试，真实文件发布仍由现有 CloudFile E2E 验收负责。
 
 当前受支持的 MCP 工具及边界以 [MCP.md](MCP.md) 为准，不能将本设计表格误认为已实现功能。
+
+## 6. 通用 Agent Provider 与本地通讯
+
+[Agent Providers / MCP / Local Communications V1](AI_AGENT_AND_LOCAL_COMMUNICATION_V1.md) 扩展本合同：WorkBuddy、Codex、Pi 按本机授权和能力选择，Pi 不再是硬编码的唯一 Agent；通讯首选受用户确认的本机微信分享，WorkBuddy 微信助理作为可选受信远程能力。此处新增能力仍属设计，未修改现有 MCP 只读工具。
