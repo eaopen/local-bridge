@@ -38,9 +38,7 @@ fn parse_codex_events(output: &str) -> Result<String> {
         }
         let event: Value = serde_json::from_str(line).context("invalid Codex JSONL")?;
         match event["type"].as_str() {
-            Some("item.completed")
-                if event["item"]["type"] == "agent_message" =>
-            {
+            Some("item.completed") if event["item"]["type"] == "agent_message" => {
                 if let Some(text) = event["item"]["text"].as_str() {
                     answer = text.to_owned();
                 }
@@ -118,7 +116,10 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
 
     let deadline = Instant::now() + RUN_TIMEOUT;
     let status = loop {
-        if let Some(status) = child.try_wait().context("Codex process status unavailable")? {
+        if let Some(status) = child
+            .try_wait()
+            .context("Codex process status unavailable")?
+        {
             break status;
         }
         if Instant::now() >= deadline {
@@ -161,7 +162,10 @@ mod tests {
         ]
         .join("\n");
         assert_eq!(parse_codex_events(&stream).unwrap(), "done");
-        assert!(parse_codex_events(r#"{"type":"item.completed","item":{"type":"agent_message","text":"partial"}}"#).is_err());
+        assert!(parse_codex_events(
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"partial"}}"#
+        )
+        .is_err());
         assert!(parse_codex_events(&format!("{stream}\n{{\"type\":\"turn.failed\"}}")).is_err());
     }
 
