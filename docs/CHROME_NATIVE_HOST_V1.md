@@ -42,7 +42,13 @@ local-bridge inbox delete ctx-...
 
 Items are retained until the user deletes them. The inbox is created under the OS user data directory in `LocalBridge/inbox` (or `local-bridge/inbox` on Linux). On Unix the directory is private (0700), saved files private (0600). No browser token/cookie is collected or sent to the cloud by Bridge. Do not share confidential content unless it is appropriate for the user's machine and account.
 
-The existing `local-bridge agent codex <prompt|->` is a **separate explicit user action**. To process an inbox item, the user can choose text in `inbox read` and explicitly pass it to an Agent. No automatic AI forwarding is present in Native Messaging V1.
+The existing `local-bridge agent codex <prompt|->` remains separate. To avoid copying text between programs, the user can now explicitly invoke:
+
+```sh
+local-bridge inbox summarize codex ctx-...
+```
+
+This reads the selected inbox entry and invokes the user's **already installed and authenticated Codex CLI** in an ephemeral read-only sandbox to summarize that excerpt. The user explicitly chooses both the inbox item and the Agent. Chrome `context.share` **never automatically triggers AI or file processing**. Do not send sensitive enterprise/browser content to a model unless the user has chosen to do so and the original service rules allow it. The result is printed, not stored as a second AI conversation.
 
 ## 3. Scope and compatibility
 

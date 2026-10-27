@@ -46,6 +46,24 @@ fn run() -> Result<()> {
         [x, action, id] if x == "inbox" && action == "delete" => {
             println!("{}", inbox::delete(id)?);
         }
+        [x, action, provider, id]
+            if x == "inbox" && action == "summarize" && provider == "codex" =>
+        {
+            // User chooses a stored item AND explicitly invokes their existing
+            // authenticated Codex CLI. Browser share alone never starts AI.
+            let prompt = inbox::summarize_prompt(id)?;
+            let result = agent::run_codex(&prompt)?;
+            println!(
+                "{}",
+                json!({
+                    "inbox_id":id,
+                    "provider":"codex",
+                    "status":result["status"],
+                    "result":result["result"],
+                    "persisted_by_bridge":false
+                })
+            );
+        }
         [agent, provider, prompt] if agent == "agent" && provider == "codex" => {
             let input = if prompt == "-" {
                 agent::prompt_from_stdin()?
@@ -92,7 +110,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | agent codex <prompt|-> | inbox list|read <id>|delete <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | agent codex <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
