@@ -14,13 +14,13 @@ pub fn data_root() -> Result<PathBuf> {
         env::var_os("LOCALAPPDATA")
             .or_else(|| env::var_os("APPDATA"))
             .map(|v| PathBuf::from(v).join("LocalBridge"))
-            .context("LOCALAPPDATA is not set");
+            .context("LOCALAPPDATA is not set")
     }
     #[cfg(target_os = "macos")]
     {
         env::var_os("HOME")
             .map(|v| PathBuf::from(v).join("Library/Application Support/LocalBridge"))
-            .context("HOME is not set");
+            .context("HOME is not set")
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
