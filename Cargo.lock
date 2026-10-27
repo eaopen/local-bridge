@@ -150,7 +150,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "local-bridge-core",
+ "serde",
  "serde_json",
+ "url",
 ]
 
 [[package]]
