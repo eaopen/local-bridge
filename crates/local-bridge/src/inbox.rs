@@ -192,7 +192,8 @@ mod tests {
         let prompt = summarize_context(&json!({
             "title":"Meeting","url":"https://example.org/meeting",
             "selection":"Action: review the plan."
-        })).unwrap();
+        }))
+        .unwrap();
         assert!(prompt.contains("untrusted data"));
         assert!(prompt.contains("review the plan"));
         assert!(prompt.contains("do not inspect unrelated local files"));
