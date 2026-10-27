@@ -3,11 +3,11 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
+use local_bridge::{inbox, native};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::{
     validate_manifest, visible_channels, ChannelManifest, AVAILABLE_CAPABILITIES,
 };
-use local_bridge::{inbox, native};
 use serde_json::json;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};

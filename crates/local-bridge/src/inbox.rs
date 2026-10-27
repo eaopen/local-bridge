@@ -159,8 +159,7 @@ pub fn delete(id: &str) -> Result<Value> {
     if !valid_id(id) {
         bail!("invalid inbox item id");
     }
-    fs::remove_file(inbox_dir()?.join(format!("{id}.json")))
-        .context("inbox item not found")?;
+    fs::remove_file(inbox_dir()?.join(format!("{id}.json"))).context("inbox item not found")?;
     Ok(json!({"id":id,"deleted":true}))
 }
 
@@ -173,13 +172,19 @@ mod tests {
         let dir = env::temp_dir().join(format!(
             "local-bridge-inbox-test-{}-{}",
             std::process::id(),
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
-        let id = save_to(&dir, json!({"title":"example","url":"","selection":"hello"})).unwrap();
+        let id = save_to(
+            &dir,
+            json!({"title":"example","url":"","selection":"hello"}),
+        )
+        .unwrap();
         assert!(valid_id(&id));
-        let stored: Value = serde_json::from_slice(
-            &fs::read(dir.join(format!("{id}.json"))).unwrap()
-        ).unwrap();
+        let stored: Value =
+            serde_json::from_slice(&fs::read(dir.join(format!("{id}.json"))).unwrap()).unwrap();
         assert_eq!(stored["context"]["selection"], "hello");
         assert_eq!(stored["source"], "browser-extension");
         assert!(!valid_id("../traversal"));

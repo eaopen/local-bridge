@@ -27,7 +27,9 @@ struct BrowserContext {
 fn valid_request_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 80
-        && id.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'.' | b'-'))
+        && id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'.' | b'-'))
 }
 
 fn validate_context(value: &Value) -> Result<Value> {
@@ -64,9 +66,11 @@ fn validate_context(value: &Value) -> Result<Value> {
 pub fn handle(request: &Value) -> Value {
     let id = request["request_id"].as_str().unwrap_or("");
     let public_id = if valid_request_id(id) { id } else { "" };
-    let failure = |error: &'static str| json!({
-        "protocol_version":1,"request_id":public_id,"ok":false,"error":error
-    });
+    let failure = |error: &'static str| {
+        json!({
+            "protocol_version":1,"request_id":public_id,"ok":false,"error":error
+        })
+    };
     if request["protocol_version"] != 1 || !valid_request_id(id) {
         return failure("protocol_or_request_id_invalid");
     }
@@ -113,13 +117,17 @@ pub fn handle(request: &Value) -> Value {
 
 fn read_frame(input: &mut impl Read) -> Result<Value> {
     let mut prefix = [0_u8; 4];
-    input.read_exact(&mut prefix).context("missing Native Messaging length")?;
+    input
+        .read_exact(&mut prefix)
+        .context("missing Native Messaging length")?;
     let length = u32::from_ne_bytes(prefix) as usize;
     if length == 0 || length > MAX_REQUEST {
         bail!("invalid Native Messaging length");
     }
     let mut bytes = vec![0; length];
-    input.read_exact(&mut bytes).context("truncated Native Messaging request")?;
+    input
+        .read_exact(&mut bytes)
+        .context("truncated Native Messaging request")?;
     serde_json::from_slice(&bytes).context("invalid Native Messaging JSON")
 }
 
@@ -227,31 +235,40 @@ mod tests {
             "protocol_version":1,"request_id":"abc-1",
             "action":"host.status","payload":{}
         }));
-        assert_eq!(answer["ok"],true);
-        assert_eq!(answer["result"]["provider"],"local-bridge");
-        assert_eq!(answer["result"]["ai_run_enabled"],false);
-        assert_eq!(answer["result"]["connected_to_local_bridge"],true);
-        assert_eq!(handle(&json!({
-            "protocol_version":1,"request_id":"abc-2",
-            "action":"shell.run","payload":{}
-        }))["ok"],false);
+        assert_eq!(answer["ok"], true);
+        assert_eq!(answer["result"]["provider"], "local-bridge");
+        assert_eq!(answer["result"]["ai_run_enabled"], false);
+        assert_eq!(answer["result"]["connected_to_local_bridge"], true);
+        assert_eq!(
+            handle(&json!({
+                "protocol_version":1,"request_id":"abc-2",
+                "action":"shell.run","payload":{}
+            }))["ok"],
+            false
+        );
     }
 
     #[test]
     fn rejects_untrusted_context_and_invalid_requests() {
         assert!(validate_context(&json!({
             "title":"Note","url":"https://example.org/page?token=secret","selection":"hello"
-        })).is_err());
+        }))
+        .is_err());
         assert!(validate_context(&json!({
             "title":"Note","url":"https://example.org","selection":""
-        })).is_err());
+        }))
+        .is_err());
         assert!(validate_context(&json!({
             "title":"Note","url":"","selection":"user-selected note"
-        })).is_ok());
-        assert_eq!(handle(&json!({
-            "protocol_version":1,"request_id":"../../bad",
-            "action":"host.status","payload":{}
-        }))["ok"],false);
+        }))
+        .is_ok());
+        assert_eq!(
+            handle(&json!({
+                "protocol_version":1,"request_id":"../../bad",
+                "action":"host.status","payload":{}
+            }))["ok"],
+            false
+        );
     }
 
     #[test]
@@ -260,9 +277,9 @@ mod tests {
             "protocol_version":1,"request_id":"r1","action":"host.status","payload":{}
         });
         let mut frame = Vec::new();
-        write_frame(&mut frame,&request).unwrap();
+        write_frame(&mut frame, &request).unwrap();
         let restored = read_frame(&mut Cursor::new(frame)).unwrap();
-        assert_eq!(request,restored);
+        assert_eq!(request, restored);
         let bad = (MAX_REQUEST as u32 + 1).to_ne_bytes();
         assert!(read_frame(&mut Cursor::new(bad)).is_err());
     }
