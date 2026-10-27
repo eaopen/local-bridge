@@ -23,12 +23,17 @@ fn send_native(request: Value, root: &Path) -> Value {
 
     let bytes = serde_json::to_vec(&request).unwrap();
     let mut input = child.stdin.take().unwrap();
-    input.write_all(&(bytes.len() as u32).to_ne_bytes()).unwrap();
+    input
+        .write_all(&(bytes.len() as u32).to_ne_bytes())
+        .unwrap();
     input.write_all(&bytes).unwrap();
     drop(input);
 
     let output = child.wait_with_output().unwrap();
-    assert!(output.status.success(), "native host did not exit successfully");
+    assert!(
+        output.status.success(),
+        "native host did not exit successfully"
+    );
     assert!(output.stdout.len() >= 4, "no Chrome native frame");
     let prefix: [u8; 4] = output.stdout[..4].try_into().unwrap();
     let length = u32::from_ne_bytes(prefix) as usize;
