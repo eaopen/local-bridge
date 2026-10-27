@@ -29,9 +29,7 @@ fn run() -> Result<()> {
             );
         }
         [x] if x == "mcp" => mcp::serve()?,
-        [x, action, id, executable, fixed_args @ ..]
-            if x == "provider" && action == "add" =>
-        {
+        [x, action, id, executable, fixed_args @ ..] if x == "provider" && action == "add" => {
             println!("{}", mcp_provider::add(id, executable, fixed_args)?);
         }
         [x, action] if x == "provider" && action == "list" => {

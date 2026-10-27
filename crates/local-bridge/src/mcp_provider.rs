@@ -87,7 +87,9 @@ fn write_to(dir: &Path, id: &str, executable: &str, args: &[String]) -> Result<V
     let config = ProviderConfig {
         version: 1,
         id: id.to_string(),
-        executable: target.canonicalize().context("cannot resolve provider executable")?,
+        executable: target
+            .canonicalize()
+            .context("cannot resolve provider executable")?,
         args: args.to_vec(),
     };
     validate_config(&config)?;
@@ -153,7 +155,7 @@ pub fn list() -> Result<Value> {
             }
         }
     }
-    providers.sort_by(|a,b| a["id"].as_str().cmp(&b["id"].as_str()));
+    providers.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
     Ok(json!({"providers":providers}))
 }
 
@@ -173,7 +175,9 @@ fn parse_tool_name(name: &str) -> Result<()> {
 fn read_json_input(input: &str) -> Result<Value> {
     let contents = if input == "-" {
         let mut bytes = Vec::new();
-        io::stdin().take((MAX_JSON_INPUT + 1) as u64).read_to_end(&mut bytes)?;
+        io::stdin()
+            .take((MAX_JSON_INPUT + 1) as u64)
+            .read_to_end(&mut bytes)?;
         String::from_utf8(bytes).context("MCP arguments must be UTF-8 JSON")?
     } else {
         input.to_owned()
@@ -353,11 +357,7 @@ pub fn call(id: &str, tool: &str, json_input: &str) -> Result<Value> {
     if !exported_names(&discovered).contains(&tool) {
         bail!("MCP tool is not offered by this installed provider");
     }
-    let response = session.request(
-        3,
-        "tools/call",
-        json!({"name":tool,"arguments":args}),
-    )?;
+    let response = session.request(3, "tools/call", json!({"name":tool,"arguments":args}))?;
     if response["isError"] == true {
         return Ok(json!({
             "provider":id,"tool":tool,"ok":false,
@@ -380,11 +380,19 @@ mod tests {
         let root = std::env::temp_dir().join(format!(
             "lb-provider-test-{}-{}",
             std::process::id(),
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let executable = std::env::current_exe().unwrap();
-        write_to(&root, "wechat", executable.to_str().unwrap(), &["serve".into()])
-            .unwrap();
+        write_to(
+            &root,
+            "wechat",
+            executable.to_str().unwrap(),
+            &["serve".into()],
+        )
+        .unwrap();
         let config = load_from(&root, "wechat").unwrap();
         assert_eq!(config.id, "wechat");
         assert_eq!(config.args, vec!["serve"]);
@@ -395,9 +403,9 @@ mod tests {
 
     #[test]
     fn rpc_results_and_user_arguments_are_validated() {
-        assert!(parse_response(json!({"jsonrpc":"2.0","id":2,"result":{}}),2).is_ok());
-        assert!(parse_response(json!({"jsonrpc":"2.0","id":1,"result":{}}),2).is_err());
-        assert!(parse_response(json!({"jsonrpc":"2.0","id":2,"error":{"code":-1}}),2).is_err());
+        assert!(parse_response(json!({"jsonrpc":"2.0","id":2,"result":{}}), 2).is_ok());
+        assert!(parse_response(json!({"jsonrpc":"2.0","id":1,"result":{}}), 2).is_err());
+        assert!(parse_response(json!({"jsonrpc":"2.0","id":2,"error":{"code":-1}}), 2).is_err());
         assert!(read_json_input(r#"{"chat_id":"test","limit":5}"#).is_ok());
         assert!(read_json_input("[]").is_err());
         assert!(read_json_input("{bad}").is_err());
@@ -408,6 +416,6 @@ mod tests {
     #[test]
     fn detects_provider_errors_without_fake_success() {
         let result = json!({"isError":true,"content":[{"type":"text","text":"unavailable"}]});
-        assert_eq!(result["isError"],true);
+        assert_eq!(result["isError"], true);
     }
 }
