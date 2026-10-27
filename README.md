@@ -1,33 +1,38 @@
 # Local Bridge
 
-**面向企业内网的轻量、安全、可扩展的 Rust 本机能力桥接器。**
+**面向个人与企业的轻量级本地能力连接与任务协作平台。**
 
-*Lightweight, secure and extensible Rust bridge between enterprise Web applications, AI agents and local desktop tools.*
+*Connect the apps, files, AI agents and communication tools people already use — on their own computer.*
 
-[中文说明](#为什么需要-local-bridge) · [Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Roadmap](docs/ROADMAP.md)
+**最高产品原则：让用户更方便协作。** 将本机原本割裂的平台连接起来，解决复制粘贴、重复登录、导入导出、工具切换和任务难以追踪等实际困扰，而不是让用户维护新的复杂系统。
 
-> Status: **0.1.0 architecture + runnable read-only MCP scaffold**. NOT a production-ready file editor. CloudFile editing continues in the existing [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2). No automatic AI operations, remote script execution or enterprise Channel fetching are enabled by this repository yet.
+[个人/企业/混合使用场景](docs/PRODUCT_POSITIONING_AND_USE_CASES.md) · [混合 Profile 与 SSO](docs/PROFILE_AUTH_AND_COLLABORATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Security](docs/SECURITY.md)
+
+> **当前实现：0.1.0 只读 MCP + 离线 Profile 校验原型。** 可信绑定、个人工作空间、Agent run、通讯双向连接和任务聚合尚未交付。CloudFile 本地文件编辑继续由 [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2) 负责，不由本仓接管。
 
 ## 为什么需要 Local Bridge
 
-企业 Web 应用和 AI Agent 可以理解任务、调用云端 API，却不总能直接使用用户电脑里的专业软件、企业专有 EXE、文件和设备。
+同一台电脑上，企业 Web、个人微信等通讯、CloudFile、Office/CAD 和已有 Codex/WorkBuddy/Pi 往往各自工作，用户要反复复制消息、下载文件、切窗口和重新登录。
 
-Local Bridge 提供一个 **最小、受控的本机执行接口**：
-- 企业业务系统通过现有 API 与本机桥接入口协作。
-- WorkBuddy、Claude、Codex 或其他 MCP 客户端使用受批准的工具，而不是依赖某一大模型厂商。
-- 第一个业务集成是 **CloudFile**：本地打开/编辑、Checkout/Checkin、版本上传仍由已存在的 Agent2.3 核心执行，不复制 Seafile 或 Journal 实现。
-- 后续企业功能以 **Channel manifest + 本机能力白名单**扩展，不允许远程服务器下发 Shell/EXE 命令。
-- 优先支持 Windows 普通用户与便携运行、macOS；Rust 核心预留 Linux。支持企业服务端 HTTP 和 HTTPS，敏感授权另行处理。
+Local Bridge 提供**最小的本机能力连接层**：
+- **企业：**已登录的 Web 可经原应用授权调用 CloudFile、本机专业软件、MCP 和 Agent。
+- **个人：**复用已安装的 AI/MCP、个人文件和获用户许可的通讯 Connector；微信、Soul 等是否可读/订阅/发送取决于实际第三方接入能力。
+- **混合：**同一工作电脑同时编辑企业文件和运行个人聊天助手，**默认混合、按需隔离**，不强制切换 Profile 或增加额外的跨 Profile 审批。
+- **渐进兼容：**不安装 Bridge 时现有企业 Web、CloudFile 文件三模式和本地工具仍正常使用。
+
+Profile 用于来源、账号上下文与任务归属，**不默认作为个人/企业数据墙**。已有应用负责 SSO、业务权限与文件版本；Bridge 只承担自身可信调用、能力分发与任务交接，不建设新 DLP 或企业认证中心。
 
 ## 通用 Profile 与长期演进合同
 
-**本仓只认识通用 ApplicationProfile，不内建任何企业应用的业务规则。** 企业应用自行发布和维护其 Profile；CloudFile 与 Bridge 则可以双向适配文件能力。
+**一个 Runtime 同时支持个人和企业。** 有服务端的企业或个人 Web 应用使用 ApplicationProfile V1；纯本机个人工具使用规划中的轻量 PersonalProfile/默认个人工作空间（尚非已交付的新 Schema）。两者共享通用 Capability 和 BridgeTask，默认混合；Bridge 核心仍不内建企业应用业务规则。
 
 - [ApplicationProfile V1](docs/APPLICATION_PROFILE_V1.md)：应用配置、可信来源、Dev/Prod、更新及稳定身份
 - [BridgeTask V1](docs/BRIDGE_TASK_V1.md)：统一文件/企业/AI 任务中心合同
 - [Capability / MCP V1](docs/CAPABILITY_AND_MCP_V1.md)：通用工具与 MCP 权限
 - [Agent Providers / Local Communications V1](docs/AI_AGENT_AND_LOCAL_COMMUNICATION_V1.md)：WorkBuddy / Codex / Pi 本地选择、微信优先通讯
 - [CloudFile → Bridge 迁移](docs/CLOUDFILE_TO_BRIDGE_MIGRATION.md)：并行开发不接管或破坏现有文件能力
+- [个人/企业/混合场景与诉求](docs/PRODUCT_POSITIONING_AND_USE_CASES.md)：按真实用户任务组织需求与验收
+- [混合工作空间、企业 SSO 与 Chrome 授权](docs/PROFILE_AUTH_AND_COLLABORATION.md)：已有认证不重复实现
 
 ```sh
 cargo run -p local-bridge -- validate-profile examples/application-profile.json
@@ -38,7 +43,7 @@ cargo run -p local-bridge -- validate-profile examples/application-profile.json
 ## 结构
 
 ```text
-AI Agent (MCP stdio)        Enterprise Web (browser/API)
+Personal Agent / MCP       Enterprise Web / CloudFile / Personal Apps
           |                          |
           +---- Local Bridge --------+
                | Rust Runtime
@@ -94,13 +99,16 @@ Read [security boundaries](docs/SECURITY.md) before integrating Web or AI worklo
 - [CloudFile](https://github.com/eaopen/cloudfile): CloudFile product family.
 - [CloudFile Chrome Extension](https://github.com/eaopen/cloudfile-chrome-extension): browser-native connection; no automatic takeover by this project.
 
-## Principles
+## Product principles
 
-1. **Use existing AI agents** instead of developing another chat assistant.
-2. **Keep the default runtime small**: no WebView, filesystem drivers, privileged service, full disk sync, or remote code loading.
-3. **Local capabilities are explicit and auditable**: the enterprise config may advertise an action but cannot grant it.
-4. **Enterprise-owned workflows, vendor-neutral AI**: business permissions and authoritative file versions remain server-side.
-5. **Real first, platform second**: only expose tools whose implementation and authorization can actually be tested.
+1. **真实痛点先行**：先减少用户步骤，再建设通用框架。
+2. **默认混合，按需隔离**：个人与企业可共用已授权能力及任务视图。
+3. **复用已有系统**：SSO、CloudFile、Agent、MCP、通讯程序不重复造轮子。
+4. **尽可能无感**：已登录不重复登录，已安装不重复安装，来源不同不额外审批。
+5. **开放真正可用的 Connector**：第三方可在用户许可范围内提供消息读取/订阅/发送，实际接口能力需核实。
+6. **简单可靠的责任边界**：验证调用来源、能力与原系统授权，不开发企业 DLP、庞大任务账本、任意命令执行平台。
+
+未来开发请先读 [AGENTS.md](AGENTS.md) 与 [使用场景](docs/PRODUCT_POSITIONING_AND_USE_CASES.md)。
 
 License: Apache-2.0.
 
