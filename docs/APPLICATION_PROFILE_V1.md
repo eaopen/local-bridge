@@ -4,7 +4,7 @@
 
 ## 1. 角色边界
 
-- **企业应用**拥有自己的业务身份、组织权限、项目对象、AI 服务和服务器配置，通过 Profile 向本地申请能力。Local Bridge 不需要认识任何具体企业应用名称或业务数据库。
+- **有服务端的企业或个人 Web 应用**拥有自己的身份、权限、对象和服务端配置，通过 ApplicationProfile 向本地请求能力。Local Bridge 不需要认识任何具体企业应用名称或业务数据库。
 - **Local Bridge**负责 Profile 结构、受信应用注册、本机能力发现、任务聚合、用户确认、MCP 工具暴露和客户端生命周期。不实施企业项目权限，也不代发 CloudFile 文件版本。
 - **CloudFile**与 Local Bridge 可双向集成：Bridge 发现并路由 CloudFile 文件能力；CloudFile Agent 可声明 Bridge 所需的能力与任务摘要。CloudFile 的文件会话/Journal/Guard 是文件操作的唯一事实源。
 
@@ -14,7 +14,7 @@
 
 1. `ApplicationProfile` 是服务端发布的声明，不含账号 Token、更新签名公钥、本机 EXE 路径或任何可执行脚本。
 2. `LocalBinding` 是本机安装/注册状态：`profile_id` → 受信 origin、当前用户和设备身份、已安装模块、开发/生产隔离目录、允许的发布源 ID。它不是另一套服务器 Profile。
-3. `EffectiveProfile` 是运行时的**派生视图**：经过认证的 ApplicationProfile ∩ 实际安装模块 ∩ 服务端当前对象授权 ∩ 本地用户许可。不要以它覆盖 ApplicationProfile，也不要持久化一份相互冲突的业务配置。
+3. `EffectiveProfile` 是运行时的**派生视图**：已受信的应用/本地个人配置 ∩ 实际可用模块 ∩ 当前操作的原系统授权 ∩ 本机用户许可。不要以它覆盖 ApplicationProfile，也不要持久化一份相互冲突的业务配置。
 4. `TaskContext` 随单个任务传递业务上下文。Bridge 只处理明确的通用字段；额外的 `context` 为应用模块拥有的不可执行、不可信数据，不能直接解释成文件路径或 Shell 参数。
 
 ## 2.1 同一 Profile 支持“直连能力客户端 → 通用 Bridge”演进
@@ -27,6 +27,15 @@ ApplicationProfile **描述应用及其需要的能力，不描述本机执行�
 - 未来切换不要求应用发布第二份 Profile，也不默认迁移活动文件任务。既有文件 Journal 和 Guard 留在原执行引擎，新的任务在明确验收后切换路由；未知回执绝不跨运行时自动重放。
 
 本约定适用于任何上层应用；**Local Bridge 核心不能包含企业特定适配名称或业务逻辑**。
+
+## 2.2 个人工作空间与默认混合（设计约定，非新 V1 Schema）
+
+- 默认个人工作空间（规划称 PersonalProfile）是同一 OS 用户选择的本地 Agent、MCP、文件和通讯 Connector 配置；没有必要为此要求企业 origin、SSO、服务器 expires_at 或 Bridge 云账号。首期**不新增第二套服务端 Profile Schema**，也不修改既有 ApplicationProfile V1 JSON 字段及 Agent2 消费合同。
+- 同一个用户可以拥有多个 ApplicationProfile 和本机 PersonalProfile。Profile 标记服务来源、会话关联及任务归属，**不是默认个人/企业数据隔离边界**。默认允许使用其他 Profile 下已安装并获得本机与原服务授权的能力，无需 Bridge 特设跨 Profile 审批。
+- 用户可自行选择独立工作空间或针对某 Profile 限制本机能力组合；此功能是可选路由设置，不是 OS 沙箱或企业 DLP。
+- CloudFile、Etech 等原有业务对象权限、文件 Guard/Journal 继续由源系统决定。**企业 DEV/PROD Host、凭据、工作副本与更新根依旧隔离**，是防止错误路由和覆盖的运行约束，而非默认阻断个人与企业协作。
+
+详见 [混合工作空间与认证](PROFILE_AUTH_AND_COLLABORATION.md)。
 
 ## 3. V1 JSON 字段
 
