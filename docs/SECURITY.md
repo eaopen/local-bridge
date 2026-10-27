@@ -12,3 +12,9 @@
 - Avoid default localhost web listeners, unrestricted filesystem access, remote code download, secrets in logs, silent Checkout release and auto-triggered write actions.
 
 Security reports: use the repository maintainers' private contact method; do not post credentials or exploit payloads in a public issue.
+
+## ApplicationProfile V1 / Dev 与 Prod
+
+Profile JSON 的语法校验不等于来源认证、设备绑定或业务授权；`validate-profile` 永远不注册来源、不触发下载或执行。有效期、修订号与真正的受信 origin 必须在上线接入时再次验证。`update.source_id` 只能指向已安装并钉住签名公钥的更新来源，不接受服务端直接替换公钥。不同环境不能共用 Native Host、缓存/Journal、会话或 MCP 授权上下文。
+
+通用 Bridge 不硬编码任何企业应用的接口或账号模型。CloudFile 的文件写入只能通过当前有效的服务端票据和现有 Agent2 Journal/Guard 执行。参见 [统一 Profile 合同](APPLICATION_PROFILE_V1.md)。

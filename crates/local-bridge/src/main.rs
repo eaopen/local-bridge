@@ -2,6 +2,7 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
+use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::{
     validate_manifest, visible_channels, ChannelManifest, AVAILABLE_CAPABILITIES,
 };
@@ -45,9 +46,25 @@ fn run() -> Result<()> {
                 "visible_channels":visible_channels(&value, AVAILABLE_CAPABILITIES)})
             );
         }
+        [command, filename] if command == "validate-profile" => {
+            // Shape-only: a local file is not proof of trusted origin or authorization.
+            let path = Path::new(filename);
+            let metadata = std::fs::metadata(path)?;
+            if !metadata.is_file() || metadata.len() > 64 * 1024 {
+                bail!("invalid application profile file size");
+            }
+            let value: ApplicationProfile = serde_json::from_slice(&std::fs::read(path)?)?;
+            validate_profile_shape(&value)?;
+            println!(
+                "{}",
+                json!({"shape_valid":true, "trusted":false, "activated":false,
+                    "profile_id":value.profile_id,
+                    "channels":value.channels.len()})
+            );
+        }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | validate-channel <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

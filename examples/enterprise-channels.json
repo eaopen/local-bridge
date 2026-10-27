@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "provider": "sample-app",
+  "origin": "https://app.example.test",
+  "expires_at": 1999999999,
+  "channels": [
+    {
+      "id": "cloudfile-status",
+      "title": "File Agent Status",
+      "kind": "builtin",
+      "entry": "cloudfile.status",
+      "requires": [
+        "cloudfile.status"
+      ]
+    },
+    {
+      "id": "enterprise-ai",
+      "title": "Enterprise AI",
+      "kind": "web",
+      "entry": "/ai",
+      "requires": []
+    }
+  ]
+}

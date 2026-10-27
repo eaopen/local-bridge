@@ -19,6 +19,21 @@ Local Bridge 提供一个 **最小、受控的本机执行接口**：
 - 后续企业功能以 **Channel manifest + 本机能力白名单**扩展，不允许远程服务器下发 Shell/EXE 命令。
 - 优先支持 Windows 普通用户与便携运行、macOS；Rust 核心预留 Linux。支持企业服务端 HTTP 和 HTTPS，敏感授权另行处理。
 
+## 通用 Profile 与长期演进合同
+
+**本仓只认识通用 ApplicationProfile，不内建任何企业应用的业务规则。** 企业应用自行发布和维护其 Profile；CloudFile 与 Bridge 则可以双向适配文件能力。
+
+- [ApplicationProfile V1](docs/APPLICATION_PROFILE_V1.md)：应用配置、可信来源、Dev/Prod、更新及稳定身份
+- [BridgeTask V1](docs/BRIDGE_TASK_V1.md)：统一文件/企业/AI 任务中心合同
+- [Capability / MCP / Pi V1](docs/CAPABILITY_AND_MCP_V1.md)：通用工具、Pi RPC、MCP 权限
+- [CloudFile → Bridge 迁移](docs/CLOUDFILE_TO_BRIDGE_MIGRATION.md)：并行开发不接管或破坏现有文件能力
+
+```sh
+cargo run -p local-bridge -- validate-profile examples/application-profile.json
+```
+
+`validate-profile` **仅验证 JSON 结构**，返回 `trusted=false` / `activated=false`；不会下载配置或注册 Host。现有 `validate-channel`、MCP 的 `bridge.status` 和 `cloudfile.status` 完全保持原样。
+
 ## 结构
 
 ```text
@@ -66,7 +81,7 @@ An MCP client can launch `local-bridge mcp` with **stdio**, without any listenin
 Example Channel configuration (not authenticated or automatically fetched):
 
 ```bash
-cargo run -p local-bridge -- validate-channel examples/etech-channels.json
+cargo run -p local-bridge -- validate-channel examples/enterprise-channels.json
 ```
 
 Read [security boundaries](docs/SECURITY.md) before integrating Web or AI workloads. Schema validation alone never authenticates an enterprise server.
