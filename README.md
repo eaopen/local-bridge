@@ -72,6 +72,10 @@ Requires Rust **1.90+**. No Node.js, Python, Docker or model runtime required at
 cargo test --workspace
 cargo run -p local-bridge -- status
 cargo run -p local-bridge -- mcp
+# Optional explicit local Agent task (requires installed + logged-in Codex CLI):
+cargo run -p local-bridge -- agent codex "Summarize the current working directory"
+# Or hand selected/piped text from a user-controlled source to the same Agent:
+printf 'Meeting notes...' | cargo run -p local-bridge -- agent codex -
 ```
 
 Configure the first optional CloudFile integration **locally** (not from an AI prompt):
@@ -82,7 +86,8 @@ export LOCAL_BRIDGE_CLOUDFILE_HOST=/absolute/path/to/cloudfile-launcher
 cargo run -p local-bridge -- status
 ```
 
-An MCP client can launch `local-bridge mcp` with **stdio**, without any listening HTTP port. Currently offered tools: `bridge.status`, `cloudfile.status`. Neither tool modifies files or checks out a repository. A missing CloudFile binary reports disconnected rather than trying an unrelated command.
+An MCP client can launch `local-bridge mcp` with **stdio**, without any listening HTTP port. Currently offered tools: `bridge.status`, `cloudfile.status`. Neither tool modifies files or checks out a repository.
+**New opt-in CLI integration:** `agent codex <prompt|->` calls the user's existing authenticated Codex CLI in ephemeral, read-only mode, and reports `completed` only after `turn.completed` and successful process exit. This does not create a BridgeTask database, use browser SSO, read arbitrary chats, provide a messaging connector, or make agent execution callable by arbitrary webpages/MCP clients. Missing Codex/login or an incomplete run reports an error. It has not yet been validated on a real user's Windows/macOS Codex installation. A missing CloudFile binary reports disconnected rather than trying an unrelated command.
 
 Example Channel configuration (not authenticated or automatically fetched):
 
