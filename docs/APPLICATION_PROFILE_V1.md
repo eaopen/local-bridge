@@ -17,6 +17,17 @@
 3. `EffectiveProfile` 是运行时的**派生视图**：经过认证的 ApplicationProfile ∩ 实际安装模块 ∩ 服务端当前对象授权 ∩ 本地用户许可。不要以它覆盖 ApplicationProfile，也不要持久化一份相互冲突的业务配置。
 4. `TaskContext` 随单个任务传递业务上下文。Bridge 只处理明确的通用字段；额外的 `context` 为应用模块拥有的不可执行、不可信数据，不能直接解释成文件路径或 Shell 参数。
 
+## 2.1 同一 Profile 支持“直连能力客户端 → 通用 Bridge”演进
+
+ApplicationProfile **描述应用及其需要的能力，不描述本机执行程序**。一个企业应用可先由独立的文件 Agent 直接消费该 Profile 的文件通道；将来通用 Bridge 也消费完全相同的 Profile，再将文件请求交由同一文件能力提供者。
+
+- `profile_id`、`origin`、`channels[].id`、`module`、`capabilities` 和语义保持稳定，`module=cloudfile` 等 ID 是**能力模块名称**，不是“Bridge 已安装/运行”的声明。
+- 原有浏览器 → CloudFile Rust Agent 的执行路线可以继续存在，**无需现在安装 Local Bridge**；Profile V1 能否由某客户端实际消费，以该客户端已实现的解析、可信绑定和能力支持为准，不能把合同视为已有运行功能。
+- 本机 `LocalBinding` 决定具体执行者（如现有 CloudFile Agent 直连，或以后 Bridge 的 CloudFile adapter）；**禁止在服务器 Profile 增加 `runtime`、Host 注册名或 EXE 路径来强迫切换**。
+- 未来切换不要求应用发布第二份 Profile，也不默认迁移活动文件任务。既有文件 Journal 和 Guard 留在原执行引擎，新的任务在明确验收后切换路由；未知回执绝不跨运行时自动重放。
+
+本约定适用于任何上层应用；**Local Bridge 核心不能包含企业特定适配名称或业务逻辑**。
+
 ## 3. V1 JSON 字段
 
 参见 [通用示例](../examples/application-profile.json)。JSON Schema 对应 `crates/local-bridge-core/src/profile.rs`，解析器默认拒绝未定义字段。
