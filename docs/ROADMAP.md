@@ -19,6 +19,11 @@ Rust 0.1.0：只读 MCP stdio（bridge.status、cloudfile.status）、CloudFile 
 - CloudFile Agent2 既有任务摘要旁路接入 BridgeTask，文件本身继续由现役引擎处理。
 - 同一台公司电脑同时运行企业文件任务和个人聊天助手任务；不切换 Profile、不增加跨 Profile 审批，统一展示真实结果。
 
+## 已实现的本机 Provider 连接基线（仍待真实微信实机验收）
+
+- 用户显式注册已安装 MCP stdio Provider，Bridge 作为 Client 通过 CLI 完成 `initialize/tools/list/tools/call`，第一个接入示例为独立 WeChat Provider。此注册**不会**把写入/发送工具自动开放给网页和 AI。
+- 原 Provider 继续管理账号、SQLite、发送结果与幂等；Bridge 不重建聊天系统，也不声称其 UI 兼容已通过真实微信验证。先在用户主动操作的受控聊天完成真实读写验收。
+
 ## M3 — 通讯双向连接 + 企业 Web AI 增强
 
 - 使用一种**确实可用且获用户许可**的第三方/官方通讯 Connector，完成指定聊天消息读取/新消息订阅 → Agent → 草稿或授权发送 → 发送状态查询。微信、Soul 是场景，不预设其官方个人聊天 API。
