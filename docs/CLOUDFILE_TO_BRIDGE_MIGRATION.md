@@ -19,6 +19,11 @@ Enterprise Application --publishes--> Generic ApplicationProfile
 
 Bridge 不可硬编码上层应用名、项目字段、业务账号、员工组织、业务 API 端点，也不直接管理企业服务端权限。应用侧部署 Profile 与业务 Context；Bridge 只认识标准合同。
 
+
+### 与个人工具共存（不接管文件引擎）
+
+同一台公司电脑可同时运行企业 CloudFile Rust Agent2 编辑、个人通讯 Connector 和 Codex/WorkBuddy/Pi。Bridge 未来默认混合展示并组合已获许可的本地能力，不要求切换个人/企业模式或迁移未完成文件任务。个人聊天助手通过已有权限使用 CloudFile 文件工具时，文件授权、Guard、Journal、版本提交仍由 CloudFile 最终处理；Bridge 不增加额外的跨 Profile 审批。见 [混合使用场景](PRODUCT_POSITIONING_AND_USE_CASES.md)。
+
 ## 2. 必须保留的已用入口
 
 以下是现有 CloudFile Agent2 文档记录的兼容界面，切换前以实际已安装版本再确认：

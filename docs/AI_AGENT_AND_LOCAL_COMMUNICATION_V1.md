@@ -12,9 +12,11 @@
 | `cloudfile.files` | 本地查看、普通编辑、独占编辑及软件关联；文件授权、Journal、Guard 与版本发布始终由 CloudFile 管理 |
 | `ai.agent` + `ai.mcp` | 本地多 Agent 适配、MCP 工具提供与消费；用户本机选择 Agent，企业应用不能决定具体供应商 |
 | `enterprise.app` | 任意业务应用通过 ApplicationProfile 声明 Web/业务服务与请求能力；Bridge **不识别或导入特定企业应用** |
-| `communication.local` | 本地通讯和消息交接适配；首选受用户确认的桌面微信交接，具备官方授权的其他通道另行接入 |
+| `communication.local` | 通用通讯连接器：用户许可的官方或第三方本地 MCP/SDK/IPC/桌面能力可按实际支持提供消息读取、订阅、发送、状态查询；人工分享仅为可选后备 |
 
 本地通讯与 AI Agent 的可用性不得成为文件查看、编辑、退出和更新的必需前提。
+
+**产品默认：个人与企业混合协作。**同一台电脑可同时执行企业 CloudFile 文件任务与个人微信助手任务，共享已授权 Agent/MCP 能力；Profile 不是默认数据墙，也不增加单独的 Bridge 跨 Profile 审批。纯个人本地工作空间（PersonalProfile）为轻量配置概念，不替代 ApplicationProfile V1。
 
 ## 2. AgentAdapter：厂商可替换，选择保存在本机
 
@@ -59,19 +61,35 @@
 - **AI 与文件权限**：企业上下文和权限由业务应用提供，CloudFile 文件 ACL/写入仍由 CloudFile 服务端终判。AI 生成的参数与人工输入使用同一执行授权入口。
 - **任务关系**：每一次 Provider Agent run 产生至多一个主 `BridgeTask`；对话消息不是独立任务。`owner_module` 可以是 `ai.workbuddy` / `ai.codex` / `ai.pi`，实例任务 ID 映射但不替换原会话 ID。
 
-## 4. 通用通信：本地微信优先，但不假设个人微信聊天 API
+## 4. 通讯目标：真正的消息读取、订阅与发送
 
-建议按三条互不混淆的路线：
+用户希望用本机 AI 和业务/文件工具处理聊天、群消息与结果，而不只是点击“打开微信”再复制粘贴。Local Bridge 应通过**用户安装并许可的第三方或官方 Connector**接入实际可用的聊天能力。用户自己选择账号、聊天/群会话和允许的读写范围。
 
-**A. 本机微信人工分享（首发）**：Bridge 生成一份文本/文件准备态、可打开微信或提供复制/分享入口。用户**自行确认收件对象和实际发送**；无稳定受信回执时状态仅为 `prepared` / `handed_off`，绝不能冒充 `delivered`。不读取个人聊天数据库、不 Hook DLL、不保存用户聊天凭据。
+### 4.1 接入路线，不绑定特定软件
 
-**B. WorkBuddy 微信助理（优先验证的受信远程 Agent 通道）**：官方 Windows/macOS WorkBuddy 可扫码绑定手机微信助理，并通过微信消息驱动本机 WorkBuddy 任务。把 Bridge MCP 工具接入 WorkBuddy 后，微信助理可以在受授权范围内触发 Bridge 工具；**这是 WorkBuddy 的微信通道，不是 Bridge 拥有个人微信聊天收发 API**。没有 WorkBuddy 时不得假装可用。
-官方指南：https://www.workbuddy.cn/docs/workbuddy/WeixinBot-Guide
+| 路线 | 使用方式与能力边界 |
+|---|---|
+| 官方 API / 企业消息 SDK | 有权限时优先复用真正的消息/事件/发送接口 |
+| 用户安装的第三方本地 MCP / SDK / IPC Connector | 通过受控 CommunicationAdapter 接入，只暴露它真正具备的能力；无需假设个人通讯软件提供官方公共 API |
+| 应用许可的本地桌面交互 | 可作为辅助方式；区分窗口可见内容、完整聊天历史及真正的发送结果 |
+| 人工复制/分享或 WorkBuddy 微信助理 | 可以是可选适配路线，不应成为所有通讯集成的唯一要求 |
 
-**C. 企业级消息 API（确有需求后）**：企业微信智能机器人/企业微信客服等使用对应官方 API，处理真实双向入站、回执和企业消息身份。此路径与个人微信账号、个人聊天列表完全不同。
-参考：https://www.workbuddy.cn/docs/workbuddy/Wecom-Guide
+**微信、Soul 只是用户明确提出的场景，不代表官方私聊 API 已存在，也不代表 Bridge 已实现读取或发送。** 不内建破解私有协议、注入客户端、获取第三方账号密码、规避应用保护的能力。用户授权不自动覆盖平台条款、第三方隐私或企业已有终端策略。
 
-通用接口优先 `communication.prepare`、`communication.open`、`communication.request_send`、`communication.status`；其中自动发送或收件箱读取只在 Provider 明确具备合规、受权官方接口后启用。未能确认实际发送时任务状态为 `needs_action` 或 `unknown`，无重复自动发送。
+### 4.2 目标 CommunicationAdapter V1（尚未实现）
+
+- `accounts.list` / `conversations.list`：发现已接入的账号与其允许访问的聊天/群会话。
+- `messages.read` / `messages.subscribe`：读取指定聊天、订阅其新增消息事件；只有通知摘要的 Connector 不得谎称完整历史可读。
+- `messages.send` / `messages.status`：准备回复或按用户预设规则真正发送，并查询同一次操作的结果；`prepared` / `accepted` / `opened` 不等于 `delivered`。
+- 历史搜索、附件及高级事件按真实连接器能力和需求逐步扩展，未实现时标不可用。
+- 请求与事件关联连接器、账号、会话、消息 ID/时间和任务引用；结果未知先查询原操作，不盲目重复发送。
+
+### 4.3 用户自己决定如何集成
+
+- **默认混合**：个人聊天消息 → 本地 Agent → 用户有权使用的 CloudFile/业务工具 → 草稿或受权发送。Bridge 不因个人和企业 Profile 不同自动阻断正常协作。
+- 首次启用 Connector 由用户确认来源、账号、会话范围和允许读写的能力；可以选择“发送草稿需确认”或“指定聊天/规则下允许自动发送”，不必每条普通读取都重复确认。随时可停用。
+- Bridge 不是通讯平台的数据仓库。聊天正文/附件属于 Connector 或用户选定存储，BridgeTask 只保留必要关联与真实状态。
+- 来自网页、群聊天或模型的文本是输入，并不直接授权任意本机程序、消息外发或文件删除；业务服务仍管业务授权，Bridge 只管自身受信调用。
 
 ## 5. 安全和环境
 
@@ -84,10 +102,10 @@
 
 ## 6. 最小垂直交付
 
-1. 补齐通用 AgentAdapter 的 **read-only discover/health**，验证 Codex App Server、Pi RPC 与 WorkBuddy 官方接入前提；不因未授权而假装可操作。
-2. Bridge MCP 接入 WorkBuddy/Codex/Pi，先展示任务/能力，确保 CloudFile 旧功能独立可用。
-3. 让一个有自己 Web UI 的企业应用通过同一个 Profile 同时看到文件、企业 AI 与本地 Agent，工作台不重新实现企业 Chat/SSO。
-4. Windows 上先交付用户确认的本机微信分享，随后验证 WorkBuddy 微信助理 + Bridge MCP 的任务闭环；实际回执与用户审批由拥有它的 Provider 报告。
-5. 保持 Linux/macOS 核心协议统一，优先 Windows 的应用可用性、文件与通讯体验。
+1. 先用已有本机 Codex/WorkBuddy 或可选 Pi 做一次真实 discover/鉴权/Agent run，Provider 未授权则如实显示不可用。
+2. 一个个人或企业入口调用真实只读 MCP，并返回结果；BridgeTask 只聚合任务，不重做 AI 会话。
+3. **选择一种实际可用的 Connector**，在用户许可的指定会话内验证“读取/新增事件 → Agent 处理 → 草稿或受权发送 → 查询结果”。没有接口的通讯软件不应假装可用。
+4. 同一台 Windows 电脑并发验证 CloudFile 已有文件编辑和个人微信助手任务，默认共享已授权工具，保持 CloudFile Host/SSO/Guard/Journal 原行为。
+5. macOS/Linux 渐进，后续根据真实效果扩展通讯和企业连接器；不做大型通讯抓取平台、企业 DLP 或第二套文件引擎。
 
 **本合同不是运行代码交付；涉及具体应用的 Web 路由、业务模型、AI 接口属于应用项目，不加入此通用仓库。**

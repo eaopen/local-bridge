@@ -5,7 +5,7 @@
 ## 1. 依赖方向
 
 ```text
-Enterprise App / Browser / AI Client
+Personal Workspace / Enterprise App / Browser / AI Client
       |  authenticated app profile + per-action grant
 Generic Browser Extension / MCP Client
       |
@@ -26,12 +26,14 @@ existing Hub/Server         Bridge MCP stdio tools
 能力 ID 使用命名空间（例如 `cloudfile.status`、`cloudfile.file.view`、`cloudfile.file.edit`、`cloudfile.file.exclusive`、`bridge.task.list`、`enterprise.action.invoke`、`ai.local.chat`）。
 
 严格区分：
-1. **Declared**：ApplicationProfile 请求使用的能力；
+1. **Declared**：ApplicationProfile 或本机个人工作空间请求使用的能力；
 2. **Installed**：本地 Bridge 已有并可调用的能力模块；
 3. **Available**：模块/服务健康，当前用户/来源允许操作；
 4. **Authorized**：对本次对象/任务持有可信业务授权，包括 CloudFile 的文件票据和 ACL。
 
 只有 4 同时成立才能执行。Web 入口可显示不代表具有本机命令权限。未知模块/能力为不可用而非默认透传。
+
+**默认混合协作：**个人和企业任务可组合本机已安装、用户已许可且对本次对象有原系统授权的 MCP、Agent、文件和通讯能力。Bridge 不另造跨 Profile 审批中心，也不替企业做 DLP/安全分类。调用源、注册的类型化操作、连接器许可与目标系统真正权限仍必须有效；群消息和模型文本不能自己升级成用户的执行许可。参见 [混合 Profile/SSO](PROFILE_AUTH_AND_COLLABORATION.md)。
 
 ## 3. 本地能力的类型安全合同
 
