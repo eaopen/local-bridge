@@ -22,6 +22,8 @@ Local Bridge 提供**最小的本机能力连接层**：
 
 Profile 用于来源、账号上下文与任务归属，**不默认作为个人/企业数据墙**。已有应用负责 SSO、业务权限与文件版本；Bridge 只承担自身可信调用、能力分发与任务交接，不建设新 DLP 或企业认证中心。
 
+**可选本机 MCP Provider 接入：**已安装的独立 [WeChat Provider](https://github.com/eaopen/wechat-provider) 可通过本机用户显式注册后，由 Local Bridge 以 MCP stdio 调用读取、搜索、发送等现有工具。微信登录、GUI/RPA、消息索引及实际发送状态仍归原 Provider。参见 [Provider 对接说明](docs/LOCAL_MCP_PROVIDER_V1.md)；这不表示真实微信 4.x 实机兼容已验收。
+
 ## 通用 Profile 与长期演进合同
 
 **一个 Runtime 同时支持个人和企业。** 有服务端的企业或个人 Web 应用使用 ApplicationProfile V1；纯本机个人工具使用规划中的轻量 PersonalProfile/默认个人工作空间（尚非已交付的新 Schema）。两者共享通用 Capability 和 BridgeTask，默认混合；Bridge 核心仍不内建企业应用业务规则。
@@ -73,6 +75,9 @@ Requires Rust **1.90+**. No Node.js, Python, Docker or model runtime required at
 cargo test --workspace
 cargo run -p local-bridge -- status
 cargo run -p local-bridge -- mcp
+# Optional user-registered independent stdio MCP provider:
+# cargo run -p local-bridge -- provider add wechat /absolute/path/to/wechat-provider serve
+# cargo run -p local-bridge -- provider tools wechat
 # Optional independently installed Chrome Native Messaging provider:
 # cargo build --workspace --bins
 # cargo run -p local-bridge -- native-host install <extension-id>

@@ -3,7 +3,7 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
-use local_bridge::{inbox, native};
+use local_bridge::{inbox, mcp_provider, native};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::{
     validate_manifest, visible_channels, ChannelManifest, AVAILABLE_CAPABILITIES,
@@ -29,6 +29,23 @@ fn run() -> Result<()> {
             );
         }
         [x] if x == "mcp" => mcp::serve()?,
+        [x, action, id, executable, fixed_args @ ..]
+            if x == "provider" && action == "add" =>
+        {
+            println!("{}", mcp_provider::add(id, executable, fixed_args)?);
+        }
+        [x, action] if x == "provider" && action == "list" => {
+            println!("{}", mcp_provider::list()?);
+        }
+        [x, action, id] if x == "provider" && action == "remove" => {
+            println!("{}", mcp_provider::remove(id)?);
+        }
+        [x, action, id] if x == "provider" && action == "tools" => {
+            println!("{}", mcp_provider::tools(id)?);
+        }
+        [x, action, id, tool, json_input] if x == "provider" && action == "call" => {
+            println!("{}", mcp_provider::call(id, tool, json_input)?);
+        }
         [x, action, id] if x == "native-host" && action == "install" => {
             println!("{}", native::install_host(id, false)?);
         }
@@ -110,7 +127,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | agent codex <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | agent codex <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
