@@ -40,6 +40,10 @@ Bridge 不可硬编码上层应用名、项目字段、业务账号、员工组�
 - 上层应用**自行**提供 Profile 示例和适配计划。部署尚未注册时，完全走旧 CloudFile 路径。
 - CloudFile Agent2 与 Chrome 仍以现有调用为准；不因引入 Profile 而改变任何请求路由。
 
+当前直连文件模式 **不是** Bridge 的子模式：应用可使用同一份 ApplicationProfile V1 向其现有 CloudFile Rust Agent 声明文件通道，而 Chrome / Native Host 仍按原路径运行。Agent2 对 Profile 的消费属于待实现的可选适配，不能因 Profile 格式统一而声称当前已完成注册或授权；安装 Bridge 不成为存量文件操作的前置条件。
+
+未来接入后，配置 `profile_id` 与 `channels[].module=cloudfile` 保持一致；变化仅限本机受信绑定和新任务路由，不能由服务端 Profile 直接指定任意 Host 或可执行程序。正式升级的重点是**原任务继续由原 Journal 完成**，不在升级时将有效 Checkout 或未知发布复制到新执行者。
+
 ### B. 只读旁路（优先 DEV）
 
 - 本机可信注册 Profile，并将其`profile_id` 与已确认的原 CloudFile 服务/用户绑定；不改变原配对与登录。
