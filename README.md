@@ -31,6 +31,7 @@ Profile 用于来源、账号上下文与任务归属，**不默认作为个人/
 - [Capability / MCP V1](docs/CAPABILITY_AND_MCP_V1.md)：通用工具与 MCP 权限
 - [Agent Providers / Local Communications V1](docs/AI_AGENT_AND_LOCAL_COMMUNICATION_V1.md)：WorkBuddy / Codex / Pi 本地选择、微信优先通讯
 - [CloudFile → Bridge 迁移](docs/CLOUDFILE_TO_BRIDGE_MIGRATION.md)：并行开发不接管或破坏现有文件能力
+- [Chrome Native Messaging V1](docs/CHROME_NATIVE_HOST_V1.md)：可选 Local Tool Bridge 原生 Host、安装和本机收件箱
 - [个人/企业/混合场景与诉求](docs/PRODUCT_POSITIONING_AND_USE_CASES.md)：按真实用户任务组织需求与验收
 - [混合工作空间、企业 SSO 与 Chrome 授权](docs/PROFILE_AUTH_AND_COLLABORATION.md)：已有认证不重复实现
 
@@ -72,6 +73,10 @@ Requires Rust **1.90+**. No Node.js, Python, Docker or model runtime required at
 cargo test --workspace
 cargo run -p local-bridge -- status
 cargo run -p local-bridge -- mcp
+# Optional independently installed Chrome Native Messaging provider:
+# cargo build --workspace --bins
+# cargo run -p local-bridge -- native-host install <extension-id>
+# cargo run -p local-bridge -- inbox list
 # Optional explicit local Agent task (requires installed + logged-in Codex CLI):
 cargo run -p local-bridge -- agent codex "Summarize the current working directory"
 # Or hand selected/piped text from a user-controlled source to the same Agent:

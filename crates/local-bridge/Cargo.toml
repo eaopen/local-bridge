@@ -11,3 +11,7 @@ description = "Small cross-platform enterprise local capability bridge with MCP 
 local-bridge-core = { path = "../local-bridge-core" }
 anyhow.workspace = true
 serde_json.workspace = true
+
+[[bin]]
+name = "local-bridge-native-host"
+path = "src/bin/native_host.rs"
