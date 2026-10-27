@@ -14,6 +14,7 @@ Rust 0.1.0：只读 MCP stdio（bridge.status、cloudfile.status）、CloudFile 
 
 ## M2 — 个人与企业同机工作（首个真实产品成果）
 
+- 先提供显式用户触发的 `agent codex <prompt|->` 只读 CLI 接线（完成条件与超时不可误报，需真实本机验收），再扩展到 AgentAdapter/浏览器受控调用；
 - 一次实际授权的本地 Codex/WorkBuddy 或可选 Pi Agent run；不把安装状态冒充 API 可用。
 - CloudFile Agent2 既有任务摘要旁路接入 BridgeTask，文件本身继续由现役引擎处理。
 - 同一台公司电脑同时运行企业文件任务和个人聊天助手任务；不切换 Profile、不增加跨 Profile 审批，统一展示真实结果。

@@ -1,3 +1,4 @@
+mod agent;
 mod cloudfile;
 mod mcp;
 
@@ -27,6 +28,15 @@ fn run() -> Result<()> {
             );
         }
         [x] if x == "mcp" => mcp::serve()?,
+        [agent, provider, prompt] if agent == "agent" && provider == "codex" => {
+            let input = if prompt == "-" {
+                agent::prompt_from_stdin()?
+            } else {
+                prompt.clone()
+            };
+            let output = agent::run_codex(&input)?;
+            println!("{}", output);
+        }
         [command, filename] if command == "validate-channel" => {
             // File validation does not grant trust to a remote origin.
             let path = Path::new(filename);
@@ -64,7 +74,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | agent codex <prompt|-> | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
