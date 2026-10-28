@@ -151,3 +151,14 @@ cargo +1.90.0 run --example pi_validation
 ```
 
 每次创建新测试目录；运行会实际调用模型并创建一个测试文件。未通过文本任务时停止，不自动选择模型或重放写任务。Rust example 的 clippy 与 diff 检查通过。协议以本机 1.3.0 随包文档及 [Pi v1.3.0 RPC 文档](https://github.com/earendil-works/pi/blob/v1.3.0/packages/coding-agent/docs/rpc.md) 为准。
+
+## 2026-10-28：Pi 直接模型提供商（新增最小 CLI）
+
+本机此前已有 Pi RPC 真正运行任务的记录，**当时使用用户已有的 9router 扩展**，这不代表 Pi 已有独立 DeepSeek API Key 或 OpenCode 免费模型 API。本轮补的是 `local-bridge agent pi <provider> <model> <prompt|->`：由用户明确选一个 Pi 支持的 Provider/Model、复用 Pi 自己的认证，以单次 `--print --no-session --no-tools` 运行文本任务，退出码非零/空响应不得报告 completed。默认不加载 Extensions、Skills、项目上下文、文件或 Shell 工具。
+
+- Pi 安装和模型登录并不是 Local Bridge 的必装步骤。用户先在 `pi` 中使用 `/login` 设置受支持提供商，或由运行 Pi 的用户环境提供 `DEEPSEEK_API_KEY`、`GEMINI_API_KEY` 等。Bridge 不存储、输出或接管 API Key。
+- DeepSeek 是合理的低成本独立 API 路线，但 API **并非免费**，且网页免费聊天账号不等于 API 账号。必须由用户真实配置凭据。
+- OpenCode Zen 免费模型按官方政策只在 OpenCode 自身可用，外部 Pi 作为 API harness 通常返回 403；不能假装一个 OpenCode 免费账号可以无限调用 Pi。若直接用 OpenCode 免费体验，应使用 OpenCode 自身，或者用户明确选择已经授权的其它官方模型服务。
+- ChatGPT/Gemini/Claude 等 Web 端已登录会话仍通过 **Web AI Relay 人工复制/回传** 完成应急，不伪装成 Pi 自主模型调用，不自动抓取 DOM、Cookie、请求或免费配额。
+- 当前机器已发现 Pi 0.83.0，但在当前环境中未发现 DeepSeek/OpenCode/Gemini 等独立模型环境 Key，Pi 本地 auth 文件的提供商列表也为空；因此本机独立 DeepSeek 真实任务**尚未通过**，不能以先前 9router 成功代替。
+- 这是一条先能试用的最小 CLI 路线；后续只有在用户真实配置并完成一条任务后，再考虑将 Pi RPC 正式接入 BridgeTask、文件工具审批或 Chrome/企业 Web 可信动作。详见 [Pi 实际配置步骤](PI_MINIMAL_PROVIDER.md)。

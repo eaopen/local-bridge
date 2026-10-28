@@ -102,6 +102,16 @@ fn run() -> Result<()> {
             };
             println!("{}", output);
         }
+        [x, agent_name, model_provider, model_id, prompt] if x == "agent" && agent_name == "pi" => {
+            // User explicitly selects Pi's model; Pi owns the credentials.
+            // Do not silently route to Codex, 9Router, or a Web AI session.
+            let input = if prompt == "-" {
+                agent::prompt_from_stdin()?
+            } else {
+                prompt.clone()
+            };
+            println!("{}", agent::run_pi(model_provider, model_id, &input)?);
+        }
         [agent, provider, prompt] if agent == "agent" && provider == "codex" => {
             let input = if prompt == "-" {
                 agent::prompt_from_stdin()?
@@ -148,7 +158,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
