@@ -1,12 +1,12 @@
 # BridgeTask V1 — 跨模块任务中心合同
 
-状态：**接口与显示语义固定，任务聚合运行时尚未实现**。文件、企业应用、个人 AI 与通讯任务可以进入**第二套 Local Bridge 产品**自己的任务中心，不创建第二份文件编辑/AI 执行账本。**双轨期间不读取、导入或操作第一套 CloudFile Agent2 + 原 Chrome 的存量任务**；见[两套独立产品边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
+状态：**接口与显示语义固定，任务聚合运行时尚未实现**。文件、企业应用、个人 AI 与通讯任务可以进入**第二套 Local Bridge 产品**自己的任务中心，不创建第二份文件编辑/AI 执行账本。**Bridge 通过获准的 Provider 只读展示同一份 Agent2 文件任务，绝不新建第二套文件数据目录或状态账本**；见[两套独立产品边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
 
 ## 1. 所有权
 
 任务由`owner_module`产生并对专业状态负责。Local Bridge 只负责聚合、展示、用户发起的操作分派与本机通知。
 
-- `cloudfile`：第二套独立 CloudFile Provider 自己的 File ID/Branch、Journal、Intent、Guard、Checkout/Commit/Checkin 才是本套的文件发布事实源；第一套 Agent2 运行时/任务数据不被 Bridge 接管。
+- `cloudfile`：现有 Agent2 File ID/Branch、Journal、Intent、Guard、Checkout/Commit/Checkin 是**唯一文件发布事实源**；Provider 读取和后续转发已授权操作，Bridge 不建第二个 Writer。
 - `enterprise`：企业 API/桌面程序的完成与失败由相应业务模块判定。
 - `ai` / `pi`：会话、推理、工具事件由企业 AI 服务或 Pi 管理；Bridge 只显示明确的 run/task 状态。
 
@@ -53,7 +53,7 @@ CloudFile 的“本地已保存”**不等于**`completed`（云端已发布）�
 
 ### 同机个人与企业混合任务（目标）
 
-在**第二套 Provider 已独立交付相应文件能力之后**，公司电脑可以在 Bridge 内同时显示第二套 CloudFile 文件编辑与个人微信助手任务；原 CloudFile Chrome/Agent2 Tauri 的任务仍留在第一套，未经未来升级合并验收不做跨产品任务聚合/动作转发。BridgeTask 不保存全量企业文件或聊天历史，CloudFile 与通讯 Provider 仍各自负责终判。
+当 Agent2 Provider 具备可靠的只读任务摘要后，同机 Bridge 可显示**现有 Agent2 文件任务**与个人通讯/AI 任务；Agent2 Tauri 仍同时显示相同文件状态。BridgeTask 只建立跨模块的视图引用，不复制企业文件、历史聊天或 CloudFile Journal，也不因为多出一个 Chrome 入口而生成第二个文件任务。
 
 ## 4. 任务接口（规划）
 
@@ -66,9 +66,9 @@ Bridge 只维护低成本索引/展示缓存；工作副本、快照、Intent、
 
 ## 5. 失败恢复与迁移
 
-- 第一套已存在的 CloudFile 工作副本/Journal/Guard 不动、**不被 Bridge 读取**；Bridge 先通过第二套独立 Provider 的只读 Adapter 取得其**自身任务**摘要。**先读后写**，写入功能独立验收。
+- Agent2 原工作副本/Journal/Guard 仍是唯一文件状态源；Bridge 可以经用户授权的 Provider 接收**同一个 Agent2 文件任务的脱敏摘要**，但不直接读取原本机目录、不保存/改写 Journal。**先读后写**，写入转发独立验收。
 - 桥接不可用时，CloudFile 现有文件任务入口仍可独立工作；UI 应说明功能降级，不改写原任务状态。
 - 不允许 Bridge、Pi、MCP 因网络错误自动再发一次新的文件提交。结果未知时查询原操作；需人工重试也必须遵守 CloudFile 原有幂等合同。
 - 结束、退出、升级、卸载均不能删除未确认工作副本或自动释放仍有效的 Checkout。
 
-V1 验收从第二套 Provider 自有的一个真实只读任务摘要开始，再扩展企业任务和 Pi run；不导入旧 Agent2 的任务，也无需先建通用任务数据库。
+V1 从一个**原 Agent2 文件任务的脱敏摘要**开始验收；Bridge 不导入旧数据副本，也无需先建通用任务数据库。

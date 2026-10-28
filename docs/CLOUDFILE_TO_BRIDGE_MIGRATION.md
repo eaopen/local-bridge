@@ -1,72 +1,71 @@
-# CloudFile 与 Local Bridge：两套产品长期独立，未来才考虑升级合并
+# CloudFile Agent2 与 Local Bridge：两套连接入口，一份 CloudFile 文件数据
 
-**决策（2026-10-29）：现有 CloudFile 与新 Local Bridge 是两套独立产品栈，长期并行；没有默认自动合并、替换或切流。** 只有用户单独批准“升级合并”，且完成正式文件三模式、旧任务数据、Chrome/Host、签名升级与回退验收后，才允许改变这个状态。
+> 决策（2026-10-29，修正）：**旧 CloudFile Chrome/Agent2 和新 Local Bridge/Chrome 长期独立运行，直到明确批准升级合并；但同一个 CloudFile Agent2 安装仅有一套工作副本、Journal、Intent、Guard 和设备数据。** 文件数据共享是设计要求，不是两个产品的数据冲突。
+> 参见 [Agent2 Provider 计划](https://github.com/eaopen/cloudfile-local-agent2/blob/feat/local-bridge-provider/docs/DUAL_STACK_COEXISTENCE.md)。
 
-## 产品身份及依赖（当前约束）
+## 1. 两套入口的独立性
 
-| | ① CloudFile 既有产品 | ② Local Bridge 新产品 |
+| | ① CloudFile 原产品链 | ② Local Bridge 新产品链 |
 | --- | --- | --- |
-| 源码 | `cloudfile-local-agent2` **既有 dev** + `cloudfile-chrome-extension` | `local-bridge` + `local-bridge-chrome-extension` + 可选 `cloudfile-bridge-provider`（Agent2 Provider 独立分支） |
-| Chrome | 已有 CloudFile 扩展，固定 ID `gocnpbhnbikcpnlafmodflddgnmfcjoc` | 新独立 Chrome 扩展，使用自己的实际安装/发行 ID；目前不假设已经固定商店 ID |
-| 本机 Host | Windows `com.cloudfile.current_agent`；macOS 正式 `com.cloudfile.agent2`；当前 Rust DEV `com.cloudfile.agent22.dev` | `com.eaopen.browser_bridge`，独立 Manifest 和浏览器授权 |
-| 文件状态 | Agent2 Tauri、File Core、Journal、Guard、工作副本、设备身份和签名更新 | 新 Provider 的**独立数据根** `CloudFileBridgeProvider`；Bridge 本身拥有独立的任务视图/注册/授权 |
-| AI/通用 MCP | 不需要 Bridge 才能查看/编辑/独占文件 | Bridge + 新插件可独立使用 Codex/Pi/WorkBuddy/MCP；没有 CloudFile Provider 时文件功能不可用 |
-| 安装升级 | 原 CloudFile 安装、Chrome Host/扩展更新、回退保持不变 | Bridge、新 Chrome 和 Provider 分别安装、升级、回退，不能写旧 Host/Journal/升级密钥 |
+| Chrome 扩展 | 原 `cloudfile-chrome-extension`，原固定 ID 不变 | 新 `local-bridge-chrome-extension`，独立扩展 ID |
+| Native Host | Windows `com.cloudfile.current_agent`，macOS 正式 `com.cloudfile.agent2`，既有 DEV `com.cloudfile.agent22.dev` | `com.eaopen.browser_bridge`，独立 Host Manifest |
+| 前端/任务 UI | Agent2 原 Tauri/托盘/任务中心继续工作 | Bridge 自身 AI/MCP/通用 UI 独立演进，Tauri 暂不迁移 |
+| CloudFile 调用 | 原 CloudFile Chrome → 原 Agent2 Native Host | 新 Chrome → Bridge → `cloudfile-native-host --bridge-provider`（可选） |
+| **文件数据** | Agent2 唯一文件目录和任务事实源 | **读取/调用同一个 Agent2 文件数据目录**，不建第二套 |
+| 授权/版本 | CloudFile Hub/Fileserver + Agent2 原 scoped ticket、Journal/Guard | Bridge 只负责连接权限；文件操作须回到原 Agent2 引擎与原 CloudFile Server 终判 |
+| 产品发行 | 旧 Chrome/Agent2 自己安装升级回退 | 新 Chrome/Bridge 独立发行；Provider 能力需与所用 Agent2 版本兼容 |
 
-**通用代码可以复用，运行身份和本机数据不能自动共享。** 第二套的 Provider 从 Agent2 Rust Core 复用文件能力代码，**不调用已安装的第一套 Host，不读取其旧任务/工作副本/Journal/设备密钥**。双方都可以在各自通过服务端授权时调用 CloudFile Hub/Fileserver；云端服务相同不等于本机任务/身份相同。
+**两套独立的是 Chrome/Bridge 入口、Host 身份、通用任务/AI 配置、发行更新；不是两份 CloudFile 文件系统。** Bridge 的 MCP 注册、Web 站点授权和 AI Agent 任务继续放在 Bridge 自己的私有目录，CloudFile 文件数据只在 Agent2 目录中。
 
-### 两条长期保留的调用路径
+同一 OS 用户的同一个 Agent2 安装共用一份文件数据；Agent2 已有 Dev/Prod 或不同客户环境独立安装时，仍按它们原有的分隔规则，各自一份，不能跨环境错连。
+
+### 两条长期保留的路线
 
 ```text
-① CloudFile Web
-      → 现有 CloudFile Chrome 插件
-      → 原 CloudFile Native Host
-      → Agent2 Tauri / CloudFile Core → 原工作副本 / Journal / Guard
-      ↕ CloudFile Hub / Fileserver
-
-② 通用 Web / AI 工具
-      → 新 Local Bridge Chrome 插件
-      → 独立 Local Bridge Native Host / MCP / HTTP
-      → 用户主动启用的 cloudfile-bridge-provider（非必装）
-      → 第二套的文件 Core / 私有工作区和任务
-      ↕ CloudFile Hub / Fileserver
+① CloudFile Web → 原 CloudFile Chrome → 原 CloudFile Native Host ─┐
+                                                                ├─→ Agent2 Core/Desktop
+② 通用 Web → 新 Chrome → Local Bridge → Agent2 Provider (MCP) ────┘           │
+           └── 独立 AI Agent / 通讯 MCP                                          ▼
+                                                                       唯一文件数据目录
+                                                                       工作副本/Journal/Guard
+                                                                                ↕
+                                                                       CloudFile Hub/Server
 ```
 
-- **① 不依赖 ②。** 不装 Bridge、不装新 Chrome、Provider 崩溃时，第一套文件查看/编辑/独占、Tauri 和更新继续正常。
-- **② 不把 ① 当自动回退。** 缺少 Provider、权限不符或执行结果未知时，第二套报告不可用/未知，不转给旧 CloudFile Host、不重新消费一次性票据、不从旧 Journal 取任务。
-- 不同产品的 Chrome 扩展、Native Host、安装路径、数据根、发行信任分别维护。Windows `com.cloudfile.current_agent` 是旧 CloudFile 的既有固定入口，**禁止新 Bridge 接管**。
-- 新 Chrome 插件目前可独立做复制/网页内容接力；即使本机尚未安装 Bridge，也不影响基础功能。但不能因此将它视为已经替代旧 CloudFile Chrome 的本地编辑能力。
-- Bridge 可以保留现有 `cloudfile.status` **显式配置的旧组件只读诊断兼容项**，但**第二套的标准 CloudFile 文件接入只能走 `cloudfile-bridge-provider`**。不自动从第一套 Host Manifest 发现或路由新 Provider。
+Bridge/新 Chrome 缺失时，原 CloudFile 文件主链依旧能工作。Agent2 缺失时，新 Bridge/Chrome 的 AI/MCP、网页接力等通用能力仍能工作，但 CloudFile 文件 Provider 显示不可用。
 
-## 代码与运行时的依赖方向
+## 2. Provider 已实现的代码范围（仅 Agent2 独立特性分支）
 
-企业应用提供 ApplicationProfile、业务身份与合法的 CloudFile 授权；Bridge 不能硬编码企业应用名称、员工信息、库业务逻辑或访问口令。CloudFile 文件 Core 是文件处理与权限/条件提交的 Owner，Bridge 只是通信、能力注册、任务展示与已授权请求分发。
+Agent2 `feat/local-bridge-provider` 在 **原 `cloudfile-native-host`** 内增加 `--bridge-provider` MCP stdio 模式：原 Chrome Native Messaging 帧协议和 Host 注册不变。它使用原 `storage::root()`（含 `CLOUDFILE_AGENT2_HOME` 与已有默认根），只读展示 `cloudfile_status` 和 `cloudfile_task_counts`。它不创建 `CloudFileBridgeProvider` 独立数据目录/第二份工作副本、Journal、密钥或 Checkout 状态；目前没有文件写操作。
 
-- Bridge 核心保持轻量 Rust CLI/Native/MCP/Web V2，**不纳入 Tauri、Windows WebView2、CloudFile Journal/Guard、上传/升级引擎**。
-- 第一套 Agent2 继续保留 Tauri/任务中心和原有安装器。
-- 第二套 Provider 独立安装二进制 `cloudfile-bridge-provider`，当前只开放 `cloudfile_status` 与 `cloudfile_task_counts` 两个只读 MCP 工具。默认私有根为用户本地应用数据下 `CloudFileBridgeProvider`，可由本机部署使用 `CLOUDFILE_BRIDGE_PROVIDER_HOME` 指向独立绝对路径，**不读取 `CLOUDFILE_AGENT2_HOME`**。
-- Bridge 当前 `provider add` 的路径被固定为已安装二进制位置。第二套 Provider 升级/路径稳定机制须由第二套自己解决，**不得改由读取第一套 CloudFile Host Manifest 获取二进制位置**。
-- 通用 Provider MCP 工具不会自动授权给网页和模型。Provider 真正的文件操作未来仍需当前用户的 scoped ticket、Agent2 文件 Core 和 CloudFile Fileserver 终判；Bridge 的连接状态不是文件写入授权。
-- 两套默认不共享任务索引；`BridgeTask` 以后汇总的是**第二套 Provider 的任务**。旧 Agent2 任务只在第一套 Tauri 可见。若以后要聚合或迁移旧数据，必须纳入单独升级合并的验收范围。
+本机用户显式注册安装了该模式的 Agent2 可执行文件：
 
-## Dev/Stable 与企业 DEV/PROD 的区别
+```sh
+local-bridge provider add cloudfile /absolute/path/to/cloudfile-native-host --bridge-provider
+local-bridge provider tools cloudfile
+local-bridge provider call cloudfile cloudfile_status '{}'
+local-bridge provider call cloudfile cloudfile_task_counts '{}'
+```
 
-**产品栈 ①/②、客户端发行渠道 Dev/Stable、服务端环境 DEV/PROD 是独立维度。** 不借“同一个企业 Profile”绕过 Host/扩展/数据根隔离。当前 Windows 旧 Agent2 的正式 Host 是固定槽位；并不意味着旧 Agent2 的 DEV/STABLE 已能同机无冲突并存。第二套 Provider 的正式独立安装/升级尚未发布，因此不得虚构完善的双渠道部署已经落地。
+**开发/部署限制**：Provider 功能尚未合并旧 Agent2 `dev`；仅源码/CI 不表示已有在用版本可调用。Bridge 固定可执行路径，Agent2 采用版本目录升级；后续要提供稳定发现/重绑定，且确认两个进程确实解析到**同一个 Agent2 数据根**。不一致时应报告绑定失败，不能把新建的空根伪装成“旧任务已清空”。
 
-任何单个任务绑定原始产品栈、具体 Provider、来源及业务授权。请求超时、网络回执丢失、未知发布、活动 Checkout 时，**不能在两套之间自动切换/重试**。
+现有 Bridge `cloudfile.status` 独立只读组件探测可保留兼容，但未来正式任务集成一律走经过协议协商的 CloudFile Provider，不复制私有文件状态数据。
 
-## 近期和长期研发里程碑
+## 3. 一份文件事实源，避免重复执行
 
-1. **当前双轨**：第一套 Agent2 `dev` 和旧 CloudFile Chrome 独立开发、独立使用。第二套 Bridge `dev` 和新 Chrome 独立开发，Provider 在 Agent2 `feat/local-bridge-provider` 功能分支上做只读 MCP，**不合并第一套 `dev`**。
-2. **第二套自我完善**：Provider 先完成独立状态、能力和任务摘要，再用第二套自身 scoped grant、Journal/Guard/工作区逐项开发本地查看 → 普通编辑 → 独占编辑。保持第一套不变。
-3. **通用职责逐步靠向 Bridge**：第二套可以建设自己的可选任务 UI、通知、入口和发行服务，但 Tauri 不成为 Bridge Core 必需依赖；第一套 Tauri 与 Host 长期继续工作。是否共享代码以实际重复劳动为准。
-4. **合并升级（未来单独决策，不在当前 Roadmap 内自动发生）**：明确最终 Chrome ID/Host/数据目录/发行信任选择；验证 Windows/macOS 真实文件三模式、SSO、原文件版本、Journal/未知 Intent、Checkout 续租、工作副本与用户应用规则、签名升级/回退，保留原任务执行者直至结清；经用户明确批准后才允许切入口或退役旧产品。
+- **Single Writer**：已有 Agent2 Desktop/Core 是文件任务唯一写入 Owner。Bridge 不运行自己的上传/Checkout/续租/Commit/Checkin；Provider 当前只读，以后写操作须进入原 Agent2 Desktop/私有 IPC 和原 `Journal/Intent` 锁。
+- **Stable Task ID**：同一个 Agent2 文件任务从两个 Chrome 入口访问时仍使用原 `task_id`；BridgeTask 只作展示身份/授权视图，不生成第二份文件任务或数据库。
+- **授权独立于目录共享**：看到了 Agent2 本机任务不等于获得该文件读写许可。每次新文件动作均须走合法用户会话/短期 scope ticket 和 Hub/Fileserver 的 ACL、File ID、Guard 检查，不能把 MCP 可连接当成 CloudFile 管理员权限。
+- **未知结果不重试**：两套入口都不能在网络超时/原提交结果未知时跨 Host 创建新 Intent，必须查询原操作状态。Provider/Agent2 协议、Journal 版本不兼容时拒绝新的写操作。
+- **不相互接管 Chrome Host**：新扩展只通过新 Bridge Host 连接；旧扩展继续使用旧 CloudFile Host。Browser 扩展 ID、原 Manifest 及旧用户安装路径均不修改。
+- **更新/卸载保护**：两套连接软件可以分别更新，但共同的文件执行器是 Agent2。卸载 Bridge、新 Chrome 或取消 Provider 注册不得删除 Agent2 文件根；Agent2 自身升级/卸载保持原活动任务和备份保护。
 
-**不做：** 未经明确决策自动把原 CloudFile Chrome 升级为新 Chrome；Bridge 接管旧 Host； Provider 读取旧数据目录/旧设备密钥；将两套任务存入共同数据库；把 CloudFile 上传/Checkin 实现在 Bridge；删除已有用户工作副本或强制关闭有效 Checkout。
+## 4. 演进与未来合并
 
-## 依据
+**P0**：只读 Provider 状态/任务计数，Tauri 不动。**P1**：Bridge 显示原 Agent2 脱敏任务摘要（同一事实源）。**P2**：按本地查看→普通编辑→独占编辑逐项将新入口受控请求送到 Agent2 唯一执行者；长操作采用持久化受理 + 原 operation 查询，不在 Bridge 同步阻塞几分钟。**P3**：按实际价值为 Bridge 增加可选通用任务 UI/通知，原 Tauri 仍可用。
 
-- [第一套 CloudFile Agent2 既有兼容合同](https://github.com/eaopen/cloudfile-local-agent2/blob/dev/docs/CONTRACTS.md)。
-- [第二套 CloudFile Provider 代码/文档分支](https://github.com/eaopen/cloudfile-local-agent2/tree/feat/local-bridge-provider)。
-- [通用 BridgeTask 合同](BRIDGE_TASK_V1.md)：任务显示不代表文件执行账本。
-- [新 Chrome 插件的迁移说明](https://github.com/eaopen/local-bridge-chrome-extension/blob/dev/docs/CLOUDFILE_MIGRATION.md)。
+**未来“升级合并”须单独批准**：明确最终 Chrome/Host/统一 UI/发行规则，完成 Windows/macOS 真实三模式、设备与文件权限、工作副本/Journals/Intent/Guard、签名升级/回退、已有用户任务接续和失败恢复验证后，才可切换旧入口或下线旧组件。在此之前两套 Chrome/Host 长期共存，但只有一个 Agent2 文件数据事实源。
+
+## 5. 不做
+
+不另建 CloudFile 文件工作区/第二份 Journal/Guard；不复制或搬迁 `cloudfile-core` 至 Bridge；不把 Tauri/WebView2 变为 Bridge Core 的必装依赖；不为“两个产品独立”重写文件存储；不在未获得文件授权时向模型开放 CloudFile 读写工具；不更换原 CloudFile 用户的插件和 Host。
