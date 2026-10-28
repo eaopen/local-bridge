@@ -30,6 +30,6 @@ local-bridge tasks list --cloudfile
 ## 兼容与验收
 
 - 新 Chrome 与原 CloudFile Chrome 保持各自 ID/Host/发行；**一份 CloudFile 文件目录与一个 Agent2 Writer**，Bridge 不从其他路径读取旧任务。
-- 不增加新第三方依赖、常驻 HTTP、WebView2/Tauri、跨程序文件执行或 File API。
+- **CLI 聚合模块本身**不新增第三方依赖、常驻 HTTP、跨程序文件执行或 File API；独立可选 Tauri Desktop（PR #36）属于单独编译单元，不改变 CLI 的 WebView2 依赖。
 - 单元验证 Agent 状态投影、Inbox 纯只读映射、CloudFile 响应敏感字段过滤/错误拒绝。跨进程测试使用隔离用户目录，验证真实 Bridge CLI 可读取既有 Inbox 记录。
 - 只有以后明确的用户授权、来源隔离和任务聚合 Web UI 需求才能讨论受控 Web 查询入口；P1 **不自动开放**。

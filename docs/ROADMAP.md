@@ -4,20 +4,46 @@
 
 **产品定位（2026-10-27）：** 面向个人和企业的轻量级本地能力连接与任务协作平台。**默认混合、按需隔离**。每个开发任务都要证明减少用户操作，而不是增加一个平台。
 
+## 2026-10-29 实际交付与验收状态
+
+最近五批已合入 Local Bridge `dev`：[Native Host 生命周期 #32](https://github.com/eaopen/local-bridge/pull/32)、[Web 授权原子存储 #33](https://github.com/eaopen/local-bridge/pull/33)、[只读任务聚合 #34](https://github.com/eaopen/local-bridge/pull/34)、[AgentPreferences #35](https://github.com/eaopen/local-bridge/pull/35)、[可选 Tauri Desktop #36](https://github.com/eaopen/local-bridge/pull/36)。`dev` 基线 `2955732` 的 Windows/macOS/Ubuntu 核心 CI **通过**；独立 Tauri Windows/macOS 编译和静态 UI CI **通过**，但**不等于真实 GUI 安装/运行验收**。尚无正式 Release、签名安装包。
+
+| 方向 | 已实现的代码/验证 | 还未交付，不能宣称已上线 |
+| --- | --- | --- |
+| Core / CLI / MCP / Native | MCP stdio、用户注册 Provider、Chrome Host、Inbox、诊断/回退/授权持久化 | 普通用户机器上的真实 Chrome 安装/绑定与正式发布 |
+| Chrome Web V2 / Agent | 独立 Chrome MV3 + Web SDK 的版本化能力发现、只读状态工具、统一 `runAgent/readAgent`；本机 `AgentPreferences` 默认选择/优先顺序/Model/ThinkMode | Chrome → Host → 授权 MCP/Agent → 回传的真机 E2E；`installed/eligible` 不等于已登录/API 可用 |
+| Agent | Codex/Pi 文本 CLI Worker、WorkBuddy 独立真实实验回执、重复 clientKey 保护 | 通用 WorkBuddy 原桌面账号 Adapter、实际模型/ThinkMode 生效核验、多平台失败恢复 |
+| 任务中心 | 本机 CLI 和独立 Tauri 预览的只读 AI/WorkBuddy/Inbox 任务聚合 | 通用 Web 任务 API、事件订阅、跨模块动作转发；来源错误要保留不完整状态 |
+| CloudFile 文件 | Agent2 独立文件 Owner 保留；[Provider Draft #26](https://github.com/eaopen/cloudfile-local-agent2/pull/26) 有共用原 Agent2 数据根的只读脱敏代码 | Provider 未合并 Agent2 `dev`；无 Bridge 三模式真实文件动作，不能建第二 Writer |
+| 企业 V2 / Profile | ApplicationProfile V2 **离线结构解析/校验**、企业 Pi 临时推理适配代码 | 可信在线 Profile/SSO/企业 AI API 的真实 Web 联动 |
+| 通讯 Provider | Bridge MCP Client 注册/调用独立 Provider，微信状态/搜索有协议/CI 测试 | 真实微信 GUI、用户授权和消息读/发的实机验收 |
+
+**下阶段 P0：**优先完成 [#9](https://github.com/eaopen/local-bridge/issues/9) 的普通用户 Chrome + Native Host 最短闭环（一个本地已授权的只读 MCP 工具），再完成 [#6](https://github.com/eaopen/local-bridge/issues/6) 的实际 Web V2 `runAgent/readAgent`、断线同 clientKey 续读和源系统故障降级。并行完成 Tauri 开发预览的本机安装、任务读取及 AgentPreferences 保存/回读。**不再新增任务框架、账号网关或文件引擎。**
+
+其后才按实际依赖推进 CloudFile 同一文件根的只读 Provider 验证、可信企业 Profile/模型 API、WorkBuddy 正式 Adapter、独立微信 Provider。原 Agent2 Tauri 与两套 Chrome/Host 独立并行，旧客户端不自动退役。
+
 ## M0.1 — 首批从 CloudFile Agent2 提取通用能力（2026-10-29）
 
 - **Native Host 生命周期**：仅在 Local Bridge 自己的 `com.eaopen.browser_bridge` 下完善用户级注册状态、备份后显式替换、卸载、回退；旧 CloudFile Host 完全不动。
 - **轻量自检**：借鉴 Agent2 的“已配置/未配置/真正失效”区分；本机只检查私有目录可读写、Bridge Host Manifest 和用户 MCP 注册，不把 Chrome GUI、Agent 登录或 CloudFile 写入标成已验证。
 - **保持体积与依赖**：不新增常驻桌面进程、第二套 CloudFile 工作副本、Journal/Guard、Tauri/WebView2，也不因第一批增加数据库、自动更新服务或新业务参数。
-- 下一批才考虑：Bridge 本地持久化原子写入与统一任务状态投影；真正有常驻运行/用户安装需求后，再移植轻量自启、签名更新与回退机制。详见[小步迁移计划](LOCAL_FOUNDATION_MIGRATION.md)。
+- 这是首批的历史规划：其后本地授权原子写入与只读任务投影已在 M0.2/M0.3 实现；自启、签名更新和发布回退仍应在真实用户安装需求明确后处理。详见[小步迁移计划](LOCAL_FOUNDATION_MIGRATION.md)。
 
 ## M0.2 — Bridge Web 授权原子存储（第二批）
 
 从 Agent2 的原子写入/短事务原则提取极小的通用状态函数，解决固定 `.json.tmp` 残留和跨进程授权互相覆盖。仅修复 Bridge 自身 status/Agent/WorkBuddy 三组 Web 授权；存储路径/JSON schema 不变，不需要新依赖，也不涉及 CloudFile Journal、Guard 或工作副本。详细范围见[通用能力迁移计划](LOCAL_FOUNDATION_MIGRATION.md)。
 
-## M0 — 当前已实现的基线
+## M0.3 — 只读任务聚合 + AgentPreferences（已合并）
 
-Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 MCP Client、离线 Profile 结构校验、可选 Chrome Native Host/Inbox、Web AI 手动接力，以及用户主动调用既有 Codex CLI 的临时只读任务均已在代码中实现。**Codex/Pi 与 WorkBuddy 均已有独立本机实验记录；统一 Web V2 Agent 状态和 run/read 已有源码，但三者的 Chrome/HTTP 真实端到端尚未验收。已实现代码不等于已验证模型/登录/企业联动。**可信在线 Profile、PersonalProfile Runtime、跨 Provider 任务聚合、完整通信 Adapter、CloudFile 文件 IPC 均未交付。CloudFile 编辑仍走现有 Agent2/Hub/Server。详见 [Agent 实测矩阵](AGENT_PROVIDER_VALIDATION.md)。
+[PR #34](https://github.com/eaopen/local-bridge/pull/34) 交付 `tasks list [--cloudfile]`，聚合已有 AI/WorkBuddy/Inbox 任务事实源；CloudFile 仅在用户显式要求且 Agent2 Provider 已注册且兼容时读取脱敏摘要。[PR #35](https://github.com/eaopen/local-bridge/pull/35) 交付本机 AgentPreferences、优先顺序与 Model/ThinkMode，统一 `runAgent` 仅对未填写的参数使用默认值；显式参数、Origin 用户授权和任务 Owner 终态仍优先。**这不是通用 Web Task API，也没有创建新的任务数据库。**
+
+## M0.4 — 可选本机 Tauri Desktop 管理入口（独立预览）
+
+基于已交付的 `tasks list`、`self-test`、Native Host 状态和 AgentPreferences，本轮建立独立 Tauri 2 单窗口管理应用（概览/只读任务/Agent 默认配置）。Desktop 只调用本机 Rust Commands，显式选择后才读取 CloudFile Provider；默认不运行 Agent、不修改文件、不安装常驻服务。它是**与 Bridge 核心解耦的开发预览**，完整 GUI/发行验收和签名自动升级未完成，也不替代 CloudFile Agent2 现有 Tauri。参见 [Desktop 说明](../crates/local-bridge-desktop/README.md)。
+
+## M0 — 初期实现基线（历史，当前状态见上方核查表）
+
+Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 MCP Client、离线 Profile 结构校验、可选 Chrome Native Host/Inbox、Web AI 手动接力，以及用户主动调用既有 Codex CLI 的临时只读任务均已在代码中实现。**Codex/Pi 与 WorkBuddy 均已有独立本机实验记录；统一 Web V2 Agent 状态和 run/read 已有源码，但三者的 Chrome/HTTP 真实端到端尚未验收。已实现代码不等于已验证模型/登录/企业联动。**可信在线 Profile、完整 PersonalProfile Runtime、**通用 Web 任务 API / 事件订阅 / 动作转发**、完整通信 Adapter、CloudFile 文件操作 IPC 均未交付；本机 CLI/Tauri 只读聚合已在 M0.3/M0.4 完成。CloudFile 编辑仍走现有 Agent2/Hub/Server。详见 [Agent 实测矩阵](AGENT_PROVIDER_VALIDATION.md)。
 
 ## 模型来源与应急方式（2026-10-28 收敛决策）
 
@@ -50,15 +76,11 @@ Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 
 - Etech 元枢复用原 Web、SSO 与 AI API，仅添加通用 MCP/Agent 本地能力。不把企业代码或固定地址放进 Bridge 核心。
 - 可选的个人/企业隔离设置仅在真实需求下追加，不作为默认连接的 P0 阻断。
 
-## M0.4 — 可选本机 Tauri Desktop 管理入口（独立预览）
-
-基于已交付的 `tasks list`、`self-test`、Native Host 状态和 AgentPreferences，本轮建立独立 Tauri 2 单窗口管理应用（概览/只读任务/Agent 默认配置）。Desktop 只调用本机 Rust Commands，显式选择后才读取 CloudFile Provider；默认不运行 Agent、不修改文件、不安装常驻服务。它是**与 Bridge 核心解耦的开发预览**，完整 GUI/发行验收和签名自动升级未完成，也不替代 CloudFile Agent2 现有 Tauri。参见 [Desktop 说明](../crates/local-bridge-desktop/README.md)。
-
 ## M4 — 验证后才考虑统一桌面入口
 
 - 为**第二套 Chrome/Bridge 入口**逐项验证查看、普通编辑、独占编辑，经 Provider 调用原 Agent2 唯一文件执行器；两入口共用文件任务、Journal/Guard/工作副本，不独立复制。
 - Windows 普通用户优先，Mac/Linux 同合同逐步覆盖；Chrome/Agent 升级与回退须保持已有生产使用习惯。
-- 第二套可以按实际价值添加 Bridge 可选的通用桌面任务壳；第一套原 Tauri 长期保留。统一安装、旧插件退役属于未来单独批准的升级合并，不是本里程碑自动结果。
+- Bridge 可选管理 Tauri 的**开发预览已提前落地**（M0.4），但仍需真实安装和 GUI 验收；原 Agent2 Tauri 长期保留。M4 讨论验证后的文件三模式联动、安装整合与是否更换旧插件，不因已有管理界面自动切换。
 
 **判断标准：**解决了什么痛点、减少哪些步骤、复用了什么、有没有新障碍。拒绝重复 SSO、企业 DLP、重写文件引擎、大型通用 RPA、重复任务数据库和过度审批。
 
