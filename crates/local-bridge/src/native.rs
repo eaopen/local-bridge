@@ -93,7 +93,8 @@ fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Valu
                 "capabilities":["host.status","context.share","context.summarize"],
                 "handoff":"local-inbox",
                 "ai_run_supported":true,
-                "ai_run_enabled":"user_click_only",
+                "ai_run_enabled":false,
+                "ai_run_mode":"on_explicit_popup_request",
                 "agent_readiness":"not_checked; Codex must be installed and logged in"
             }})
         }
@@ -284,7 +285,8 @@ mod tests {
         assert_eq!(answer["ok"], true);
         assert_eq!(answer["result"]["provider"], "local-bridge");
         assert_eq!(answer["result"]["ai_run_supported"], true);
-        assert_eq!(answer["result"]["ai_run_enabled"], "user_click_only");
+        assert_eq!(answer["result"]["ai_run_enabled"], false);
+        assert_eq!(answer["result"]["ai_run_mode"], "on_explicit_popup_request");
         assert_eq!(answer["result"]["connected_to_local_bridge"], true);
         assert_eq!(
             handle(&json!({
