@@ -1,6 +1,7 @@
 //! The small trust boundary shared by the core, MCP adapter and enterprise
 //! integrations. A remote Channel manifest is presentation, NOT code.
 pub mod profile;
+pub mod profile_v2;
 
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};

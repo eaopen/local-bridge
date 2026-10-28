@@ -109,7 +109,9 @@ class BrokerConnection implements WorkbuddyBroker {
     private available = false;
     private maxInflight = 8;
     private id = 0;
-    constructor(endpoint: string, private readonly onDisconnect?: (error: Error) => void) {
+    private readonly onDisconnect?: (error: Error) => void;
+    constructor(endpoint: string, onDisconnect?: (error: Error) => void) {
+        this.onDisconnect = onDisconnect;
         this.socket = net.createConnection(endpoint);
         this.socket.on('error', error => this.close(failure(!this.available
             && ['ECONNREFUSED', 'ENOENT'].includes((error as NodeJS.ErrnoException).code ?? '') ? 'E_SOCKET_UNAVAILABLE' : 'E_DISCONNECTED')));

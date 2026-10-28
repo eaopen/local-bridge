@@ -1,0 +1,17 @@
+{
+  "name": "@eaopen/local-bridge-web-client",
+  "version": "2.0.0-preview.1",
+  "private": true,
+  "description": "Zero-dependency Web V2 client for Local Bridge loopback HTTP/SSE and Chrome bootstrap",
+  "type": "module",
+  "main": "./client.js",
+  "types": "./client.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "test": "node --test client.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "Apache-2.0"
+}

@@ -3,7 +3,7 @@
 //!
 //! Only user-initiated extension popup context is accepted. The real handoff
 //! is a local user-owned inbox item, NOT an AI/file operation completion.
-use crate::{agent, inbox};
+use crate::{agent, inbox, web_v2};
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -196,6 +196,9 @@ fn validate_enterprise_ai(value: &Value) -> Result<(String, String, String, Stri
 }
 
 pub fn handle(request: &Value) -> Value {
+    if request["protocol_version"] == 2 {
+        return web_v2::handle_native(request);
+    }
     handle_with_runners(request, agent::run_codex, agent::run_pi_enterprise_ticket)
 }
 
@@ -230,7 +233,7 @@ fn handle_with_runners(
                 "provider":"local-bridge",
                 "connected_to_local_bridge":true,
                 "native_protocol":1,
-                "capabilities":["host.status","context.share","context.summarize","relay.return","enterprise.pi.run"],
+                "capabilities":["host.status","context.share","context.summarize","relay.return","enterprise.pi.run","web.v2.capabilities","web.v2.mcp.status","web.v2.agent.start","web.v2.agent.poll","web.v2.session.issue"],
                 "handoff":"local-inbox",
                 "ai_run_supported":true,
                 "ai_run_enabled":false,

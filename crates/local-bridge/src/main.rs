@@ -2,8 +2,11 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
-use local_bridge::{agent, inbox, mcp_provider, native, workbuddy};
+use local_bridge::{
+    agent, inbox, local_http, mcp_provider, native, web_v2, workbuddy, workbuddy_web,
+};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
+use local_bridge_core::profile_v2::{validate_profile_v2_shape, ApplicationProfileV2};
 use local_bridge_core::{
     validate_manifest, visible_channels, ChannelManifest, AVAILABLE_CAPABILITIES,
 };
@@ -42,6 +45,27 @@ fn run() -> Result<()> {
         }
         [x, action, id, tool, json_input] if x == "provider" && action == "call" => {
             println!("{}", mcp_provider::call(id, tool, json_input)?);
+        }
+        [a, action, origin, provider, tool] if a == "web-v2" && action == "grant-status" => {
+            println!("{}", web_v2::grant_status(origin, provider, tool)?);
+        }
+        [a, action, origin, provider, tool] if a == "web-v2" && action == "revoke-status" => {
+            println!("{}", web_v2::revoke_status(origin, provider, tool)?);
+        }
+        [a, action] if a == "web-v2" && action == "serve" => {
+            local_http::serve()?;
+        }
+        [a, action, origin] if a == "web-v2" && action == "grant-workbuddy" => {
+            println!("{}", workbuddy_web::grant(origin)?);
+        }
+        [a, action, origin] if a == "web-v2" && action == "revoke-workbuddy" => {
+            println!("{}", workbuddy_web::revoke(origin)?);
+        }
+        [a, action, origin] if a == "web-v2" && action == "workbuddy-capability" => {
+            println!("{}", workbuddy_web::capability(origin)?);
+        }
+        [a, action, origin] if a == "web-v2" && action == "capabilities" => {
+            println!("{}", web_v2::capabilities(origin)?);
         }
         [x, action, id] if x == "native-host" && action == "install" => {
             println!("{}", native::install_host(id, false)?);
@@ -168,9 +192,55 @@ fn run() -> Result<()> {
                     "channels":value.channels.len()})
             );
         }
+        [command, filename] if command == "validate-profile-v2" => {
+            // Never enroll a remote enterprise Profile from an offline JSON file.
+            let path = Path::new(filename);
+            let metadata = std::fs::metadata(path)?;
+            if !metadata.is_file() || metadata.len() > 64 * 1024 {
+                bail!("invalid V2 application profile file size");
+            }
+            let value: ApplicationProfileV2 = serde_json::from_slice(&std::fs::read(path)?)?;
+            validate_profile_v2_shape(&value)?;
+            println!(
+                "{}",
+                json!({"schema_version":2, "shape_valid":true, "trusted":false, "activated":false,
+                    "profile_id":value.profile_id, "channels":value.channels.len(),
+                    "mixed_mode":value.mixed_context.mode,
+                    "agent_preference":value.agent_policy.as_ref().map(|p| &p.preferred_providers),
+                    "enterprise_ai_enabled":value.enterprise_ai_api.as_ref().is_some_and(|a| a.enabled)})
+            );
+        }
+        [command, action, filename] if command == "profile-v2" && action == "inspect" => {
+            // User-owned local Provider registrations: never reveal executables,
+            // tokens, chat data or falsely claim Provider readiness/permission.
+            let path = Path::new(filename);
+            let metadata = std::fs::metadata(path)?;
+            if !metadata.is_file() || metadata.len() > 64 * 1024 {
+                bail!("invalid V2 application profile file size");
+            }
+            let value: ApplicationProfileV2 = serde_json::from_slice(&std::fs::read(path)?)?;
+            validate_profile_v2_shape(&value)?;
+            let registry = mcp_provider::list()?;
+            let providers: Vec<_> = registry["providers"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|p| p["id"].as_str())
+                .map(|id| json!({"id":id,"state":"configured_not_verified","authorized":false}))
+                .collect();
+            println!(
+                "{}",
+                json!({"schema_version":2,"profile_id":value.profile_id,
+                    "trusted":false,"activated":false,
+                    "personal_mcp_providers":providers,
+                    "requested_personal_capabilities":value.mixed_context.personal_capability_requests,
+                    "suggested_mcp_providers":value.mixed_context.suggested_mcp_providers,
+                    "agent_preference":value.agent_policy.as_ref().map(|p| &p.preferred_providers)})
+            );
+        }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 serve | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
