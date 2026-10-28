@@ -43,6 +43,8 @@ impl RunAgentRequest {
             || self.prompt.contains('\0')
             || !["auto", "workbuddy", "codex", "pi"].contains(&self.agent.as_str())
             || !valid_id(&self.model, 128)
+            || self.model.contains("://")
+            || self.model.starts_with('/')
             || !["auto", "off", "low", "medium", "high", "xhigh", "max"]
                 .contains(&self.think_mode.as_str())
             || !["prefer", "require"].contains(&self.agent_mode.as_str())
