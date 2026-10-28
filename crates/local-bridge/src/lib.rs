@@ -5,5 +5,5 @@ pub mod inbox;
 pub mod mcp_provider;
 pub mod native;
 pub mod pi_enterprise;
-pub mod workbuddy;
 pub mod web_v2;
+pub mod workbuddy;
