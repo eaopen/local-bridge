@@ -80,6 +80,7 @@ fn native_host_status_and_explicit_inbox_handoff() {
         r#"{"schema_version":1,"agent":"codex","agent_mode":"require","model":"auto","think_mode":"medium","priority":["codex","workbuddy","pi"]}"#]);
     assert_eq!(updated["agent"], "codex");
     assert_eq!(command(&root, &["agent-preferences", "get"])["priority"][0], "codex");
+    let status = send_native(
         json!({
             "protocol_version":1,"request_id":"status_1",
             "action":"host.status","payload":{}
