@@ -22,6 +22,8 @@ Local Bridge 提供**最小的本机能力连接层**：
 
 Profile 用于来源、账号上下文与任务归属，**不默认作为个人/企业数据墙**。已有应用负责 SSO、业务权限与文件版本；Bridge 只承担自身可信调用、能力分发与任务交接，不建设新 DLP 或企业认证中心。
 
+**AI 模型从哪里来，不由 Bridge 统一解决。** 企业 Web/服务方已有 AI API 时，由企业应用服务端管理模型接入、账号授权、计费与实际推理；Bridge 只提供经授权的本机 MCP/Agent 能力和结果交接。个人用户优先复用已登录 Codex、WorkBuddy；Pi 只在本人已经配置可用模型时按需调用。没有 API 或 Agent 时，现有 Chrome Web AI Relay 可让用户手动使用已登录网页聊天。**不建设 Bridge 模型 API Key 配置界面、免费额度路由或类似 9Router 的网关。**
+
 **可选 Chrome → 本地 Codex 摘要（需主动点击）：** 本机 Native Host 可接收已安装的独立 Local Tool Bridge Chrome 扩展提交的 `context.summarize`，调用用户已有、已登录的 Codex CLI，并将结果回传 Popup；浏览器网页无法直接调用，Bridge 不预装 Codex，扩展无本机 Provider 时仍能独立采集/复制。此功能是可选的显式用户动作，Chrome/macOS/Windows 实机联动仍需验收，详见 [Native Host V1](docs/CHROME_NATIVE_HOST_V1.md)。
 
 **可选 Web AI 手动接力（非模型路由）：** Local Tool Bridge 可以将用户选择的网页上下文复制给已有 ChatGPT/Gemini/Claude 等 Web Chat，由用户在浏览器中自行粘贴和对话；收到回复后再手动导入同一 Local Bridge 本机收件箱，并关联源任务引用。CLI 也提供 `local-bridge relay prepare <inbox-id>` 生成可复制的接力提示。没有网页登录自动化、网页额度调度、API Token、远程模型网关或自动 MCP 指令执行，详见 [Web AI Relay V1](docs/WEB_AI_RELAY_V1.md)。

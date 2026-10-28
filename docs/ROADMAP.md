@@ -6,6 +6,13 @@
 
 Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 MCP Client、离线 Profile 结构校验、可选 Chrome Native Host/Inbox、Web AI 手动接力，以及用户主动调用既有 Codex CLI 的临时只读任务均已在代码中实现。**Codex App Server 官方协议和短任务已在一台开发 Mac 上单独实测，但尚未接入 Bridge AgentAdapter；WorkBuddy 尚无实际调用验证。**可信在线 Profile、PersonalProfile Runtime、跨 Provider 任务聚合、完整通信 Adapter、CloudFile 文件 IPC 均未交付。CloudFile 编辑仍走现有 Agent2/Hub/Server。详见 [Agent 实测矩阵](AGENT_PROVIDER_VALIDATION.md)。
 
+## 模型来源与应急方式（2026-10-28 收敛决策）
+
+- **企业：**企业服务方或现有 Web 应用后端直接提供 AI API、模型选择、授权、额度与费用；Local Bridge 不替企业服务重新配置模型/密钥，也不把后台 API 强塞给 Pi。企业 Web 只向 Bridge 申请获授权的本机 MCP/Agent/文件操作，并接收真实结果。
+- **个人：**优先使用用户自己已登录的 Codex / WorkBuddy；Pi 仍是**非必装**备选，只有用户自己已配置可用模型/API 时才使用现有一次性 CLI，**不继续增加 Bridge 自己的 API 配置 UI、计费/额度调度和多提供商路由**。
+- **没有 API/Agent：**保留已实现的 Chrome Web AI Relay 人工接力到已登录 ChatGPT/Gemini 等网页，用户自己粘贴、对话和选择回复，Bridge 可接收关联结果；不把消费级网页会话当程序化 API。
+- **实际研发重心：**Chrome ↔ Native Host 实机验收、可信 Web 应用调用本机 MCP/Agent 和结果回传，而非再扩张模型配置/免费额度机制。Pi 配置指引仅供主动需要的用户使用，不能作为产品安装门槛或开发阻断。
+
 ## M1 — 最短 Web / 本机调用闭环（优先）
 
 - 可信 ApplicationProfile + LocalBinding + 能力发现，明确 declared/installed/available/authorized；个人工作空间只做轻量本地配置，不创建云账号或服务端 PersonalProfile Schema。

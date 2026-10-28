@@ -1,6 +1,6 @@
 # Pi 最小可用接入：用户自己的 API / 模型，而非模型路由平台
 
-**目标：** Codex 或 WorkBuddy 当前不可用时，如果用户愿意提供一个官方 API Key（例如 DeepSeek），就能用已安装的 Pi 继续一个文本任务。不要求用户购买额外 Agent 账号。Pi、WorkBuddy、Codex、Chrome 和 WeChat 均为 Local Bridge 的可选组成部分。
+**定位（2026-10-28）：** 这是**已配置 Pi 用户的可选使用指引**，不是要求每个人再办理模型账号的安装步骤，更不是企业 Web 必须走的默认 Agent。企业已有 AI 服务/API 时由企业应用后端负责模型、认证、额度和费用，Bridge 只连接获准的本地能力。个人优先复用 Codex/WorkBuddy 等原有登录；没有 Pi 模型 API 时直接使用现有 Chrome Web AI Relay 手动接力。只有明确需要自动调用 Pi、且用户自己已有或愿意配置官方模型 API 时，才使用下列可选 CLI。
 
 ## 1. 先在 Pi 自己的设置里连接模型
 
@@ -29,14 +29,14 @@ Bridge 会调用 `pi --print --no-session --no-tools --no-extensions --no-skills
 
 API Key、OAuth、余额、模型列表、模型费用等均由 Pi 和各 Provider 已有功能负责；Bridge 管一次任务的调用/结果即可，避免额外配置、重复密钥存储及 9Router 式调度。可以在 Pi 中改一次模型或 API，Bridge 仅需要调用时指定对应 Provider/Model。
 
-- **首选：DeepSeek API**，通常低成本、需自行开通 API Key/确认余额。准确模型 ID/价格以 Provider 和 Pi 实际目录为准。
+- **可选示例：DeepSeek API**，通常低成本，但需要用户主动开通 API Key/确认余额；**不是所有 Local Bridge 用户的默认配置**。准确模型 ID/价格以 Provider 和 Pi 实际目录为准。
 - **可选：Gemini API 有条件的免费层、Groq 等已有额度。** 免费模型、额度、地域和数据处理条款以各自实际账户为准。
 - **OpenCode 免费模型：** OpenCode 官方明确免费模型只在 OpenCode 内部提供。Pi 作为外部 API harness 访问这类免费模型会返回 403；即便 Pi 支持 `OPENCODE_API_KEY`，也不代表免费模型可以外部调用。若要用免费的 OpenCode，先独立使用 OpenCode 正式产品，不在 Bridge 中模拟调用或绕过厂商限制。
 - **无任何 API Key：** 现有 [Web AI Relay](WEB_AI_RELAY_V1.md) 保留 ChatGPT/Gemini/Claude 等网页聊天的**人工复制 → 对话 → 带回结果**，不依赖 Pi；Web Chat 不是 Local Bridge 或 Pi 的自动模型 API。
 
 ## 2. 实施范围与下一阶段
 
-V1 不新增 Provider 配置 Schema、模型路由、自动降级或计费层。缺少 Pi 程序/模型/认证时必须返回不可用；绝不改用某个历史 9Router 配置或静默转向云端 Chat。前台用户只选择一个明确的 Provider/Model。
+现有 V1 仅保留可选的一次性 Pi CLI，不再把为 Pi 增加 API Key 配置或模型选择界面列为近期产品任务。**企业已有 AI API，无需经过 Pi；个人没有 Pi API 也不影响 Chrome Web AI Relay 和 Bridge 的其它能力。** V1 不新增 Provider 配置 Schema、模型路由、自动降级或计费层。缺少 Pi 程序/模型/认证时必须返回不可用；绝不改用某个历史 9Router 配置或静默转向云端 Chat。用户明确需要 Pi 时才指定 Provider/Model。
 
 **验收还缺一条独立 API 的真实调用：** 当前可连接开发 Mac 上 Pi CLI 已安装，但未发现 DeepSeek/OpenCode/Gemini 直连凭据，因此不能声称已验证 Pi + DeepSeek。此前以用户已有 9Router 扩展跑通的 Pi RPC 是另一条独立验证记录。等用户自身 Provider API 可用后，用完全虚构的文本做一次任务，确认最终响应和用量符合期望，再决定是否值得做 Pi RPC、工具审批和 Web Agent 自动联动。
 
