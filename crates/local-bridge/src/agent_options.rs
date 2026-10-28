@@ -70,7 +70,11 @@ fn installed_cli(name: &str) -> bool {
     let paths = std::env::var_os("PATH").unwrap_or_default();
     #[cfg(target_os = "macos")]
     let dirs: Vec<_> = std::env::split_paths(&paths)
-        .chain(["/opt/homebrew/bin", "/usr/local/bin"].into_iter().map(std::path::PathBuf::from))
+        .chain(
+            ["/opt/homebrew/bin", "/usr/local/bin"]
+                .into_iter()
+                .map(std::path::PathBuf::from),
+        )
         .collect();
     #[cfg(not(target_os = "macos"))]
     let dirs: Vec<_> = std::env::split_paths(&paths).collect();
