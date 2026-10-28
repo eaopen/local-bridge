@@ -9,6 +9,26 @@
 - **浏览器协议与 Profile 版本不同**：既有通用 Chrome 扩展的 `local-tool-bridge:web:v1` 和 Native Messaging framed V1 与 V2 Profile 并不等价。Web V2 调用需要单独协商/版本标识，不移除已有 `context.share/summarize/relay.return/enterprise.pi.run`。Chrome 插件、Native Host 的独立版本与升级不强制绑定到 V2 Profile。
 - V2 复用 V1 的 `profile_id`、`provider`、`environment`、`revision`、`expires_at`、`application`、`origin`、`services`、`channels`、`update` 的通用语义；`schema_version=2` 允许两个新增对象 `agent_policy` 与 `enterprise_ai_api`。**V1 解析器仍拒绝 V2 新字段**，不能对 V1 端点新增它们。
 
+## 2. 工作/个人混合 Profile：统一 Runtime，个人 Provider 本地持有
+
+`mixed_context` 是服务端**请求/提示**，不是个人 Profile 的配置，也不意味着企业应用获得个人工具读取/发消息权限：
+
+```json
+"mixed_context": {
+  "mode": "mixed",
+  "personal_capability_requests": ["mcp.tool.call", "communication.local"],
+  "suggested_mcp_providers": ["wechat"]
+}
+```
+
+- `mode=mixed`（默认）允许在**同一 OS 用户的 Runtime**中同时出现企业 Web AI、已有 Codex/WorkBuddy/Pi、用户注册的个人 MCP/通讯 Provider。无需切换企业/个人账号，也不在企业端保存微信账号、MCP 可执行路径或本地 Token。
+- **Local PersonalProfile** 归本机用户；V2 通过 `personal_capability_requests` 申请用途，`suggested_mcp_providers` 只用于 UX 提示：`wechat` 可安装可不安装，**不会自动注册、启动或授予读取/发送能力**。
+- 运行时 `EffectiveProfile = trusted ApplicationProfile V2 请求 ∩ 本机真实 Provider 状态 ∩ 本机用户许可 ∩ 目标业务对象授权`。本机 Provider 的注册、`tools/list`、登录、访问范围由其所属 Provider 决定；**配置已存在不等于已验证 ready**，能力显示与调用许可分离。
+- `mode=enterprise_only` 是企业应用显式提出不使用个人工具的场景，必须同时清空 `personal_capability_requests`；**不改变已有本机个人 Provider 的配置或安装**。
+- 个人与工作混合不额外创造一个 Bridge DLP 或重复 SSO；Chat/微信/文件的消息回执和权限仍由原服务掌握。企业任务主动调用个人微信需先获得当前操作用户许可与具体 Provider/工具的执行授权。网页/模型的自然语言文本不是同意或操作许可。
+
+**已实现的最小代码**：`crates/local-bridge-core/src/profile_v2.rs` 独立类型/结构验证、纯函数 Provider 选择和 Personal MCP 权限交集；CLI `validate-profile-v2` / `profile-v2 inspect` 只能显示结构与本机已注册 Provider，`trusted=false`、`authorized=false`，**不是已交付的网页→微信或 Agent 运行授权**。V1 解析与 CloudFile 保持不变。
+
 ## 2. Agent 策略（可声明，不是本地授权）
 
 ```json
