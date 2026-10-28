@@ -79,6 +79,7 @@ function agentRequest(options) {
       (agent === 'auto' && agentMode === 'require') ||
       typeof model !== 'string' || model.length < 1 || model.length > 128 ||
       !/^[A-Za-z0-9_./:-]+$/.test(model) ||
+      model.includes('://') || model.startsWith('/') ||
       !THINK_MODES.has(thinkMode))
     throw new LocalBridgeError('invalid_agent_options')
   return {

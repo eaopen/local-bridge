@@ -213,7 +213,7 @@ test('unified Agent options never silently downgrade a rejected model or thinkMo
   }),/local_http_422/)
   assert.equal(calls.filter(x=>x.action==='agent.run').length,0)
   for(const bad of [
-    {agent:'shell'}, {model:'https://x/?token=y'}, {thinkMode:'infinite'},
+    {agent:'shell'}, {model:'https://x/?token=y'}, {model:'https://evil.example'}, {thinkMode:'infinite'},
     {agent:'auto',agentMode:'require'}, {shell:'rm -rf .'}
   ]) {
     await assert.rejects(()=>bridge.runAgent({
