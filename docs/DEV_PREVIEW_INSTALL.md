@@ -23,6 +23,12 @@ Use a new test user-home/profile, not your regular CloudFile/Chrome profile.
 
 The desktop app must be launched manually and tested in a separate DEV account/home. Verify Overview → Tasks → Settings, save Agent selection, close/reopen, then read back using the same CLI settings file. Do **not** install a user-wide background daemon or alter OS startup in this preview.
 
+### macOS Chrome for Testing 的额外实机注意事项
+
+在 2026-10-29 验收所用的 **Chrome for Testing 156 + 自定义 user-data-dir** 环境中，Native Host Manifest 必须能被该测试 profile 的 `NativeMessagingHosts/` 搜索路径发现。单纯复制到用户默认 Chrome/ChromeForTesting 的常规目录并未被这个自定义 profile 检出。**这是该版本测试观察，不是生产 Chrome 的安装规范；用户正常 Chrome 仍使用 Bridge 标准 `native-host install`。** 使用测试 profile 前先检查是否存在同名文件，切勿覆盖它；结束时只删除此次新创建的测试 Manifest。
+
+真实 Mac 证据详见 [2026-10-29 浏览器/Agent/Tauri 验收](validation/chrome-macos-20261029.md)。模拟权限弹窗的测试专用 unpacked 扩展配置只在隔离副本中使用，不可作为生产扩展打包版本。
+
 ## Real Chrome DEV E2E
 
 1. Create an isolated Chrome profile and load the separate [Local Tool Bridge](https://github.com/eaopen/local-bridge-chrome-extension) unpacked extension. Obtain the **real** 32-letter extension ID.

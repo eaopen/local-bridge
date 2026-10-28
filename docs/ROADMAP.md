@@ -6,19 +6,25 @@
 
 ## 2026-10-29 实际交付与验收状态
 
+### macOS 实机新增验收（2026-10-29）
+
+已在独立 Chrome for Testing 156 配置下验证 **真实 Chrome → 独立 Native Host → Bridge → 本机 MCP 只读 Provider → 浏览器结果**，包括 Origin 授权后调用与撤销后拒绝；通过已有 Codex 桌面登录的 CLI，完成 **Web V2 `runAgent/readAgent` → 明确 `task.completed`**，并验证同一 `client_key` 再调用返回 `reused:true`、不启动第二个任务。可选 Tauri DEV .app 实际启动并显示窗口；AgentPreferences 后端保存/回读通过。验收记录：[macOS Chrome/Agent/Tauri 实机报告](validation/chrome-macos-20261029.md)。
+
+范围限制：测试扩展预先授予仅测试用户配置的权限，**未测试正式权限弹窗 UX**；Chrome HTTP/SSE → Native 断线续读、Tauri 窗口内保存/重启验收、Windows 浏览器真机、企业 SSO 和 CloudFile 文件端到端仍未完成。开发预览构建 [PR #38](https://github.com/eaopen/local-bridge/pull/38) 已合并，Windows/macOS unsigned artifacts CI 通过，尚无正式签名 Release。
+
 最近五批已合入 Local Bridge `dev`：[Native Host 生命周期 #32](https://github.com/eaopen/local-bridge/pull/32)、[Web 授权原子存储 #33](https://github.com/eaopen/local-bridge/pull/33)、[只读任务聚合 #34](https://github.com/eaopen/local-bridge/pull/34)、[AgentPreferences #35](https://github.com/eaopen/local-bridge/pull/35)、[可选 Tauri Desktop #36](https://github.com/eaopen/local-bridge/pull/36)。`dev` 基线 `2955732` 的 Windows/macOS/Ubuntu 核心 CI **通过**；独立 Tauri Windows/macOS 编译和静态 UI CI **通过**，但**不等于真实 GUI 安装/运行验收**。尚无正式 Release、签名安装包。
 
 | 方向 | 已实现的代码/验证 | 还未交付，不能宣称已上线 |
 | --- | --- | --- |
 | Core / CLI / MCP / Native | MCP stdio、用户注册 Provider、Chrome Host、Inbox、诊断/回退/授权持久化 | 普通用户机器上的真实 Chrome 安装/绑定与正式发布 |
-| Chrome Web V2 / Agent | 独立 Chrome MV3 + Web SDK 的版本化能力发现、只读状态工具、统一 `runAgent/readAgent`；本机 `AgentPreferences` 默认选择/优先顺序/Model/ThinkMode | Chrome → Host → 授权 MCP/Agent → 回传的真机 E2E；`installed/eligible` 不等于已登录/API 可用 |
+| Chrome Web V2 / Agent | 独立 Chrome MV3 + Web SDK、AgentPreferences；**macOS 实机已通过只读 MCP 及真实 Codex `runAgent/readAgent`、同 clientKey 去重、Origin 撤权** | Windows、正式权限弹窗、HTTP/SSE → Native 断连续读、企业 Web 登录；其他 Agent 的 ready 不等于已验证 |
 | Agent | Codex/Pi 文本 CLI Worker、WorkBuddy 独立真实实验回执、重复 clientKey 保护 | 通用 WorkBuddy 原桌面账号 Adapter、实际模型/ThinkMode 生效核验、多平台失败恢复 |
 | 任务中心 | 本机 CLI 和独立 Tauri 预览的只读 AI/WorkBuddy/Inbox 任务聚合 | 通用 Web 任务 API、事件订阅、跨模块动作转发；来源错误要保留不完整状态 |
 | CloudFile 文件 | Agent2 独立文件 Owner 保留；[Provider Draft #26](https://github.com/eaopen/cloudfile-local-agent2/pull/26) 有共用原 Agent2 数据根的只读脱敏代码 | Provider 未合并 Agent2 `dev`；无 Bridge 三模式真实文件动作，不能建第二 Writer |
 | 企业 V2 / Profile | ApplicationProfile V2 **离线结构解析/校验**、企业 Pi 临时推理适配代码 | 可信在线 Profile/SSO/企业 AI API 的真实 Web 联动 |
 | 通讯 Provider | Bridge MCP Client 注册/调用独立 Provider，微信状态/搜索有协议/CI 测试 | 真实微信 GUI、用户授权和消息读/发的实机验收 |
 
-**下阶段 P0：**优先完成 [#9](https://github.com/eaopen/local-bridge/issues/9) 的普通用户 Chrome + Native Host 最短闭环（一个本地已授权的只读 MCP 工具），再完成 [#6](https://github.com/eaopen/local-bridge/issues/6) 的实际 Web V2 `runAgent/readAgent`、断线同 clientKey 续读和源系统故障降级。并行完成 Tauri 开发预览的本机安装、任务读取及 AgentPreferences 保存/回读。**不再新增任务框架、账号网关或文件引擎。**
+**下阶段 P0：**macOS 真实 Chrome + Native Host + 只读 MCP 及真实 Codex Agent 任务已通过，改优先验证 **Windows 真机 / 正式权限点击 / HTTP-SSE 断线转 Native 续读**，继续在 [#9](https://github.com/eaopen/local-bridge/issues/9)、[#6](https://github.com/eaopen/local-bridge/issues/6) 跟踪；补齐 Tauri 窗口内设置保存与重开回读。签名发布、企业登录和 CloudFile 写入均未包含本轮。**不再新增任务框架、账号网关或文件引擎。**
 
 其后才按实际依赖推进 CloudFile 同一文件根的只读 Provider 验证、可信企业 Profile/模型 API、WorkBuddy 正式 Adapter、独立微信 Provider。原 Agent2 Tauri 与两套 Chrome/Host 独立并行，旧客户端不自动退役。
 
