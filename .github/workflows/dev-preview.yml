@@ -1,0 +1,98 @@
+name: Unsigned Local Bridge developer preview
+on:
+  pull_request:
+    paths:
+      - 'crates/local-bridge/**'
+      - 'crates/local-bridge-core/**'
+      - 'crates/local-bridge-desktop/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/dev-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-arm64:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build CLI and native Chrome Host
+        run: cargo build --workspace --release --locked
+      - name: Bundle unsigned optional Tauri desktop
+        working-directory: crates/local-bridge-desktop
+        run: >
+          npx --yes @tauri-apps/cli@2.12.4 build --ci --no-sign
+          --bundles app --config '{"bundle":{"active":true}}'
+      - name: Stage macOS preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="$RUNNER_TEMP/preview"
+          mkdir -p "$dest/bin"
+          cp target/release/local-bridge target/release/local-bridge-native-host "$dest/bin/"
+          chmod +x "$dest/bin/"*
+          app="$(find crates/local-bridge-desktop/target/release/bundle/macos -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app"
+          /usr/bin/ditto "$app" "$dest/$(basename "$app")"
+          printf 'source_sha=%s\nplatform=macos-arm64\nsigned=false\nnotarized=false\n' "$GITHUB_SHA" > "$dest/BUILD_INFO.txt"
+          cp docs/DEV_PREVIEW_INSTALL.md "$dest/README.md"
+          tar -C "$dest" -czf "$RUNNER_TEMP/local-bridge-dev-macos-arm64.tar.gz" .
+          tar -tzf "$RUNNER_TEMP/local-bridge-dev-macos-arm64.tar.gz" | grep -q '/bin/local-bridge-native-host'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-bridge-dev-macos-arm64
+          path: ${{ runner.temp }}/local-bridge-dev-macos-arm64.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+
+  windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build CLI and native Chrome Host
+        run: cargo build --workspace --release --locked
+      - name: Bundle unsigned optional Tauri desktop
+        working-directory: crates/local-bridge-desktop
+        run: >
+          npx --yes @tauri-apps/cli@2.12.4 build --ci --no-sign
+          --bundles nsis --config "{\"bundle\":{\"active\":true}}"
+      - name: Stage Windows preview
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stage = Join-Path $env:RUNNER_TEMP "preview"
+          New-Item -ItemType Directory -Force (Join-Path $stage "bin") | Out-Null
+          Copy-Item "target/release/local-bridge.exe" (Join-Path $stage "bin") -ErrorAction Stop
+          Copy-Item "target/release/local-bridge-native-host.exe" (Join-Path $stage "bin") -ErrorAction Stop
+          $setup = Get-ChildItem "crates/local-bridge-desktop/target/release/bundle/nsis/*.exe" |
+            Select-Object -First 1
+          if (-not $setup) { throw "NSIS preview installer missing" }
+          Copy-Item $setup.FullName $stage
+          "source_sha=$env:GITHUB_SHA\nplatform=windows-x64\nsigned=false" |
+            Set-Content (Join-Path $stage "BUILD_INFO.txt")
+          Copy-Item "docs/DEV_PREVIEW_INSTALL.md" (Join-Path $stage "README.md")
+          $archive = Join-Path $env:RUNNER_TEMP "local-bridge-dev-windows-x64.zip"
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $archive -Force
+          if (-not (Test-Path $archive)) { throw "Preview ZIP missing" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-bridge-dev-windows-x64
+          path: ${{ runner.temp }}/local-bridge-dev-windows-x64.zip
+          retention-days: 14
+          if-no-files-found: error
