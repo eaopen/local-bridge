@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local-bridge-main",
+  "description": "Only the packaged, local main window may call the desktop manager.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
