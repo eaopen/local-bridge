@@ -189,7 +189,7 @@ fn validate_enterprise_ai(value: &Value) -> Result<(String, String, String, Stri
         bail!("invalid enterprise model, authorization or prompt");
     }
     Ok((
-        endpoint.into(),
+        endpoint.to_string(),
         raw.model,
         raw.ticket,
         raw.prompt,
