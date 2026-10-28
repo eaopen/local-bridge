@@ -191,19 +191,15 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
     }))
 }
 
-
 // CodeBuddy Code is a separate, officially supported CLI. Logging in once
 // with the user's existing Buddy account can use the shared subscription
 // credits, but does NOT inherit the running WorkBuddy desktop's GUI, skills,
 // session, or login credentials. This entrypoint is deliberately text-only:
 // no --dangerously-skip-permissions, no built-in tools, and no MCP tools.
 fn parse_codebuddy_result(output: &str) -> Result<String> {
-    let event: Value = serde_json::from_str(output.trim())
-        .context("invalid CodeBuddy headless JSON response")?;
-    if event["is_error"] == true
-        || event["type"] == "error"
-        || event["subtype"] == "error"
-    {
+    let event: Value =
+        serde_json::from_str(output.trim()).context("invalid CodeBuddy headless JSON response")?;
+    if event["is_error"] == true || event["type"] == "error" || event["subtype"] == "error" {
         bail!("CodeBuddy reported an unsuccessful run");
     }
     if let Some(kind) = event["type"].as_str() {
@@ -256,8 +252,11 @@ fn codebuddy_command(program: &str) -> Command {
 fn spawn_codebuddy() -> Result<std::process::Child> {
     #[cfg(target_os = "macos")]
     let candidates = [
-        "codebuddy", "cbc", "/opt/homebrew/bin/codebuddy",
-        "/opt/homebrew/bin/cbc", "/usr/local/bin/codebuddy",
+        "codebuddy",
+        "cbc",
+        "/opt/homebrew/bin/codebuddy",
+        "/opt/homebrew/bin/cbc",
+        "/usr/local/bin/codebuddy",
         "/usr/local/bin/cbc",
     ];
     #[cfg(target_os = "windows")]
@@ -282,7 +281,10 @@ pub fn run_codebuddy(prompt: &str) -> Result<Value> {
         bail!("agent prompt must contain 1..65536 bytes of text");
     }
     let mut child = spawn_codebuddy()?;
-    let stdout = child.stdout.take().context("CodeBuddy stdout unavailable")?;
+    let stdout = child
+        .stdout
+        .take()
+        .context("CodeBuddy stdout unavailable")?;
     let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
         let mut stdout = stdout;
         let mut bytes = Vec::new();
