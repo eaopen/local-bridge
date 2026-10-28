@@ -7,11 +7,11 @@ use crate::{agent, inbox};
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use url::Url;
 use std::env;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use url::Url;
 
 const MAX_REQUEST: usize = 128 * 1024;
 const MAX_RESPONSE: usize = 256 * 1024;
@@ -177,23 +177,22 @@ fn validate_enterprise_ai(value: &Value) -> Result<(String, String, String, Stri
     if raw.model.is_empty()
         || raw.model.len() > 128
         || raw.model.contains("..")
-        || !raw.model.bytes().all(|b| {
-            b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'/' | b'.')
-        })
+        || !raw
+            .model
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'/' | b'.'))
         || raw.ticket.trim().is_empty()
         || raw.ticket.len() > 8192
-        || raw.ticket.bytes().any(|b| b.is_ascii_whitespace() || b < 0x21)
+        || raw
+            .ticket
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || b < 0x21)
         || raw.prompt.trim().is_empty()
         || raw.prompt.len() > 64 * 1024
     {
         bail!("invalid enterprise model, authorization or prompt");
     }
-    Ok((
-        endpoint.to_string(),
-        raw.model,
-        raw.ticket,
-        raw.prompt,
-    ))
+    Ok((endpoint.to_string(), raw.model, raw.ticket, raw.prompt))
 }
 
 pub fn handle(request: &Value) -> Value {
@@ -618,9 +617,9 @@ mod tests {
                 Ok(json!({"status":"completed","result":"TEST_OK"}))
             },
         );
-        assert_eq!(reply["ok"],true);
-        assert_eq!(reply["result"]["result"],"TEST_OK");
-        assert_eq!(reply["result"]["tools_enabled"],false);
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["result"]["result"], "TEST_OK");
+        assert_eq!(reply["result"]["tools_enabled"], false);
         let bad_cases = [
             ("origin", "https://app.example.org/evil"),
             ("origin", "http://public.example.org"),
@@ -630,7 +629,7 @@ mod tests {
             ("ticket", " "),
             ("prompt", ""),
         ];
-        for (field,value) in bad_cases {
+        for (field, value) in bad_cases {
             let mut bad = valid.clone();
             bad[field] = json!(value);
             assert!(validate_enterprise_ai(&bad).is_err(), "{field}={value}");
