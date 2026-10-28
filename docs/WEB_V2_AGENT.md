@@ -27,7 +27,7 @@
 | `eligible` | 可**尝试提交**（installed + grant + run_supported），非 ready |
 | `authenticated`、`api_ready`、`ready` | 当前全部为 null，表示**未核实**；不从 installed 推导 |
 | `state` | `not_installed / unsupported_platform / not_granted / unverified` |
-| `task_mode` | 当前全部 `text_only_no_tools` |
+| `task_mode` | WorkBuddy/Pi 为 `text_only_no_tools`；Codex 为 `read_only_sandbox`，允许 Codex 在只读沙箱中使用其内置能力 |
 | `supports_model_override` / `supported_think_modes` | 代码支持的参数范围，非模型实际能力证明 |
 
 此处只做轻量本地安装发现与权限读取，**不主动登录、消耗额度或调用模型**。默认 `auto` 的尝试顺序为 WorkBuddy → Codex → Pi（仅在已授权、已安装、参数支持时进入候选）；用户显式 `prefer` 会优先于默认顺序。未来接入可信 ApplicationProfile 策略后可以替换默认顺序，当前不要把尚未激活的远程 Profile 当作权限。
@@ -39,6 +39,8 @@
 | WorkBuddy | 原 macOS Desktop 的 WBIPC + bundled CLI/ACP，现有独立 Node Worker | ACP 的 `end_turn` 与实际助手回复；可有多条 message | 仅 `model=auto`、`think_mode=auto`；当前 macOS |
 | Codex | 已有 `codex exec --ephemeral --sandbox read-only --json`，独立轻量任务 Worker | Codex JSONL `turn.completed` + 有效 assistant message | `--model`；`-c model_reasoning_effort=` 支持 low/medium/high/xhigh |
 | Pi | 已有 `pi --print --no-session --no-tools` 的单次文本 CLI | 正常退出且有非空文本（尚待实机确认实际状态语义） | 可指定 `--model`、`--thinking`（off/low/medium/high/xhigh）；不支持 max |
+
+**注意：Codex `read-only` 只限制写入，不等同于禁止读取本机文件。** 只对用户明确授权的可信 Web Origin 启用；浏览器不能直接传 Shell 或工作目录，但 Codex 的内部只读工具仍可能读取本机文件。若实际业务要求严格无本地文件读取，应只授权 Pi/WorkBuddy 文本模式，待 Codex 有可信无工具执行策略后再开放。
 
 Codex/Pi 共用轻量持久化 task.json + seq 事件，启动的是 Bridge 当前已安装二进制的独立 worker（Native Host 和 HTTP 都能创建）；它不继承网页进程寿命。Bridge 只保存本轮引用、短期请求/事件；不复制三家账号、会话/模型路由或文件引擎。后续可依据真实平台能力逐项增强，**不是已完成三个正式生产 Adapter 的宣称**。
 
