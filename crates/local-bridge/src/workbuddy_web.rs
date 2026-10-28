@@ -1,11 +1,16 @@
 //! WorkBuddy Web V2: one macOS native-account text-only job, cursor-based replies.
 //! Browser AND OS-user grants are required. No tool calls, shell or auto retry.
 use crate::{inbox, state_file};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
+#[cfg(target_os = "macos")]
+use anyhow::Context;
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs::{self, OpenOptions};
+use std::fs;
+#[cfg(target_os = "macos")]
+use std::fs::OpenOptions;
+#[cfg(target_os = "macos")]
 use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
@@ -51,6 +56,7 @@ fn private_dir(p: &Path) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(target_os = "macos")]
 fn private_write(p: &Path, b: &[u8]) -> Result<()> {
     let mut o = OpenOptions::new();
     o.create_new(true).write(true);
