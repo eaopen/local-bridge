@@ -180,14 +180,20 @@ pub fn handle_native(request: &Value) -> Value {
             }
         }
         Some("web.v2.agent.start") if p.as_object().is_some_and(|o| o.len() == 4) => {
-            match (p["provider"].as_str(),p["client_key"].as_str(),p["prompt"].as_str()) {
-                (Some("workbuddy"),Some(key),Some(prompt)) => workbuddy_web::start(origin,key,prompt),
+            match (
+                p["provider"].as_str(),
+                p["client_key"].as_str(),
+                p["prompt"].as_str(),
+            ) {
+                (Some("workbuddy"), Some(key), Some(prompt)) => {
+                    workbuddy_web::start(origin, key, prompt)
+                }
                 _ => return fail("invalid_agent_request"),
             }
         }
         Some("web.v2.agent.poll") if p.as_object().is_some_and(|o| o.len() == 3) => {
-            match (p["task_id"].as_str(),p["cursor"].as_u64()) {
-                (Some(id),Some(cursor)) => workbuddy_web::poll(origin,id,cursor),
+            match (p["task_id"].as_str(), p["cursor"].as_u64()) {
+                (Some(id), Some(cursor)) => workbuddy_web::poll(origin, id, cursor),
                 _ => return fail("invalid_agent_poll"),
             }
         }
