@@ -7,16 +7,12 @@ use crate::{agent, inbox, web_v2};
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::env;
-use std::fs;
 use std::io::{self, Read, Write};
-use std::path::PathBuf;
 use url::Url;
 
 const MAX_REQUEST: usize = 128 * 1024;
 const MAX_RESPONSE: usize = 256 * 1024;
 const MAX_SUMMARY_BYTES: usize = 48 * 1024;
-const HOST_NAME: &str = "com.eaopen.browser_bridge";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -403,78 +399,7 @@ pub fn serve() -> Result<()> {
     write_frame(&mut io::stdout().lock(), &reply)
 }
 
-fn chrome_manifest_dir() -> Result<PathBuf> {
-    #[cfg(target_os = "windows")]
-    {
-        Ok(inbox::data_root()?.join("NativeMessagingHosts"))
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let home = env::var_os("HOME").context("HOME is not set")?;
-        Ok(PathBuf::from(home)
-            .join("Library/Application Support/Google/Chrome/NativeMessagingHosts"))
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        let home = env::var_os("HOME").context("HOME is not set")?;
-        Ok(PathBuf::from(home).join(".config/google-chrome/NativeMessagingHosts"))
-    }
-}
-
-pub fn install_host(extension_id: &str, replace: bool) -> Result<Value> {
-    if extension_id.len() != 32 || !extension_id.bytes().all(|b| (b'a'..=b'p').contains(&b)) {
-        bail!("invalid Chrome extension id (expected 32 letters a-p)");
-    }
-    let current = env::current_exe().context("cannot identify Local Bridge CLI")?;
-    let executable = if cfg!(windows) {
-        "local-bridge-native-host.exe"
-    } else {
-        "local-bridge-native-host"
-    };
-    let native = current.with_file_name(executable);
-    if !native.is_file() {
-        bail!("native host executable is missing; build/install both Local Bridge binaries first");
-    }
-
-    let dir = chrome_manifest_dir()?;
-    fs::create_dir_all(&dir).context("cannot create NativeMessagingHosts directory")?;
-    let manifest_path = dir.join(format!("{HOST_NAME}.json"));
-    let manifest = json!({
-        "name":HOST_NAME,
-        "description":"Optional Local Bridge native provider for Local Tool Bridge",
-        "path":native.canonicalize()?.to_string_lossy(),
-        "type":"stdio",
-        "allowed_origins":[format!("chrome-extension://{extension_id}/")]
-    });
-    let data = serde_json::to_vec_pretty(&manifest)?;
-    if manifest_path.exists() && fs::read(&manifest_path)? != data && !replace {
-        bail!("Native host manifest exists with different settings; use --replace to opt in to updating it");
-    }
-    fs::write(&manifest_path, data).context("cannot write Chrome host manifest")?;
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::process::Command;
-        let registry = format!("HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\{HOST_NAME}");
-        let status = Command::new("reg.exe")
-            .args(["ADD", &registry, "/ve", "/t", "REG_SZ", "/d"])
-            .arg(&manifest_path)
-            .arg("/f")
-            .status()
-            .context("cannot register Chrome native host")?;
-        if !status.success() {
-            bail!("Windows native host registry registration failed");
-        }
-    }
-
-    Ok(json!({
-        "installed":true,
-        "host":HOST_NAME,
-        "extension_id":extension_id,
-        "manifest":manifest_path.to_string_lossy(),
-        "restart_chrome_if_needed":true
-    }))
-}
+pub use crate::native_host_registration::install_host;
 
 #[cfg(test)]
 mod tests {

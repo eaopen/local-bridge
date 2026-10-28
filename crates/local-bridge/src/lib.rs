@@ -8,6 +8,7 @@ pub mod inbox;
 pub mod local_http;
 pub mod mcp_provider;
 pub mod native;
+pub mod native_host_registration;
 pub mod pi_enterprise;
 pub mod web_v2;
 pub mod workbuddy;
