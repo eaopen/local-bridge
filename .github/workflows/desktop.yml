@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate static desktop JavaScript
         run: |
-          node --check crates/local-bridge-desktop/ui/app.js
+          node --check crates/local-bridge-desktop/ui/app.mjs
           node --test crates/local-bridge-desktop/ui/preferences.test.mjs
   desktop-check:
     strategy:
