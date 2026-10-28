@@ -135,3 +135,11 @@ Read [security boundaries](docs/SECURITY.md) before integrating Web or AI worklo
 License: Apache-2.0.
 
 For MCP client setup, see [MCP stdio guide](docs/MCP.md).
+
+## WorkBuddy CLI 增量（2026-10-28）
+
+Bridge → WorkBuddy 官方 Local Assistant 的 `status/send/messages` 已实现，详见 [CLI 使用与限制](docs/WORKBUDDY_CLI.md)。此前未实现的记录为历史基线；当前已提供 CLI 适配，但 OAuth 实机调用仍待验收。客户端 UI 短任务成功不代表 API 授权或此适配器端到端成功。
+
+## 本机 Agent 验收（2026-10-28）
+
+Codex 既有 CLI/App Server、WorkBuddy 原桌面账号 WBIPC + 内置 CLI/ACP、Pi RPC 均有真实任务证据。WorkBuddy/Pi 的 Rust 实验入口已验证写文件及独立结果读取；它们尚不是通用正式 Adapter，也没有 Web/Chrome 接线。Pi 成功使用已有 9router 扩展，默认 MiniMax 直连仍有 401 问题。见 [统一验收记录](docs/AGENT_PROVIDER_VALIDATION.md)、[WorkBuddy 实验说明](scripts/workbuddy-native-validation/README.md)。这些可选实机实验不在 CI 中调用模型。

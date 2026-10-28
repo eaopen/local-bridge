@@ -1,0 +1,79 @@
+{
+  "root": "/tmp/local-bridge-wb-native-Nojdrf",
+  "transport": "WBIPC authenticated fetch + bundled CLI ACP",
+  "events": [
+    {
+      "event": "broker_connected"
+    },
+    {
+      "event": "catalog_loaded",
+      "models": [
+        "auto",
+        "hy4-preview",
+        "hy3",
+        "deepseek-v4.1-flash",
+        "step-5-preview",
+        "glm-5.3",
+        "glm-5.3-flash",
+        "glm-5.2",
+        "glm-5.1",
+        "glm-5v-turbo",
+        "kimi-k3.1-pro",
+        "kimi-k3-1",
+        "kimi-k2.8-preview",
+        "space-bunny",
+        "minimax-m3.1-flash",
+        "minimax-m3",
+        "deepseek-v4-pro",
+        "mimo-v2.6-pro"
+      ]
+    },
+    {
+      "event": "worker_started",
+      "pid": 40648,
+      "root": "/tmp/local-bridge-wb-native-Nojdrf"
+    },
+    {
+      "event": "initialized",
+      "protocolVersion": 1
+    },
+    {
+      "event": "proxy_response",
+      "path": "/v3/config",
+      "status": 400
+    },
+    {
+      "event": "session_created",
+      "sessionId": "01a1810c-27b7-7e9f-83e6-0941cce90878"
+    },
+    {
+      "event": "proxy_response",
+      "path": "/v2/chat/completions",
+      "status": 200
+    },
+    {
+      "event": "prompt_completed",
+      "stopReason": "end_turn",
+      "text": "WB_BRIDGE_AGENT_OK_20261028"
+    },
+    {
+      "event": "worker_exit",
+      "code": 0
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/v3/config",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "path": "/v2/chat/completions",
+      "status": 200
+    }
+  ],
+  "worker_pid": 40648,
+  "session_id": "01a1810c-27b7-7e9f-83e6-0941cce90878",
+  "text_verified": true
+}

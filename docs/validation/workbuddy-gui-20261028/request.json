@@ -1,0 +1,5 @@
+{
+  "marker": "LOCAL-BRIDGE-WB-GUI-F16176DD10",
+  "inbox_id": "ctx-18e29abcdb9f44c0-9084-0",
+  "prompt": "GUI文件任务验收，标记 LOCAL-BRIDGE-WB-GUI-F16176DD10。请实际使用文件工具读取 /tmp/local-bridge-wb-gui-f16176dd10/orders.csv。计算非 cancelled 订单数量、数量合计、金额合计，以及 pending 金额（金额精确两位小数）。将结果写入 /tmp/local-bridge-wb-gui-f16176dd10/result.json，字段 task_marker、order_count、quantity_total、amount_total、pending_total，金额用字符串。只读取这个测试CSV，只创建这个result.json；不要访问网络、其他文件或修改项目。完成后回复同一标记、结果文件路径及汇总。不要仅提供操作建议。"
+}

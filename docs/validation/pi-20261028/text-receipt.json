@@ -1,0 +1,40 @@
+{
+  "content_verified": true,
+  "events": [
+    {
+      "command": "prompt",
+      "data": {
+        "disposition": "started"
+      },
+      "id": "task",
+      "success": true,
+      "type": "response"
+    },
+    {
+      "error": null,
+      "stop_reason": "stop",
+      "text": "PI_BRIDGE_OK_local-bridge-pi-1793167867605541000",
+      "type": "assistant_final"
+    },
+    {
+      "type": "agent_end"
+    },
+    {
+      "aborted": false,
+      "type": "agent_settled"
+    }
+  ],
+  "file_task": false,
+  "passed": true,
+  "pid": 50257,
+  "prompt": "Do not use tools. Reply exactly PI_BRIDGE_OK_local-bridge-pi-1793167867605541000",
+  "result": "PI_BRIDGE_OK_local-bridge-pi-1793167867605541000",
+  "state": {
+    "model": "m3cn/MiniMax-M2.7",
+    "provider": "9router",
+    "session_id": "01a18122-3f50-74fb-b861-fb9a83e22998",
+    "thinking": "medium"
+  },
+  "target": "/var/folders/j2/m5c3lmqs67xc0r50gt4cf8tm0000gn/T/local-bridge-pi-1793167867605541000/bridge-pi-test.txt",
+  "worker_exit_success": true
+}
