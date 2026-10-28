@@ -198,7 +198,10 @@ fn run() -> Result<()> {
             let value: ApplicationProfileV2 = serde_json::from_slice(&std::fs::read(path)?)?;
             validate_profile_v2_shape(&value)?;
             let registry = mcp_provider::list()?;
-            let providers: Vec<_> = registry["providers"].as_array().into_iter().flatten()
+            let providers: Vec<_> = registry["providers"]
+                .as_array()
+                .into_iter()
+                .flatten()
                 .filter_map(|p| p["id"].as_str())
                 .map(|id| json!({"id":id,"state":"configured_not_verified","authorized":false}))
                 .collect();
