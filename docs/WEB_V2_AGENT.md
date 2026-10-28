@@ -1,58 +1,67 @@
-# Agent Web V2：统一运行与多次消息返回（当前 WorkBuddy 适配器）
+# Web V2 Agent：统一状态、选择、执行与读取（2026-10-28）
 
-此实现使用独立的 Local Bridge Native Host + 新通用 Chrome 插件；不迁移 CloudFile V1，也不修改 etech-bpm。
+> **实现状态：代码已接线，尚未做真实登录、模型、Chrome、Windows/macOS 端到端验收。** 以下是当前 \`dev\` 候选代码合同，不把源码存在或 CI 通过当作实际 Agent 可用。
 
-## 1. 为什么不是一次 sendNativeMessage 等待完成
+## 公共合同
 
-Chrome Native Messaging 的一次性调用不能可靠承载多次 WorkBuddy 回复。**目前主链改成** Chrome 仅完成一次本地短期授权 → Web 直接 HTTP 提交 → SSE 增量读取，Native 只用于直连失败的兼容回退。HTTP/SSE 与 Native fallback 消费同一份短期本机任务记录：
+三个 Provider 统一通过 \`runAgent/readAgent\`，请求仍是 \`api_version=2\`：
 
-1. `agent.run`（Chrome V2）→ `web.v2.agent.run`（Native V2），提交 `api_version=2`、唯一 `client_key`、文本及可选 `agent/model/thinkMode/agentMode`，回复 `status=accepted, task_id`。
-2. 独立 WorkBuddy worker 通过用户既有 WorkBuddy Desktop 的 WBIPC + bundled CLI/ACP 运行，所有本机工具与 MCP 禁用；收到的 `session/update` 转为有序事件。
-3. `agent.read`（浏览器 V2）→ `web.v2.agent.read`，提交 `task_id + cursor`，返回最多 40 个新增事件、`next_seq`、`has_more`、`status` 与 `terminal`；跨窗口/刷新可续读。
-4. 单次 WorkBuddy assistant 回复可包含多段 `message.delta`；每条逻辑回复以 `message.final` 标记。工具信息是 `tool.update`，最终只在 ACP `session/prompt` 的 `stopReason=end_turn` 确认并且有真实助手输出后产生 `task.completed`。文本/工具事件都**不是**整个任务完成。
-5. `task.failed` 或超过运行期限无终判则显示 `unknown`；**不自动重试、不切换 Codex/Pi**。网络回执丢失时使用同一个 `client_key`，服务端寻找原 task，不重新提交。
+- \`agent\`: \`auto | workbuddy | codex | pi\`（不指定时为 auto）。
+- \`agent_mode\`: \`prefer | require\`；\`require\` 只选该 Provider，\`prefer\` 可在**提交前**选择其他符合要求的 Provider。
+- \`model\` / \`think_mode\`: 默认 \`auto\`，具体支持由所选 Provider 决定。不支持时在提交前拒绝，不静默忽略。最终 \`applied_model/applied_think_mode\` 在当前代码中为 null，表示**未核验实际生效值**。
+- \`client_key\` 必须在 HTTP 失败转 Native、刷新重试中保持相同；所有三个 Agent 在新建任务前共同查询已有任务，防止换通道时自动重跑。
+- \`POST /v2/agents/tasks\` → \`accepted/task_id/selected_agent\`。仅 accepted 表示本地记录/worker 已安排，不表示成功。
+- \`GET /v2/agents/tasks/{task_id}/events?cursor=N\` 或 \`/stream?cursor=N\` → \`seq\` 事件、\`next_seq\`、\`status\`、\`terminal\`。Native 备用通道仍用 \`agent.run\` / \`agent.read\`；无厂商专用 Web API。
+- \`message.final\` 结束一条回答，只有 \`task.completed\` 或其他终态才能结束任务；\`failed/unknown\` **绝不跨 Provider 自动重试**。
 
-### 示例事件序列
+### 统一 Agent 状态
 
-```json
-{"seq":1,"type":"task.started"}
-{"seq":2,"type":"message.delta","message_id":"msg-1","text":"第一部分"}
-{"seq":3,"type":"message.final","message_id":"msg-1"}
-{"seq":4,"type":"message.delta","message_id":"msg-2","text":"补充说明"}
-{"seq":5,"type":"message.final","message_id":"msg-2"}
-{"seq":6,"type":"task.completed","stop_reason":"end_turn"}
-```
+\`GET /v2/capabilities\`、Native \`web.v2.capabilities\` / Chrome \`local.capabilities\`，以及 CLI \`web-v2 capabilities <origin>\` 均返回 \`agents\` 数组。每个条目包含：
 
-Web 按 seq 去重、按 message_id 合并分片；刷新后从 cursor 0 重读原 task，再恢复显示。不自动合并进旧元枢聊天记录，用户可以主动选择与原元枢交接的内容。
+| 字段 | 含义 |
+| --- | --- |
+| \`agent\` | \`workbuddy / codex / pi\` |
+| \`installed\` | 根据当前 OS 的可执行文件/现有安装路径发现，不代表登录成功 |
+| \`local_grant\` | 当前 OS 用户是否对精确 Web Origin 授权该 Agent |
+| \`run_supported\` | Bridge 当前代码是否支持对应平台的文本任务 |
+| \`eligible\` | 可**尝试提交**（installed + grant + run_supported），非 ready |
+| \`authenticated\`、\`api_ready\`、\`ready\` | 当前全部为 null，表示**未核实**；不从 installed 推导 |
+| \`state\` | \`not_installed / unsupported_platform / not_granted / unverified\` |
+| \`task_mode\` | 当前全部 \`text_only_no_tools\` |
+| \`supports_model_override\` / \`supported_think_modes\` | 代码支持的参数范围，非模型实际能力证明 |
 
-## 2. 首期权限与安装
+此处只做轻量本地安装发现与权限读取，**不主动登录、消耗额度或调用模型**。默认 \`auto\` 的尝试顺序为 Codex → WorkBuddy → Pi（仅在已授权、已安装、参数支持时进入候选）；用户显式 \`prefer\` 会优先于默认顺序。未来接入可信 ApplicationProfile 策略后可以替换默认顺序，当前不要把尚未激活的远程 Profile 当作权限。
 
-受信 Etech Web Origin 需要 **两级授权**：在 Chrome 插件 Popup 中对该站点单独启用 text-only WorkBuddy；在同一台电脑当前 OS 用户下显式运行：
+## 三种现有执行方式
 
-```sh
-local-bridge web-v2 grant-workbuddy https://your-etech-web.example
-local-bridge web-v2 workbuddy-capability https://your-etech-web.example
-# 停用
-local-bridge web-v2 revoke-workbuddy https://your-etech-web.example
-```
+| Agent | Web V2 提交后执行方式 | 结果与完成依据 | 参数限制 |
+| --- | --- | --- | --- |
+| WorkBuddy | 原 macOS Desktop 的 WBIPC + bundled CLI/ACP，现有独立 Node Worker | ACP 的 \`end_turn\` 与实际助手回复；可有多条 message | 仅 \`model=auto\`、\`think_mode=auto\`；当前 macOS |
+| Codex | 已有 \`codex exec --ephemeral --sandbox read-only --json\`，独立轻量任务 Worker | Codex JSONL \`turn.completed\` + 有效 assistant message | \`--model\`；\`-c model_reasoning_effort=\` 支持 low/medium/high/xhigh |
+| Pi | 已有 \`pi --print --no-session --no-tools\` 的单次文本 CLI | 正常退出且有非空文本（尚待实机确认实际状态语义） | 可指定 \`--model\`、\`--thinking\`（off/low/medium/high/xhigh）；不支持 max |
 
-Chrome Service Worker 必须以真实 sender.origin 验证来源和 top-frame；Native Host 按 origin 二次核验本机授权。任何网站/Profile/LLM 文本都无法自行授权，也不能传命令、工具列表、工作目录或 WorkBuddy 凭据。用户点击元枢新面板才发起任务，默认仅文本，无法读写文件、执行 Shell/MCP。**由 WorkBuddy 本人既有登录与权限处理模型费用和实际响应。**
+Codex/Pi 共用轻量持久化 task.json + seq 事件，启动的是 Bridge 当前已安装二进制的独立 worker（Native Host 和 HTTP 都能创建）；它不继承网页进程寿命。Bridge 只保存本轮引用、短期请求/事件；不复制三家账号、会话/模型路由或文件引擎。后续可依据真实平台能力逐项增强，**不是已完成三个正式生产 Adapter 的宣称**。
 
-当前执行器只对已验证过 ACP 实验的 **macOS WorkBuddy Desktop + Node 24+** 开放，且仍需安装软件的真实用户机验证。无 WorkBuddy 时显示不可用，原 Etech Web 和 Chrome v1 Popup 不受影响。Node 仅为可选 WorkBuddy Adapter 使用，不成为 Local Bridge 核心依赖。
+Pi 保留用户已经配置的模型 Provider/扩展供给，但用 \`--no-tools\` 禁用模型工具、MCP 调用、文件写入；这是用户已安装本地扩展自身的信任边界，不给网页开放任意命令、扩展路径或参数。企业 EAP 的短期 Pi 票据/服务 API 仍走现有受信专用路径，不能直接从未经验证的网页参数赋予 Bridge。
 
-## 3. 本地事件记录与生命周期
+## 授权、回退与兼容
 
-每个任务有独立 OS 用户目录（Unix 权限 0700）以及事件 JSONL（0600），不保存浏览器 Cookie、EAP Token 或模型 API Key。最多 250 条事件、512 KiB、30 分钟有效；旧任务在后续使用中顺手清理，**不是精确到点的定时删除保证**。Worker 最长约 170 秒，Chrome 通过短轮询读返回；单页初版只启动一个任务，结果 unknown 时保留原记录，用户必须手动决定是否新建任务。
+仅 OS 用户可以明确批准某个站点 Agent，Chrome 插件还需单独批准精确站点：
 
-本机 WorkBuddy 5.9.3 的 WBIPC / bundled CLI ACP 验证来自之前实验；内部协议尚无稳定兼容承诺。本版本**未**验证 Windows、真实已登录 WorkBuddy 设备、桌面 GUI 已有会话/专家继承、ACP 工具审批后的复杂任务与真实企业 Web 端到端。不能凭 Chrome Node 测试或 Rust CI 报告已联调成功。
+\`\`\`sh
+local-bridge web-v2 grant-agent https://your-application.example codex
+local-bridge web-v2 grant-agent https://your-application.example workbuddy
+local-bridge web-v2 grant-agent https://your-application.example pi
+local-bridge web-v2 capabilities https://your-application.example
+local-bridge web-v2 revoke-agent https://your-application.example pi
+\`\`\`
 
-## 4. 阶段边界
+旧的 \`grant-workbuddy/revoke-workbuddy\` 仍指向 WorkBuddy 原有授权文件，已授权站点不丢权限。新增 Codex/Pi 授权独立存于当前 OS 用户的数据目录（Unix 私有文件）。从浏览器打开的任何 Profile/消息都**不能**自行授权 Agent。
 
-- P0：Web 元枢一个短文本任务、支持多段回复/状态/断线恢复；Mac WorkBuddy 用户机实测之后收口。
-- P1：在实际 WorkBuddy 已完成时考虑可交互授权的工具、更多事件类型；再支持其它 Agent Provider。
-- P2：本地企业定制套壳元枢；CloudFile 独立评估稳定后迁移。
+Chrome 负责可信 Origin/用户同意/短期会话；Bridge 默认本机 \`http://127.0.0.1:48293\` + SSE，失败时 Chrome Native 在同一个 \`client_key\`/task ID 上续接。无扩展、Bridge 未安装、站点未授权时企业原网页照常运行；CloudFile Agent2、文件三模式、EAP 原元枢和 V1 Host 均不改。
 
-关联：[Local Bridge #6](https://github.com/eaopen/local-bridge/issues/6)、[#22](https://github.com/eaopen/local-bridge/issues/22)、[EAP #44](https://github.com/jcetech/etech-eap/issues/44)。
+## 完成与剩余验证
 
+**代码级完成**：统一状态 JSON、参数规则、权限、分配、双通道 idempotency、三条可运行的本地 Worker 路径、统一读取/终判；增加纯单元/合同测试。**未完成**：三个 Agent 的真实登录/模型额度/流式结果核验、Codex/Pi 的真机默认模型兼容、Pi 扩展及推理档位实际生效、Windows/macOS 的浏览器多通道端到端、企业 SSO/企业 Pi API 端到端。
 
-**V2 已删除未上线的厂商专用 Web task 路由**。公开合同是 `runAgent/readAgent`、`POST /v2/agents/tasks` 和 `GET /v2/agents/tasks/{id}/events|stream`；底层 WorkBuddy worker 可以继续使用自身实现与结果记录。Codex/Pi 的真实 Web adapter 尚待逐个验收，不能因支持统一参数就宣称完成。
+最小后续验收应分别在实际装有 Agent 的普通用户机进行：\`not_installed\` → \`not_granted\` → 申请授权 → 短任务 \`accepted\` → 确认 \`completed\` 或真实失败 → HTTP/SSE 中断转 Native 续读、不重复执行。不要把构建通过、安装发现、\`accepted\` 或单条 \`message.final\` 记录为 Agent 已完成。
