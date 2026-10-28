@@ -11,6 +11,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use url::Url;
 
 const MAX_REQUEST: usize = 128 * 1024;
 const MAX_RESPONSE: usize = 256 * 1024;
@@ -41,6 +42,18 @@ struct BrowserContext {
     title: String,
     url: String,
     selection: String,
+}
+
+/// Only the Chrome service worker may construct 'origin' from sender.origin.
+/// The original enterprise service must sign/verify the short-lived ticket.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EnterpriseAiRequest {
+    origin: String,
+    api_path: String,
+    model: String,
+    ticket: String,
+    prompt: String,
 }
 
 fn valid_request_id(id: &str) -> bool {
@@ -127,13 +140,77 @@ fn validate_relay(value: &Value) -> Result<(Value, Value)> {
     Ok((reply, relation))
 }
 
-pub fn handle(request: &Value) -> Value {
-    handle_with_summary(request, agent::run_codex)
+fn validate_enterprise_ai(value: &Value) -> Result<(String, String, String, String)> {
+    if serde_json::to_vec(value)?.len() > 96 * 1024 {
+        bail!("enterprise request too large");
+    }
+    let raw: EnterpriseAiRequest =
+        serde_json::from_value(value.clone()).context("invalid enterprise request")?;
+    let origin = Url::parse(&raw.origin).context("invalid enterprise origin")?;
+    let local_http = origin.scheme() == "http"
+        && matches!(origin.host_str(), Some("127.0.0.1" | "localhost" | "[::1]"));
+    if (origin.scheme() != "https" && !local_http)
+        || !origin.username().is_empty()
+        || origin.password().is_some()
+        || origin.query().is_some()
+        || origin.fragment().is_some()
+        || origin.path() != "/"
+        || raw.origin != origin.origin().ascii_serialization()
+    {
+        bail!("invalid enterprise origin");
+    }
+    if !raw.api_path.starts_with('/')
+        || raw.api_path.starts_with("//")
+        || raw.api_path.len() > 128
+        || raw.api_path.contains("..")
+        || !raw
+            .api_path
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'_' | b'-'))
+    {
+        bail!("invalid same-origin enterprise API path");
+    }
+    let endpoint = origin.join(&raw.api_path)?;
+    if endpoint.origin() != origin.origin() {
+        bail!("enterprise API path cannot leave the approved Web origin");
+    }
+    if raw.model.is_empty()
+        || raw.model.len() > 128
+        || raw.model.contains("..")
+        || !raw
+            .model
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'/' | b'.'))
+        || raw.ticket.trim().is_empty()
+        || raw.ticket.len() > 8192
+        || raw
+            .ticket
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || b < 0x21)
+        || raw.prompt.trim().is_empty()
+        || raw.prompt.len() > 64 * 1024
+    {
+        bail!("invalid enterprise model, authorization or prompt");
+    }
+    Ok((endpoint.to_string(), raw.model, raw.ticket, raw.prompt))
 }
 
-// Keep the actual AI invocation behind a single tested user-action route.
-// Tests inject a fake runner; host.status and context.share need no Codex.
+pub fn handle(request: &Value) -> Value {
+    handle_with_runners(request, agent::run_codex, agent::run_pi_enterprise_ticket)
+}
+
+// Keep existing Codex test injection while the approved enterprise path can
+// be separately tested without invoking any network or account.
+#[cfg(test)]
 fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Value>) -> Value {
+    handle_with_runners(request, runner, agent::run_pi_enterprise_ticket)
+}
+
+fn handle_with_runners(
+    request: &Value,
+    summarize: impl FnOnce(&str) -> Result<Value>,
+    enterprise: impl FnOnce(&str, &str, &str, &str) -> Result<Value>,
+) -> Value {
     let id = request["request_id"].as_str().unwrap_or("");
     let public_id = if valid_request_id(id) { id } else { "" };
     let failure = |error: &'static str| {
@@ -153,7 +230,7 @@ fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Valu
                 "provider":"local-bridge",
                 "connected_to_local_bridge":true,
                 "native_protocol":1,
-                "capabilities":["host.status","context.share","context.summarize","relay.return"],
+                "capabilities":["host.status","context.share","context.summarize","relay.return","enterprise.pi.run"],
                 "handoff":"local-inbox",
                 "ai_run_supported":true,
                 "ai_run_enabled":false,
@@ -211,6 +288,41 @@ fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Valu
                 Err(_) => failure("local_inbox_unavailable"),
             }
         }
+        Some("enterprise.pi.run") => {
+            // The extension must require an *additional per-origin user grant*
+            // and derive origin from Chrome's trusted sender, never from a page.
+            // Local tools are disabled; only one enterprise AI text task runs.
+            let Some(payload) = request.get("payload") else {
+                return failure("invalid_enterprise_request");
+            };
+            let Ok((base, model, ticket, prompt)) = validate_enterprise_ai(payload) else {
+                return failure("invalid_enterprise_request");
+            };
+            match enterprise(&base, &model, &ticket, &prompt) {
+                Ok(reply) => {
+                    let answer = reply["result"].as_str().unwrap_or("");
+                    if reply["status"] != "completed" || answer.trim().is_empty() {
+                        return failure("enterprise_ai_incomplete");
+                    }
+                    if answer.len() > MAX_SUMMARY_BYTES {
+                        return failure("enterprise_ai_response_too_large");
+                    }
+                    json!({
+                        "protocol_version":1,"request_id":id,"ok":true,
+                        "result":{
+                            "provider":"local-bridge",
+                            "agent":"pi",
+                            "model_source":"enterprise_session",
+                            "status":"completed",
+                            "result":answer,
+                            "tools_enabled":false,
+                            "local_files_changed":false
+                        }
+                    })
+                }
+                Err(_) => failure("enterprise_ai_unavailable_or_failed"),
+            }
+        }
         Some("context.summarize") => {
             // Only the trusted extension popup can send this typed action;
             // the extension service worker explicitly rejects website calls.
@@ -224,7 +336,7 @@ fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Valu
             let Ok(prompt) = inbox::summarize_context(&ctx) else {
                 return failure("invalid_context");
             };
-            match runner(&prompt) {
+            match summarize(&prompt) {
                 Ok(result) => {
                     let answer = result["result"].as_str().unwrap_or("");
                     if result["status"] != "completed" || answer.trim().is_empty() {
@@ -478,6 +590,50 @@ mod tests {
         bad = good.clone();
         bad["task_ref"] = json!("../secret");
         assert!(validate_relay(&bad).is_err());
+    }
+
+    #[test]
+    fn enterprise_ai_is_same_origin_and_requires_trusted_ticket() {
+        let valid = json!({
+            "origin":"https://app.example.org",
+            "api_path":"/api/local-ai/v1",
+            "model":"team-chat",
+            "ticket":"short-lived-test-ticket",
+            "prompt":"Return only TEST_OK"
+        });
+        let (base, model, ticket, prompt) = validate_enterprise_ai(&valid).unwrap();
+        assert_eq!(base, "https://app.example.org/api/local-ai/v1");
+        assert_eq!(model, "team-chat");
+        assert_eq!(ticket, "short-lived-test-ticket");
+        assert_eq!(prompt, "Return only TEST_OK");
+        let reply = handle_with_runners(
+            &json!({"protocol_version":1,"request_id":"enterprise_1",
+                "action":"enterprise.pi.run","payload":valid}),
+            |_| panic!("must not invoke Codex for an enterprise Pi request"),
+            |endpoint, model, token, _| {
+                assert_eq!(endpoint, "https://app.example.org/api/local-ai/v1");
+                assert_eq!(model, "team-chat");
+                assert_eq!(token, "short-lived-test-ticket");
+                Ok(json!({"status":"completed","result":"TEST_OK"}))
+            },
+        );
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["result"]["result"], "TEST_OK");
+        assert_eq!(reply["result"]["tools_enabled"], false);
+        let bad_cases = [
+            ("origin", "https://app.example.org/evil"),
+            ("origin", "http://public.example.org"),
+            ("api_path", "//evil.example.org/v1"),
+            ("api_path", "/api/../evil"),
+            ("api_path", "/api/v1?redirect=bad"),
+            ("ticket", " "),
+            ("prompt", ""),
+        ];
+        for (field, value) in bad_cases {
+            let mut bad = valid.clone();
+            bad[field] = json!(value);
+            assert!(validate_enterprise_ai(&bad).is_err(), "{field}={value}");
+        }
     }
 
     #[test]
