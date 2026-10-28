@@ -37,3 +37,12 @@
 - P1 验收：站点 HTTPS + loopback 许可成功时从 HTTP/SSE 续读同一任务；权限拒绝或连接断开回退 Native poll，绝不重复启动任务。
 
 技术资料：Chrome Native Messaging 官方说明、Chrome Local Network Access 限制。详见 [Web V2 WorkBuddy](WEB_V2_WORKBUDDY.md)、[V2 Profile](APPLICATION_PROFILE_V2.md)。
+
+
+## Web JS/TS Client V2（单一实现，静态版本引入）
+
+Local Bridge 提供 [clients/web-v2](../clients/web-v2/README.md) 中的零外部依赖 `client.js` + `client.d.ts`（`2.0.0-preview.1`）。企业 Web 应用应在**构建时锁定、打包**已审查版本，按 `createLocalBridgeClient()` 调用 `connect / startWorkbuddy / readWorkbuddy / mcpStatus`。客户端统一管理 Chrome 首次授权、HTTP/SSE 主要传输、Chrome Native 后备传输与 `task_id/seq` 去重恢复；各业务 Web 不应再各自复制这些逻辑。
+
+**不推荐**让网页通过 `<script src="http://127.0.0.1/...">` 动态执行本地 Bridge 下发的 JS：这会增加本地服务不可用时的启动依赖、静默版本变更、来源/CSP 与供应链风险。运行期只获取短期连接信息和受信的**JSON 能力数据**，绝不通过远程 Profile 下发可执行 JS。本地 Bridge SDK 以后可以独立发布 npm 包，但目前无需额外服务或发布系统。EAP Web 的首个接入通过源码哈希锁定静态拷贝，**原元枢入口不依赖 SDK**。
+
+客户端测试（在 Local Bridge 工作树）：`node --test clients/web-v2/client.test.mjs`。
