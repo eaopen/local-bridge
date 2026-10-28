@@ -30,7 +30,7 @@
 | `task_mode` | 当前全部 `text_only_no_tools` |
 | `supports_model_override` / `supported_think_modes` | 代码支持的参数范围，非模型实际能力证明 |
 
-此处只做轻量本地安装发现与权限读取，**不主动登录、消耗额度或调用模型**。默认 `auto` 的尝试顺序为 Codex → WorkBuddy → Pi（仅在已授权、已安装、参数支持时进入候选）；用户显式 `prefer` 会优先于默认顺序。未来接入可信 ApplicationProfile 策略后可以替换默认顺序，当前不要把尚未激活的远程 Profile 当作权限。
+此处只做轻量本地安装发现与权限读取，**不主动登录、消耗额度或调用模型**。默认 `auto` 的尝试顺序为 WorkBuddy → Codex → Pi（仅在已授权、已安装、参数支持时进入候选）；用户显式 `prefer` 会优先于默认顺序。未来接入可信 ApplicationProfile 策略后可以替换默认顺序，当前不要把尚未激活的远程 Profile 当作权限。
 
 ## 三种现有执行方式
 
