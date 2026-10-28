@@ -87,14 +87,22 @@ pub fn issue_session(origin: &str) -> Result<Value> {
     let mut retained = 0;
     for file in fs::read_dir(&path)? {
         let item = file?;
-        if !item.file_type()?.is_file() { continue; }
-        let valid = fs::read(item.path()).ok()
+        if !item.file_type()?.is_file() {
+            continue;
+        }
+        let valid = fs::read(item.path())
+            .ok()
             .and_then(|raw| serde_json::from_slice::<Session>(&raw).ok())
             .is_some_and(|record| record.expires_at > now_time);
-        if valid { retained += 1; }
-        else { let _ = fs::remove_file(item.path()); }
+        if valid {
+            retained += 1;
+        } else {
+            let _ = fs::remove_file(item.path());
+        }
     }
-    if retained >= 128 { bail!("too many active local sessions"); }
+    if retained >= 128 {
+        bail!("too many active local sessions");
+    }
     for _ in 0..4 {
         let token = strong_token()?;
         let file = token_file(&token)?;
@@ -465,7 +473,12 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
                 let data: Value = match serde_json::from_slice(&req.body) {
                     Ok(value) => value,
                     Err(_) => {
-                        reply(&mut stream,400,Some(&req.origin),&json!({"error":"invalid_json"}))?;
+                        reply(
+                            &mut stream,
+                            400,
+                            Some(&req.origin),
+                            &json!({"error":"invalid_json"}),
+                        )?;
                         return Ok(());
                     }
                 };
