@@ -70,10 +70,7 @@ pub fn handle(request: &Value) -> Value {
 
 // Keep the actual AI invocation behind a single tested user-action route.
 // Tests inject a fake runner; host.status and context.share need no Codex.
-fn handle_with_summary(
-    request: &Value,
-    runner: impl FnOnce(&str) -> Result<Value>,
-) -> Value {
+fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Value>) -> Value {
     let id = request["request_id"].as_str().unwrap_or("");
     let public_id = if valid_request_id(id) { id } else { "" };
     let failure = |error: &'static str| {
