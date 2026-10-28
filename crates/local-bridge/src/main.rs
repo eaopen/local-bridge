@@ -47,7 +47,7 @@ fn run() -> Result<()> {
         }
         [x, action, option] if x == "tasks" && action == "list" && option == "--cloudfile" => {
             println!("{}", task_center::list(true));
-        },
+        }
         [x, action, id, executable, fixed_args @ ..] if x == "provider" && action == "add" => {
             println!("{}", mcp_provider::add(id, executable, fixed_args)?);
         }

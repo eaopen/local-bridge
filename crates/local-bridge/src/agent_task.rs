@@ -406,22 +406,39 @@ mod tests {
         let dir = home.join(id);
         private_dir(&dir).unwrap();
         let meta = Meta {
-            id:id.into(), origin:"https://private.example".into(),
-            client_key:"private-key".into(), agent:"codex".into(),
-            created:now().unwrap(), model:"secret-model".into(), think_mode:"high".into(),
+            id: id.into(),
+            origin: "https://private.example".into(),
+            client_key: "private-key".into(),
+            agent: "codex".into(),
+            created: now().unwrap(),
+            model: "secret-model".into(),
+            think_mode: "high".into(),
         };
         private_write(&dir.join("meta.json"), &serde_json::to_vec(&meta).unwrap()).unwrap();
         append(&dir, 1, json!({"type":"task.started"})).unwrap();
-        append(&dir, 2, json!({"type":"message.final","text":"private answer"})).unwrap();
+        append(
+            &dir,
+            2,
+            json!({"type":"message.final","text":"private answer"}),
+        )
+        .unwrap();
         let rows = summaries_from(&home, meta.created + 100).unwrap();
         assert_eq!(rows[0]["status"], "running");
         assert_eq!(rows[0]["task_id"], id);
         assert_eq!(rows[0]["available_actions"], json!([]));
-        for secret in ["private.example","private-key","secret-model","private answer"] {
+        for secret in [
+            "private.example",
+            "private-key",
+            "secret-model",
+            "private answer",
+        ] {
             assert!(!rows[0].to_string().contains(secret));
         }
         append(&dir, 3, json!({"type":"task.completed"})).unwrap();
-        assert_eq!(summaries_from(&home,meta.created+200).unwrap()[0]["status"], "completed");
+        assert_eq!(
+            summaries_from(&home, meta.created + 200).unwrap()[0]["status"],
+            "completed"
+        );
         fs::remove_dir_all(home).unwrap();
     }
     #[test]

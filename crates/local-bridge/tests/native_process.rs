@@ -107,8 +107,7 @@ fn native_host_status_and_explicit_inbox_handoff() {
     assert_eq!(aggregate["local_cli_only"], true);
     assert_eq!(aggregate["complete"], true);
     assert!(aggregate["items"].as_array().unwrap().iter().any(|item| {
-        item["task_id"] == id && item["owner_module"] == "inbox"
-            && item["status"] == "needs_action"
+        item["task_id"] == id && item["owner_module"] == "inbox" && item["status"] == "needs_action"
     }));
     assert_eq!(aggregate["sources"][3]["state"], "not_requested");
     let item = command(&root, &["inbox", "read", id]);

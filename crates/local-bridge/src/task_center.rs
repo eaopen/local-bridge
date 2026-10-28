@@ -75,14 +75,19 @@ fn cloudfile_rows(response: &Value) -> Result<(Vec<Value>, bool)> {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("CloudFile task ID missing"))?;
         if id.len() != 64
-            || !id.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            || !id
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
         {
             bail!("invalid CloudFile task ID");
         }
         let mode = item["mode"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("CloudFile mode missing"))?;
-        if !matches!(mode, "local-view" | "local-edit" | "optimistic-edit" | "exclusive-edit") {
+        if !matches!(
+            mode,
+            "local-view" | "local-edit" | "optimistic-edit" | "exclusive-edit"
+        ) {
             bail!("unknown CloudFile task mode");
         }
         let status = item["status"]
@@ -96,8 +101,11 @@ fn cloudfile_rows(response: &Value) -> Result<(Vec<Value>, bool)> {
             .ok_or_else(|| anyhow::anyhow!("CloudFile stage missing"))?;
         if !matches!(
             stage,
-            "original_publish_unconfirmed" | "remote_conflict" |
-                "checkin_confirmed" | "local_view_available" | "local_edit_session"
+            "original_publish_unconfirmed"
+                | "remote_conflict"
+                | "checkin_confirmed"
+                | "local_view_available"
+                | "local_edit_session"
         ) {
             bail!("invalid CloudFile stage");
         }
@@ -165,7 +173,12 @@ pub fn list(include_cloudfile: bool) -> Value {
                 sources.push(source("cloudfile", "ok", rows.len(), truncated));
                 items.extend(rows);
             }
-            Err(_) => sources.push(source("cloudfile", "not_configured_or_unavailable", 0, false)),
+            Err(_) => sources.push(source(
+                "cloudfile",
+                "not_configured_or_unavailable",
+                0,
+                false,
+            )),
         }
     } else {
         sources.push(source("cloudfile", "not_requested", 0, false));
@@ -179,8 +192,7 @@ pub fn list(include_cloudfile: bool) -> Value {
             .cmp(&a["created_at_unix_ms"].as_u64().unwrap_or(0))
     });
     let complete = sources.iter().all(|src| {
-        matches!(src["state"].as_str(), Some("ok" | "not_requested"))
-            && src["truncated"] == false
+        matches!(src["state"].as_str(), Some("ok" | "not_requested")) && src["truncated"] == false
     });
     json!({
         "schema_version":1,
@@ -220,7 +232,12 @@ mod tests {
         assert!(!truncated);
         assert_eq!(rows[0]["status"], "unknown");
         assert_eq!(rows[0]["available_actions"], json!([]));
-        for value in ["private.dwg","internal.test","PRIVATE-TICKET","secrets/file"] {
+        for value in [
+            "private.dwg",
+            "internal.test",
+            "PRIVATE-TICKET",
+            "secrets/file",
+        ] {
             assert!(!rows[0].to_string().contains(value));
         }
     }
@@ -235,7 +252,8 @@ mod tests {
         assert!(cloudfile_rows(&json!({
             "ok":true,"result":{"isError":false,
                 "content":[{"type":"text","text":file.to_string()}]}
-        })).is_err());
+        }))
+        .is_err());
     }
 
     #[test]

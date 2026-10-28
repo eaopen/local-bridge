@@ -490,19 +490,21 @@ mod tests {
         fs::remove_dir_all(&path).unwrap();
     }
 
-
     #[test]
     fn read_only_summary_does_not_count_message_final_as_task_completion() {
         let home = std::env::temp_dir().join(format!(
             "local-bridge-wb-summary-{}-{}",
-            std::process::id(), timestamp().unwrap()
+            std::process::id(),
+            timestamp().unwrap()
         ));
         let id = "wb-1234-a-b";
         let dir = home.join(id);
         fs::create_dir_all(&dir).unwrap();
         let meta = Meta {
-            id:id.into(), origin:"https://private.example".into(),
-            client_key:"private-key".into(), created:timestamp().unwrap()
+            id: id.into(),
+            origin: "https://private.example".into(),
+            client_key: "private-key".into(),
+            created: timestamp().unwrap(),
         };
         fs::write(dir.join("meta.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
         fs::write(
