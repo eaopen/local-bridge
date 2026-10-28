@@ -191,9 +191,184 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
     }))
 }
 
+
+// CodeBuddy Code is a separate, officially supported CLI. Logging in once
+// with the user's existing Buddy account can use the shared subscription
+// credits, but does NOT inherit the running WorkBuddy desktop's GUI, skills,
+// session, or login credentials. This entrypoint is deliberately text-only:
+// no --dangerously-skip-permissions, no built-in tools, and no MCP tools.
+fn parse_codebuddy_result(output: &str) -> Result<String> {
+    let event: Value = serde_json::from_str(output.trim())
+        .context("invalid CodeBuddy headless JSON response")?;
+    if event["is_error"] == true
+        || event["type"] == "error"
+        || event["subtype"] == "error"
+    {
+        bail!("CodeBuddy reported an unsuccessful run");
+    }
+    if let Some(kind) = event["type"].as_str() {
+        if kind != "result" {
+            bail!("CodeBuddy did not return a final result event");
+        }
+    }
+    let answer = event["result"]
+        .as_str()
+        .filter(|value| !value.trim().is_empty())
+        .context("CodeBuddy did not return a non-empty completed response")?;
+    Ok(answer.to_owned())
+}
+
+fn codebuddy_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    command
+        .args([
+            "-p",
+            "--output-format",
+            "json",
+            "--tools",
+            "",
+            "--strict-mcp-config",
+            "--no-session-persistence",
+        ])
+        // A one-shot result must never hide a running background agent task.
+        .env("CODEBUDDY_CODE_DISABLE_BACKGROUND_TASKS", "1")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(target_os = "macos")]
+    {
+        use std::path::PathBuf;
+        let raw = std::env::var_os("PATH").unwrap_or_default();
+        let mut dirs: Vec<PathBuf> = std::env::split_paths(&raw).collect();
+        for dir in ["/opt/homebrew/bin", "/usr/local/bin"] {
+            let path = PathBuf::from(dir);
+            if path.is_dir() && !dirs.contains(&path) {
+                dirs.push(path);
+            }
+        }
+        if let Ok(paths) = std::env::join_paths(dirs) {
+            command.env("PATH", paths);
+        }
+    }
+    command
+}
+
+fn spawn_codebuddy() -> Result<std::process::Child> {
+    #[cfg(target_os = "macos")]
+    let candidates = [
+        "codebuddy", "cbc", "/opt/homebrew/bin/codebuddy",
+        "/opt/homebrew/bin/cbc", "/usr/local/bin/codebuddy",
+        "/usr/local/bin/cbc",
+    ];
+    #[cfg(target_os = "windows")]
+    let candidates = ["codebuddy", "cbc", "codebuddy.cmd", "cbc.cmd"];
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let candidates = ["codebuddy", "cbc"];
+
+    for candidate in candidates {
+        match codebuddy_command(candidate).spawn() {
+            Ok(child) => return Ok(child),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(err).context("CodeBuddy CLI could not start"),
+        }
+    }
+    bail!("CodeBuddy CLI not found; install CodeBuddy Code and log in separately with your Buddy account")
+}
+
+/// Explicit local read-only CodeBuddy task. A successful process start, a
+/// desktop subscription check, or an IPC hello never count as a completed run.
+pub fn run_codebuddy(prompt: &str) -> Result<Value> {
+    if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
+        bail!("agent prompt must contain 1..65536 bytes of text");
+    }
+    let mut child = spawn_codebuddy()?;
+    let stdout = child.stdout.take().context("CodeBuddy stdout unavailable")?;
+    let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
+        let mut stdout = stdout;
+        let mut bytes = Vec::new();
+        let mut buffer = [0_u8; 8192];
+        let mut too_large = false;
+        loop {
+            let n = stdout.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            if !too_large {
+                if bytes.len() + n > MAX_EVENTS {
+                    too_large = true;
+                    bytes.clear();
+                } else {
+                    bytes.extend_from_slice(&buffer[..n]);
+                }
+            }
+        }
+        Ok((!too_large).then_some(bytes))
+    });
+
+    let write_result = child
+        .stdin
+        .take()
+        .context("CodeBuddy stdin unavailable")?
+        .write_all(prompt.as_bytes());
+    if write_result.is_err() {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = reader.join();
+        bail!("CodeBuddy could not accept the prompt");
+    }
+    let deadline = Instant::now() + RUN_TIMEOUT;
+    let status = loop {
+        if let Some(status) = child
+            .try_wait()
+            .context("CodeBuddy process status unavailable")?
+        {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = reader.join();
+            bail!("CodeBuddy run timed out; completion is unknown; do not retry automatically");
+        }
+        thread::sleep(Duration::from_millis(100));
+    };
+    let bytes = reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("CodeBuddy output reader failed"))??
+        .context("CodeBuddy response exceeded size limit")?;
+    if !status.success() {
+        bail!("CodeBuddy did not complete; check its own CLI sign-in and subscription");
+    }
+    let response = std::str::from_utf8(&bytes).context("CodeBuddy response not UTF-8")?;
+    let answer = parse_codebuddy_result(response)?;
+    Ok(json!({
+        "source": "local-cli",
+        "owner_module": "ai.codebuddy",
+        "status": "completed",
+        "result": answer,
+        "persisted_by_bridge": false
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codebuddy_requires_a_real_final_answer() {
+        let ok = r#"{"type":"result","subtype":"success","is_error":false,"result":"PONG"}"#;
+        assert_eq!(parse_codebuddy_result(ok).unwrap(), "PONG");
+        for bad in [
+            r#"{"type":"result","is_error":true,"result":"login required"}"#,
+            r#"{"type":"result","subtype":"error","result":"failed"}"#,
+            r#"{"type":"system","result":"not final"}"#,
+            r#"{"type":"result","is_error":false}"#,
+            r#"{"type":"result","result":"  "}"#,
+            "invalid",
+        ] {
+            assert!(parse_codebuddy_result(bad).is_err(), "{bad}");
+        }
+    }
 
     #[cfg(target_os = "macos")]
     #[test]
