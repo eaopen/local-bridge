@@ -44,5 +44,15 @@
   "update": {
     "track": "dev",
     "source_id": "trusted-dev"
+  },
+  "mixed_context": {
+    "mode": "mixed",
+    "personal_capability_requests": [
+      "mcp.tool.call",
+      "communication.local"
+    ],
+    "suggested_mcp_providers": [
+      "wechat"
+    ]
   }
 }
