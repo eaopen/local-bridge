@@ -3,8 +3,8 @@ mod mcp;
 
 use anyhow::{bail, Context, Result};
 use local_bridge::{
-    agent, agent_grants, agent_preferences, agent_task, diagnostics, inbox, local_http, mcp_provider, native,
-    native_host_registration, task_center, web_v2, workbuddy, workbuddy_web,
+    agent, agent_grants, agent_preferences, agent_task, diagnostics, inbox, local_http,
+    mcp_provider, native, native_host_registration, task_center, web_v2, workbuddy, workbuddy_web,
 };
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::profile_v2::{validate_profile_v2_shape, ApplicationProfileV2};
@@ -56,7 +56,7 @@ fn run() -> Result<()> {
             }
             let parsed: serde_json::Value = serde_json::from_str(&data)?;
             println!("{}", agent_preferences::save_value(parsed)?);
-        },
+        }
         [x, action] if x == "tasks" && action == "list" => {
             println!("{}", task_center::list(false));
         }

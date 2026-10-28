@@ -124,11 +124,11 @@ pub fn allowed(origin: &str) -> Result<bool> {
     Ok(read_grants()?.iter().any(|x| x == origin))
 }
 pub fn installed() -> bool {
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     {
         Path::new("/Applications/WorkBuddy.app/Contents/Resources/app.asar.unpacked/cli/dist/codebuddy-lite-wb.mjs").is_file()
     }
-    #[cfg(not(target_os="macos"))]
+    #[cfg(not(target_os = "macos"))]
     {
         false
     }
