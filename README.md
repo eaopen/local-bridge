@@ -100,7 +100,7 @@ local-bridge agent codebuddy "请只回复 LOCAL_BRIDGE_OK"
 printf '整理以下经过用户确认的网页内容：...\n' | local-bridge agent codebuddy -
 ```
 
-此入口只做真实的一次性文本 Agent 运行并解析 CLI 的最终 JSON；**不启用文件、命令或 MCP 工具执行**，不使用 `-y`，不开放给任意网页，且不会自动安装/登录。CodeBuddy CLI 需**单独登录一次**（同账号积分共享，但登录态、桌面 Skills、专家、会话和 GUI 权限不共享）。**尚未在带 WorkBuddy 的目标电脑上实机验收**，不能声称 Bridge 已能驱动 WorkBuddy Desktop 的普通任务。后者继续通过官方 Local Assistant API 或用户授权 GUI 适配单独验收。
+此入口只做真实的一次性文本 Agent 运行并解析 CLI 的最终 JSON；**不启用文件、命令或 MCP 工具执行**，不使用 `-y`，不开放给任意网页，且不会自动安装/登录。CodeBuddy CLI 需**单独登录一次**（同账号积分共享，但登录态、桌面 Skills、专家、会话和 GUI 权限不共享）。**尚未在带 WorkBuddy 的目标电脑上实机验收**，不能声称 Bridge 已能驱动 WorkBuddy Desktop 的普通任务。原桌面账号的 WBIPC + 内置 CLI/ACP 文件任务已另行通过本机实验验收，见统一验收记录；本 CodeBuddy 独立登录入口仍待单独实测。
 
 Configure the first optional CloudFile integration **locally** (not from an AI prompt):
 
@@ -144,3 +144,11 @@ Read [security boundaries](docs/SECURITY.md) before integrating Web or AI worklo
 License: Apache-2.0.
 
 For MCP client setup, see [MCP stdio guide](docs/MCP.md).
+
+## WorkBuddy CLI 增量（2026-10-28）
+
+Bridge → WorkBuddy 官方 Local Assistant 的 `status/send/messages` 已实现，详见 [CLI 使用与限制](docs/WORKBUDDY_CLI.md)。此前未实现的记录为历史基线；当前已提供 CLI 适配，但 OAuth 实机调用仍待验收。客户端 UI 短任务成功不代表 API 授权或此适配器端到端成功。
+
+## 本机 Agent 验收（2026-10-28）
+
+Codex 既有 CLI/App Server、WorkBuddy 原桌面账号 WBIPC + 内置 CLI/ACP、Pi RPC 均有真实任务证据。WorkBuddy/Pi 的 Rust 实验入口已验证写文件及独立结果读取；它们尚不是通用正式 Adapter，也没有 Web/Chrome 接线。Pi 成功使用已有 9router 扩展，默认 MiniMax 直连仍有 401 问题。见 [统一验收记录](docs/AGENT_PROVIDER_VALIDATION.md)、[WorkBuddy 实验说明](scripts/workbuddy-native-validation/README.md)。这些可选实机实验不在 CI 中调用模型。

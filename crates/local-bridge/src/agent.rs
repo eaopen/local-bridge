@@ -199,13 +199,8 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
 fn parse_codebuddy_result(output: &str) -> Result<String> {
     let event: Value =
         serde_json::from_str(output.trim()).context("invalid CodeBuddy headless JSON response")?;
-    if event["is_error"] == true || event["type"] == "error" || event["subtype"] == "error" {
-        bail!("CodeBuddy reported an unsuccessful run");
-    }
-    if let Some(kind) = event["type"].as_str() {
-        if kind != "result" {
-            bail!("CodeBuddy did not return a final result event");
-        }
+    if event["type"] != "result" || event["subtype"] != "success" || event["is_error"] != false {
+        bail!("CodeBuddy did not return an explicit successful final result");
     }
     let answer = event["result"]
         .as_str()
@@ -224,6 +219,8 @@ fn codebuddy_command(program: &str) -> Command {
             "--tools",
             "",
             "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
             "--no-session-persistence",
         ])
         // A one-shot result must never hide a running background agent task.
@@ -366,6 +363,8 @@ mod tests {
             r#"{"type":"system","result":"not final"}"#,
             r#"{"type":"result","is_error":false}"#,
             r#"{"type":"result","result":"  "}"#,
+            r#"{"result":"not a completion event"}"#,
+            r#"{"type":"result","subtype":"error_max_turns","is_error":false,"result":"partial"}"#,
             "invalid",
         ] {
             assert!(parse_codebuddy_result(bad).is_err(), "{bad}");

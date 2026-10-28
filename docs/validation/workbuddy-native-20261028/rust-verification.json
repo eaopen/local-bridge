@@ -1,0 +1,10 @@
+{
+  "status": "completed",
+  "validation_only": true,
+  "verifier": "local-bridge Rust example",
+  "session_id": "01a1810f-6335-7247-8efb-5d950ccb96be",
+  "content_verified": true,
+  "bytes": 25,
+  "path": "/tmp/local-bridge-wb-native-Q5wKdU/workspace/bridge-workbuddy-test.txt",
+  "sha256": "1fef5e1bd50731f42e0e287c15e3851681b6f1d37556da9b660f9b77d945025e"
+}

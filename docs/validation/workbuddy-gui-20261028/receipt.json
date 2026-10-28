@@ -1,0 +1,17 @@
+{
+  "validation": "gui-feasibility",
+  "date": "2026-10-28",
+  "app_version": "5.9.3",
+  "model": "Hy3",
+  "driver": "Codex Computer Use (CUA), external to Local Bridge",
+  "inbox_id": "ctx-18e29abcdb9f44c0-9084-0",
+  "task_marker": "LOCAL-BRIDGE-WB-GUI-F16176DD10",
+  "task_title": "验收GUI任务并写入结果文件",
+  "ui_completion": "已完成 18s",
+  "submitted_once": true,
+  "result_verified_independently": true,
+  "reopened_task_marker_and_result_verified": true,
+  "new_login_or_oauth": false,
+  "standalone_bridge_gui_adapter": false,
+  "result_sha256": "2b1502b40958d0a76075f55e426cdc5fbe0c24e5b029a3326bc889ae092c137b"
+}

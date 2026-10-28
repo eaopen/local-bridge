@@ -2,7 +2,7 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
-use local_bridge::{agent, inbox, mcp_provider, native};
+use local_bridge::{agent, inbox, mcp_provider, native, workbuddy};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::{
     validate_manifest, visible_channels, ChannelManifest, AVAILABLE_CAPABILITIES,
@@ -81,6 +81,27 @@ fn run() -> Result<()> {
                 })
             );
         }
+        [command, provider, action]
+            if command == "agent" && provider == "workbuddy" && action == "status" =>
+        {
+            println!("{}", workbuddy::Client::from_env()?.status()?);
+        }
+        [command, provider, action, value] if command == "agent" && provider == "workbuddy" => {
+            let client = workbuddy::Client::from_env()?;
+            let output = match action.as_str() {
+                "send" => {
+                    let prompt = if value == "-" {
+                        agent::prompt_from_stdin()?
+                    } else {
+                        value.clone()
+                    };
+                    client.send(&prompt)?
+                }
+                "messages" => client.messages(value)?,
+                _ => bail!("expected workbuddy status | send <prompt|-> | messages <message-id>"),
+            };
+            println!("{}", output);
+        }
         [agent, provider, prompt]
             if agent == "agent" && (provider == "codex" || provider == "codebuddy") =>
         {
@@ -133,7 +154,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex|codebuddy <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex|codebuddy <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

@@ -1,0 +1,40 @@
+{
+  "content_verified": false,
+  "events": [
+    {
+      "command": "prompt",
+      "data": {
+        "disposition": "started"
+      },
+      "id": "task",
+      "success": true,
+      "type": "response"
+    },
+    {
+      "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid api key\"},\"request_id\":\"0730c4afa42b23f7941ec61b11b74ed0\"}",
+      "stop_reason": "error",
+      "text": "",
+      "type": "assistant_final"
+    },
+    {
+      "type": "agent_end"
+    },
+    {
+      "aborted": false,
+      "type": "agent_settled"
+    }
+  ],
+  "file_task": false,
+  "passed": false,
+  "pid": 49790,
+  "prompt": "Do not use tools. Reply exactly PI_BRIDGE_OK_local-bridge-pi-1793167791071294000",
+  "result": "",
+  "state": {
+    "model": "MiniMax-M2.7",
+    "provider": "minimax",
+    "session_id": "01a18121-1474-725b-a8b8-8276e6135fbb",
+    "thinking": "medium"
+  },
+  "target": "/var/folders/j2/m5c3lmqs67xc0r50gt4cf8tm0000gn/T/local-bridge-pi-1793167791071294000/bridge-pi-test.txt",
+  "worker_exit_success": true
+}

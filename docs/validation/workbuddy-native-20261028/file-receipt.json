@@ -1,0 +1,160 @@
+{
+  "root": "/tmp/local-bridge-wb-native-F2RoAv",
+  "transport": "WBIPC authenticated fetch + bundled CLI ACP",
+  "events": [
+    {
+      "event": "broker_connected"
+    },
+    {
+      "event": "catalog_loaded",
+      "models": [
+        "auto",
+        "hy4-preview",
+        "hy3",
+        "deepseek-v4.1-flash",
+        "step-5-preview",
+        "glm-5.3",
+        "glm-5.3-flash",
+        "glm-5.2",
+        "glm-5.1",
+        "glm-5v-turbo",
+        "kimi-k3.1-pro",
+        "kimi-k3-1",
+        "kimi-k2.8-preview",
+        "space-bunny",
+        "minimax-m3.1-flash",
+        "minimax-m3",
+        "deepseek-v4-pro",
+        "mimo-v2.6-pro"
+      ]
+    },
+    {
+      "event": "worker_started",
+      "pid": 42453,
+      "root": "/tmp/local-bridge-wb-native-F2RoAv"
+    },
+    {
+      "event": "initialized",
+      "protocolVersion": 1
+    },
+    {
+      "event": "proxy_response",
+      "path": "/v3/config",
+      "status": 400
+    },
+    {
+      "event": "session_created",
+      "sessionId": "01a1810e-5e01-7c84-95a3-421777fd6fda"
+    },
+    {
+      "event": "proxy_response",
+      "path": "/v2/chat/completions",
+      "status": 200
+    },
+    {
+      "event": "tool_event",
+      "kind": "tool_call",
+      "title": "Write",
+      "status": "in_progress",
+      "toolCallId": "chatcmpl-tool-bccd5c27e021ca41"
+    },
+    {
+      "event": "tool_event",
+      "kind": "tool_call_update",
+      "toolCallId": "chatcmpl-tool-bccd5c27e021ca41"
+    },
+    {
+      "event": "tool_event",
+      "kind": "tool_call_update",
+      "toolCallId": "chatcmpl-tool-bccd5c27e021ca41"
+    },
+    {
+      "event": "tool_event",
+      "kind": "tool_call",
+      "title": "Write /tmp/local-bridge-wb-native-F2RoAv/workspace/bridge-workbuddy-test.txt",
+      "status": "pending",
+      "toolCallId": "chatcmpl-tool-bccd5c27e021ca41"
+    },
+    {
+      "event": "permission_request",
+      "toolCall": {
+        "toolCallId": "chatcmpl-tool-bccd5c27e021ca41",
+        "rawInput": {
+          "file_path": "/tmp/local-bridge-wb-native-F2RoAv/workspace/bridge-workbuddy-test.txt",
+          "content": "LOCAL_BRIDGE_WORKBUDDY_OK"
+        },
+        "_meta": {
+          "codebuddy.ai/toolName": "Write"
+        }
+      },
+      "options": [
+        {
+          "kind": "allow_always",
+          "name": "Always Allow",
+          "optionId": "allow_always"
+        },
+        {
+          "kind": "allow_once",
+          "name": "Allow",
+          "optionId": "allow"
+        },
+        {
+          "kind": "reject_once",
+          "name": "Reject",
+          "optionId": "reject"
+        }
+      ]
+    },
+    {
+      "event": "permission_allowed",
+      "path": "/tmp/local-bridge-wb-native-F2RoAv/workspace/bridge-workbuddy-test.txt",
+      "kind": "allow_once"
+    },
+    {
+      "event": "tool_event",
+      "kind": "tool_call_update",
+      "status": "completed",
+      "toolCallId": "chatcmpl-tool-bccd5c27e021ca41"
+    },
+    {
+      "event": "proxy_response",
+      "path": "/v2/chat/completions",
+      "status": 200
+    },
+    {
+      "event": "prompt_completed",
+      "stopReason": "end_turn",
+      "text": "/tmp/local-bridge-wb-native-F2RoAv/workspace/bridge-workbuddy-test.txt"
+    },
+    {
+      "event": "file_verification",
+      "passed": true,
+      "path": "/tmp/local-bridge-wb-native-F2RoAv/workspace/bridge-workbuddy-test.txt"
+    },
+    {
+      "event": "worker_exit",
+      "code": 0
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/v3/config",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "path": "/v2/chat/completions",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/v2/chat/completions",
+      "status": 200
+    }
+  ],
+  "worker_pid": 42453,
+  "session_id": "01a1810e-5e01-7c84-95a3-421777fd6fda",
+  "file_verified": true,
+  "result_path": "/tmp/local-bridge-wb-native-F2RoAv/workspace/bridge-workbuddy-test.txt"
+}
