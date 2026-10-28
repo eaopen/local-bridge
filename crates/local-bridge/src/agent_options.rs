@@ -5,8 +5,12 @@ use anyhow::{bail, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-fn default_auto() -> String { "auto".into() }
-fn default_prefer() -> String { "prefer".into() }
+fn default_auto() -> String {
+    "auto".into()
+}
+fn default_prefer() -> String {
+    "prefer".into()
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,9 +28,10 @@ pub struct RunAgentRequest {
 }
 
 fn valid_id(s: &str, max: usize) -> bool {
-    !s.is_empty() && s.len() <= max
-        && s.bytes().all(|b| b.is_ascii_alphanumeric()
-            || matches!(b, b'_' | b'-' | b'.' | b':' | b'/'))
+    !s.is_empty()
+        && s.len() <= max
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.' | b':' | b'/'))
 }
 impl RunAgentRequest {
     pub fn check(&self) -> Result<()> {
@@ -51,7 +56,10 @@ impl RunAgentRequest {
 
 fn pick_agent<'a>(requested: &str, mode: &str, candidates: &'a [&'a str]) -> Result<&'a str> {
     if mode == "require" {
-        return candidates.iter().copied().find(|c| *c == requested)
+        return candidates
+            .iter()
+            .copied()
+            .find(|c| *c == requested)
             .ok_or_else(|| anyhow::anyhow!("required agent unavailable"));
     }
     if requested != "auto" {
@@ -59,7 +67,9 @@ fn pick_agent<'a>(requested: &str, mode: &str, candidates: &'a [&'a str]) -> Res
             return Ok(selected);
         }
     }
-    candidates.first().copied()
+    candidates
+        .first()
+        .copied()
         .ok_or_else(|| anyhow::anyhow!("no available local agent adapter"))
 }
 
@@ -68,14 +78,12 @@ fn pick_agent<'a>(requested: &str, mode: &str, candidates: &'a [&'a str]) -> Res
 pub fn run(origin: &str, request: RunAgentRequest) -> Result<Value> {
     request.check()?;
     let wb = workbuddy_web::capability(origin)?;
-    let available = if wb["installed"] == true
-        && wb["local_grant"] == true
-        && wb["run_supported"] == true
-    {
-        vec!["workbuddy"]
-    } else {
-        Vec::new()
-    };
+    let available =
+        if wb["installed"] == true && wb["local_grant"] == true && wb["run_supported"] == true {
+            vec!["workbuddy"]
+        } else {
+            Vec::new()
+        };
     let chosen = pick_agent(&request.agent, &request.agent_mode, &available)?;
     if request.model != "auto" {
         bail!("explicit model not supported by selected adapter");
@@ -89,9 +97,13 @@ pub fn run(origin: &str, request: RunAgentRequest) -> Result<Value> {
     };
     task["selected_agent"] = json!(chosen);
     task["requested_agent"] = json!(request.agent);
-    task["selection"] = json!(if request.agent == chosen { "preferred" }
-        else if request.agent == "auto" { "automatic" }
-        else { "fallback_before_execution" });
+    task["selection"] = json!(if request.agent == chosen {
+        "preferred"
+    } else if request.agent == "auto" {
+        "automatic"
+    } else {
+        "fallback_before_execution"
+    });
     task["applied_model"] = Value::Null;
     task["applied_think_mode"] = Value::Null;
     Ok(task)
@@ -108,9 +120,18 @@ mod tests {
     use super::*;
     #[test]
     fn agent_selection_respects_preferences_and_strictness() {
-        assert_eq!(pick_agent("auto", "prefer", &["workbuddy", "codex"]).unwrap(), "workbuddy");
-        assert_eq!(pick_agent("codex", "prefer", &["workbuddy", "codex"]).unwrap(), "codex");
-        assert_eq!(pick_agent("pi", "prefer", &["workbuddy"]).unwrap(), "workbuddy");
+        assert_eq!(
+            pick_agent("auto", "prefer", &["workbuddy", "codex"]).unwrap(),
+            "workbuddy"
+        );
+        assert_eq!(
+            pick_agent("codex", "prefer", &["workbuddy", "codex"]).unwrap(),
+            "codex"
+        );
+        assert_eq!(
+            pick_agent("pi", "prefer", &["workbuddy"]).unwrap(),
+            "workbuddy"
+        );
         assert!(pick_agent("pi", "require", &["workbuddy"]).is_err());
         assert!(pick_agent("auto", "prefer", &[]).is_err());
     }
@@ -120,14 +141,19 @@ mod tests {
         assert!(from_value(&base).is_ok());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"test",
            "agent":"workbuddy","model":"auto","think_mode":"high",
-           "agent_mode":"prefer"})).is_ok());
+           "agent_mode":"prefer"}))
+        .is_ok());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"test",
-           "agent":"auto","agent_mode":"require"})).is_err());
+           "agent":"auto","agent_mode":"require"}))
+        .is_err());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"test",
-           "model":"https://secret.example/path?token=abc"})).is_err());
+           "model":"https://secret.example/path?token=abc"}))
+        .is_err());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"test",
-           "think_mode":"unlimited"})).is_err());
+           "think_mode":"unlimited"}))
+        .is_err());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"test",
-           "shell":"rm -rf"})).is_err());
+           "shell":"rm -rf"}))
+        .is_err());
     }
 }
