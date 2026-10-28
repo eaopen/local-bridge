@@ -2,7 +2,7 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
-use local_bridge::{agent, inbox, mcp_provider, native, web_v2, workbuddy};
+use local_bridge::{agent, inbox, mcp_provider, native, web_v2, workbuddy, workbuddy_web};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::profile_v2::{validate_profile_v2_shape, ApplicationProfileV2};
 use local_bridge_core::{
@@ -49,6 +49,15 @@ fn run() -> Result<()> {
         }
         [a, action, origin, provider, tool] if a == "web-v2" && action == "revoke-status" => {
             println!("{}", web_v2::revoke_status(origin, provider, tool)?);
+        }
+        [a, action, origin] if a == "web-v2" && action == "grant-workbuddy" => {
+            println!("{}", workbuddy_web::grant(origin)?);
+        }
+        [a, action, origin] if a == "web-v2" && action == "revoke-workbuddy" => {
+            println!("{}", workbuddy_web::revoke(origin)?);
+        }
+        [a, action, origin] if a == "web-v2" && action == "workbuddy-capability" => {
+            println!("{}", workbuddy_web::capability(origin)?);
         }
         [a, action, origin] if a == "web-v2" && action == "capabilities" => {
             println!("{}", web_v2::capabilities(origin)?);
@@ -226,7 +235,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

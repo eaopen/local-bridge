@@ -7,3 +7,4 @@ pub mod native;
 pub mod pi_enterprise;
 pub mod web_v2;
 pub mod workbuddy;
+pub mod workbuddy_web;

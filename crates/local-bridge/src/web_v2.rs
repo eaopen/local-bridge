@@ -2,7 +2,7 @@
 //! Chrome must validate the real sender origin and a separate website permission.
 //! The local user grants an exact (origin, installed provider, status tool) tuple.
 //! This is not a remote-profile permission, nor generic provider.call.
-use crate::{inbox, mcp_provider};
+use crate::{inbox, mcp_provider, workbuddy_web};
 use anyhow::{bail, Context, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
@@ -134,7 +134,8 @@ pub fn capabilities(origin: &str) -> Result<Value> {
         })
         .collect();
     Ok(json!({"origin":origin,"mcp_status_grants":grants,
-        "agent_web_run_supported":false,"profile_trusted":false}))
+        "workbuddy":workbuddy_web::capability(origin)?,
+        "agent_web_run_supported":cfg!(target_os="macos"),"profile_trusted":false}))
 }
 pub fn status_tool(origin: &str, provider: &str, tool: &str) -> Result<Value> {
     checked(origin, provider, tool)?;
@@ -176,6 +177,18 @@ pub fn handle_native(request: &Value) -> Value {
             match (p["provider"].as_str(), p["tool"].as_str()) {
                 (Some(provider), Some(tool)) => status_tool(origin, provider, tool),
                 _ => return fail("invalid_mcp_request"),
+            }
+        }
+        Some("web.v2.agent.start") if p.as_object().is_some_and(|o| o.len() == 4) => {
+            match (p["provider"].as_str(),p["client_key"].as_str(),p["prompt"].as_str()) {
+                (Some("workbuddy"),Some(key),Some(prompt)) => workbuddy_web::start(origin,key,prompt),
+                _ => return fail("invalid_agent_request"),
+            }
+        }
+        Some("web.v2.agent.poll") if p.as_object().is_some_and(|o| o.len() == 3) => {
+            match (p["task_id"].as_str(),p["cursor"].as_u64()) {
+                (Some(id),Some(cursor)) => workbuddy_web::poll(origin,id,cursor),
+                _ => return fail("invalid_agent_poll"),
             }
         }
         _ => return fail("unsupported_v2_action"),
