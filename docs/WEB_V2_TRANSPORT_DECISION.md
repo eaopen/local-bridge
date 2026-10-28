@@ -50,6 +50,6 @@ Local Bridge 提供 [clients/web-v2](../clients/web-v2/README.md) 中的零外�
 
 ## 2026-10-28 定案：统一 Agent V2，loopback HTTP 默认不启 TLS
 
-**Web SDK 仅导出 `runAgent/readAgent`，`api_version=2` 必须写入实际 JSON 请求；用户可选 `agent/model/thinkMode/agentMode`。** 旧 `startWorkbuddy/readWorkbuddy/pollWorkbuddy` 及 V2 vendor 专用 `web.v2.agent.start/poll`、`/v2/workbuddy/tasks` 路由已在开发版本直接删除。WorkBuddy 后台执行器保留，统一 V2 Agent 适配器调用；Codex/Pi 进入通用参数合同但尚不是已实测可用的 Web Adapter，不得虚报。Explicit `model/thinkMode` 若不能真正应用必须拒绝。
+**Web SDK 仅导出 `runAgent/readAgent`，`api_version=2` 必须写入实际 JSON 请求；用户可选 `agent/model/thinkMode/agentMode`。** 旧 `startWorkbuddy/readWorkbuddy/pollWorkbuddy` 及 V2 vendor 专用 `web.v2.agent.start/poll`、`/v2/workbuddy/tasks` 路由已在开发版本直接删除。WorkBuddy 后台执行器保留，Codex/Pi 增加了独立 CLI 文本 Worker，共享 V2 授权、状态和任务游标。三者均未做企业网页/真实登录端到端验收；`eligible` 仅代表可尝试提交，不宣称 `ready`。Explicit `model/thinkMode` 若不能真正应用必须拒绝。
 
 默认本机 127.0.0.1 **HTTP 非 TLS**，不配置证书、不静默安装根证书。Chrome 142 本地网络访问许可、145 `loopback-network`/ `local-network` 划分属于浏览器权限，获得 loopback 许可后安全上下文访问本机 HTTP 可用（具体仍受企业策略/CORS 影响）。不兼容时回退 Native Messaging。企业如独立部署可信 localhost HTTPS 代理可显式选择固定代理端点，非默认功能，不关闭浏览器 TLS 校验。详见 [统一 Web SDK](../clients/web-v2/README.md)。
