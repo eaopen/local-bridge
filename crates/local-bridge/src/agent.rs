@@ -56,15 +56,13 @@ fn parse_codex_events(output: &str) -> Result<String> {
     Ok(answer)
 }
 
-/// Run only the user's explicitly requested Codex task in its documented
-/// non-interactive, ephemeral, read-only mode. No arbitrary executable or
-/// arguments can arrive from a Profile, browser page, MCP, or model text.
-pub fn run_codex(prompt: &str) -> Result<Value> {
-    if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
-        bail!("agent prompt must contain 1..65536 bytes of text");
-    }
-
-    let mut child = Command::new("codex")
+// macOS Chrome launched from Finder has a minimal PATH; a user's existing
+// Homebrew Codex CLI (and its /usr/bin/env node interpreter) can otherwise be
+// invisible. Only add conventional local tool directories to *this child*.
+// Never run a shell or change global/user PATH settings.
+fn codex_command(program: &str) -> Command {
+    let mut command = Command::new(program);
+    command
         .args([
             "exec",
             "--ephemeral",
@@ -76,9 +74,52 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .context("Codex CLI not available; install and log in to Codex first")?;
+        .stderr(Stdio::null());
+    #[cfg(target_os = "macos")]
+    {
+        use std::path::PathBuf;
+        let raw = std::env::var_os("PATH").unwrap_or_default();
+        let mut dirs: Vec<PathBuf> = std::env::split_paths(&raw).collect();
+        for dir in ["/opt/homebrew/bin", "/usr/local/bin"] {
+            let path = PathBuf::from(dir);
+            if path.is_dir() && !dirs.contains(&path) {
+                dirs.push(path);
+            }
+        }
+        if let Ok(paths) = std::env::join_paths(dirs) {
+            command.env("PATH", paths);
+        }
+    }
+    command
+}
+
+fn spawn_codex() -> Result<std::process::Child> {
+    // Prefer the user's PATH, and on macOS fall back to existing Homebrew
+    // launchers for Chrome's GUI environment. No installation is performed.
+    #[cfg(target_os = "macos")]
+    let candidates = ["codex", "/opt/homebrew/bin/codex", "/usr/local/bin/codex"];
+    #[cfg(not(target_os = "macos"))]
+    let candidates = ["codex"];
+
+    for candidate in candidates {
+        match codex_command(candidate).spawn() {
+            Ok(child) => return Ok(child),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(err).context("Codex CLI could not start"),
+        }
+    }
+    bail!("Codex CLI not available; install and log in to Codex first")
+}
+
+/// Run only the user's explicitly requested Codex task in its documented
+/// non-interactive, ephemeral, read-only mode. No arbitrary executable or
+/// arguments can arrive from a Profile, browser page, MCP, or model text.
+pub fn run_codex(prompt: &str) -> Result<Value> {
+    if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
+        bail!("agent prompt must contain 1..65536 bytes of text");
+    }
+
+    let mut child = spawn_codex()?;
 
     let stdout = child.stdout.take().context("Codex stdout unavailable")?;
     let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
@@ -153,6 +194,20 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_gui_codex_child_path_can_find_homebrew_node() {
+        let command = codex_command("/opt/homebrew/bin/codex");
+        let child_path = command
+            .get_envs()
+            .find_map(|(name, value)| (name == "PATH").then_some(value).flatten())
+            .expect("macOS child must get an augmented PATH");
+        let dirs: Vec<_> = std::env::split_paths(child_path).collect();
+        if std::path::Path::new("/opt/homebrew/bin").is_dir() {
+            assert!(dirs.contains(&std::path::PathBuf::from("/opt/homebrew/bin")));
+        }
+    }
 
     #[test]
     fn only_real_completed_turn_counts() {
