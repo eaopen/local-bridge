@@ -60,7 +60,9 @@ pub fn with_lock<T>(path: &Path, work: impl FnOnce() -> Result<T>) -> Result<T> 
     loop {
         match lock.try_lock().map_err(std::io::Error::from) {
             Ok(()) => break,
-            Err(error) if error.kind() == ErrorKind::WouldBlock && started.elapsed() < LOCK_WAIT => {
+            Err(error)
+                if error.kind() == ErrorKind::WouldBlock && started.elapsed() < LOCK_WAIT =>
+            {
                 std::thread::sleep(Duration::from_millis(40));
             }
             Err(error) => return Err(error).context("another local grant update is active"),
@@ -72,8 +74,7 @@ pub fn with_lock<T>(path: &Path, work: impl FnOnce() -> Result<T>) -> Result<T> 
 }
 
 fn busy(error: &std::io::Error) -> bool {
-    matches!(error.raw_os_error(), Some(5 | 32 | 33))
-        || error.kind() == ErrorKind::PermissionDenied
+    matches!(error.raw_os_error(), Some(5 | 32 | 33)) || error.kind() == ErrorKind::PermissionDenied
 }
 
 /// Serialize into a unique private file, fsync, then atomically replace the
@@ -92,7 +93,10 @@ pub fn write_json<T: Serialize + ?Sized>(path: &Path, value: &T) -> Result<()> {
         .file_name()
         .context("local state target missing file name")?
         .to_string_lossy();
-    let tmp = parent.join(format!(".{name}.{}-{time}-{unique}.tmp", std::process::id()));
+    let tmp = parent.join(format!(
+        ".{name}.{}-{time}-{unique}.tmp",
+        std::process::id()
+    ));
     let mut file = new_private_file(&tmp)?;
     let result = (|| -> Result<()> {
         file.write_all(&content)?;
@@ -146,8 +150,16 @@ mod tests {
         let path = root.join("web-v2-agent-grants.json");
         let legacy_tmp = root.join("web-v2-agent-grants.json.tmp");
         fs::write(&legacy_tmp, b"interrupted older write").unwrap();
-        write_json(&path, &json!([{"origin":"https://example.test","agent":"pi"}])).unwrap();
-        write_json(&path, &json!([{"origin":"https://example.test","agent":"codex"}])).unwrap();
+        write_json(
+            &path,
+            &json!([{"origin":"https://example.test","agent":"pi"}]),
+        )
+        .unwrap();
+        write_json(
+            &path,
+            &json!([{"origin":"https://example.test","agent":"codex"}]),
+        )
+        .unwrap();
         let raw: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         assert_eq!(raw[0]["agent"], "codex");
         assert_eq!(fs::read(legacy_tmp).unwrap(), b"interrupted older write");
@@ -166,11 +178,11 @@ mod tests {
             tasks.push(std::thread::spawn(move || {
                 for _ in 0..8 {
                     with_lock(&target, || {
-                        let mut state: Value =
-                            serde_json::from_slice(&fs::read(&target)?)?;
+                        let mut state: Value = serde_json::from_slice(&fs::read(&target)?)?;
                         state["value"] = json!(state["value"].as_u64().unwrap() + 1);
                         write_json(&target, &state)
-                    }).unwrap();
+                    })
+                    .unwrap();
                 }
             }));
         }
