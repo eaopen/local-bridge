@@ -67,7 +67,8 @@ impl EnterprisePiSession {
     pub fn from_environment() -> Result<Self> {
         let base = env::var(URL_ENV).context("enterprise AI session unavailable: no endpoint")?;
         let model = env::var(MODEL_ENV).context("enterprise AI session unavailable: no model")?;
-        let token = env::var(TOKEN_ENV).context("enterprise AI session unavailable: no authorization")?;
+        let token =
+            env::var(TOKEN_ENV).context("enterprise AI session unavailable: no authorization")?;
         Self::from_values(&base, &model, &token)
     }
 
@@ -106,7 +107,8 @@ impl EnterprisePiSession {
             .as_nanos();
         for n in 0..16 {
             let dir = env::temp_dir().join(format!(
-                "local-bridge-enterprise-pi-{}-{now:x}-{n}", std::process::id()
+                "local-bridge-enterprise-pi-{}-{now:x}-{n}",
+                std::process::id()
             ));
             match fs::create_dir(&dir) {
                 Ok(()) => {}
@@ -148,10 +150,17 @@ mod tests {
     #[test]
     fn enterprise_model_is_private_and_never_serializes_bearer_token() {
         let session = EnterprisePiSession::from_values(
-            "https://ai.example.invalid/openai/v1", "corp-chat", "private-dummy-test-token",
+            "https://ai.example.invalid/openai/v1",
+            "corp-chat",
+            "private-dummy-test-token",
         )
         .unwrap();
         let stored = fs::read_to_string(session.agent_dir.join("models.json")).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(
+            parsed["providers"]["local-bridge-enterprise"]["models"][0]["id"],
+            "corp-chat"
+        );
         assert!(stored.contains("corp-chat"));
         assert!(stored.contains("$LOCAL_BRIDGE_ENTERPRISE_AI_TOKEN"));
         assert!(!stored.contains("private-dummy-test-token"));
@@ -175,10 +184,16 @@ mod tests {
         assert!(check_endpoint("http://127.0.0.1:32123/v1").is_ok());
         assert!(check_endpoint("https://enterprise.example.org/v1").is_ok());
         assert!(EnterprisePiSession::from_values(
-            "https://enterprise.example.org/v1", "corp-chat", ""
-        ).is_err());
+            "https://enterprise.example.org/v1",
+            "corp-chat",
+            ""
+        )
+        .is_err());
         assert!(EnterprisePiSession::from_values(
-            "https://enterprise.example.org/v1", "../unsafe", "test"
-        ).is_err());
+            "https://enterprise.example.org/v1",
+            "../unsafe",
+            "test"
+        )
+        .is_err());
     }
 }
