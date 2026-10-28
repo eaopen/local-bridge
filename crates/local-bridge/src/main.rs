@@ -2,7 +2,9 @@ mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
-use local_bridge::{agent, inbox, local_http, mcp_provider, native, web_v2, workbuddy, workbuddy_web};
+use local_bridge::{
+    agent, inbox, local_http, mcp_provider, native, web_v2, workbuddy, workbuddy_web,
+};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::profile_v2::{validate_profile_v2_shape, ApplicationProfileV2};
 use local_bridge_core::{
