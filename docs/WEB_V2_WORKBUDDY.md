@@ -4,7 +4,7 @@
 
 ## 1. 为什么不是一次 sendNativeMessage 等待完成
 
-Chrome Native Messaging 的一次性调用不能可靠承载多次 WorkBuddy 回复，更不能将 HTTP/Open API 的 accepted 当 completed。采用短期本机任务记录，保持 Native Host 快速返回：
+Chrome Native Messaging 的一次性调用不能可靠承载多次 WorkBuddy 回复。**目前主链改成** Chrome 仅完成一次本地短期授权 → Web 直接 HTTP 提交 → SSE 增量读取，Native 只用于直连失败的兼容回退。HTTP/SSE 与 Native fallback 消费同一份短期本机任务记录：
 
 1. `agent.start`（Chrome V2）→ `web.v2.agent.start`（Native V2），提交唯一 `client_key` 和界限内的文本，回复 `status=accepted, task_id`。
 2. 独立 WorkBuddy worker 通过用户既有 WorkBuddy Desktop 的 WBIPC + bundled CLI/ACP 运行，所有本机工具与 MCP 禁用；收到的 `session/update` 转为有序事件。

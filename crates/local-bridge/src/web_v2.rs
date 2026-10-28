@@ -2,7 +2,7 @@
 //! Chrome must validate the real sender origin and a separate website permission.
 //! The local user grants an exact (origin, installed provider, status tool) tuple.
 //! This is not a remote-profile permission, nor generic provider.call.
-use crate::{inbox, mcp_provider, workbuddy_web};
+use crate::{inbox, local_http, mcp_provider, workbuddy_web};
 use anyhow::{bail, Context, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
@@ -137,6 +137,11 @@ pub fn capabilities(origin: &str) -> Result<Value> {
         "workbuddy":workbuddy_web::capability(origin)?,
         "agent_web_run_supported":cfg!(target_os="macos"),"profile_trusted":false}))
 }
+/// Presence of a local OS-user grant; execution still rechecks an exact tool.
+pub fn has_status_grant(origin: &str) -> Result<bool> {
+    if !valid_origin(origin) { bail!("invalid site origin"); }
+    Ok(load()?.iter().any(|grant|grant.origin==origin))
+}
 pub fn status_tool(origin: &str, provider: &str, tool: &str) -> Result<Value> {
     checked(origin, provider, tool)?;
     if !load()?
@@ -178,6 +183,11 @@ pub fn handle_native(request: &Value) -> Value {
                 (Some(provider), Some(tool)) => status_tool(origin, provider, tool),
                 _ => return fail("invalid_mcp_request"),
             }
+        }
+        // Chrome bootstrap is a separate, short action. The returned token
+        // is scoped to one origin; all task messages subsequently use local HTTP/SSE.
+        Some("web.v2.session.issue") if p.as_object().is_some_and(|o| o.len() == 1) => {
+            local_http::issue_session(origin)
         }
         Some("web.v2.agent.start") if p.as_object().is_some_and(|o| o.len() == 4) => {
             match (p["provider"].as_str(),p["client_key"].as_str(),p["prompt"].as_str()) {

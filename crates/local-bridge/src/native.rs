@@ -233,7 +233,7 @@ fn handle_with_runners(
                 "provider":"local-bridge",
                 "connected_to_local_bridge":true,
                 "native_protocol":1,
-                "capabilities":["host.status","context.share","context.summarize","relay.return","enterprise.pi.run","web.v2.capabilities","web.v2.mcp.status","web.v2.agent.start","web.v2.agent.poll"],
+                "capabilities":["host.status","context.share","context.summarize","relay.return","enterprise.pi.run","web.v2.capabilities","web.v2.mcp.status","web.v2.agent.start","web.v2.agent.poll","web.v2.session.issue"],
                 "handoff":"local-inbox",
                 "ai_run_supported":true,
                 "ai_run_enabled":false,
