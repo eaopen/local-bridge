@@ -10,6 +10,12 @@
 
 > **当前实现：0.1.0 核心及后续最小接线。** 已有只读 MCP Server、离线 Profile 校验、本机显式 Codex CLI run、Chrome Native Host/手动网页收件箱，以及用户注册的 MCP Client（已与独立 WeChat Provider 完成不涉及账号的协议联动）。**尚未交付**真实 Chrome/微信桌面实机验收、可信企业 SSO/Web 动作、PersonalProfile 运行时、双向通讯自动订阅、通用 BridgeTask 运行时或 CloudFile 文件编辑接管。现有文件编辑仍由 [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2) 负责。
 
+## 可选本机管理 UI（Tauri Desktop MVP）
+
+Local Bridge 的 **CLI/Native Host/MCP 仍然独立运行**，可选的 [Local Bridge Desktop](crates/local-bridge-desktop/README.md) 使用独立 Tauri 工程提供一个窗口中的概览、只读任务中心与 Agent 设置。它直接调用已有 Rust 模块，不新建 HTTP 管理接口、Web 任务权限或第二份任务数据库。默认 Agent/Model/ThinkMode/优先顺序使用统一的 `agent-preferences-v1.json`，Web SDK 未明确指定的参数才由 Bridge 默认设置决定。
+
+当前是**开发预览版**，尚无签名安装包、托盘自动启动或真实 Windows/macOS GUI 验收。桌面工程不进入核心 Cargo 工作区，独立 CI 检查；旧 CloudFile Agent2/Tauri、两套 Chrome Host 和原文件 Journal 均不改变。
+
 ## Native Host lifecycle (user-level, optional)
 
 Borrowing the **reversible installer/diagnostic pattern** from CloudFile Agent2 without importing its file engine or Tauri:
