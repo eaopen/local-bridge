@@ -1,4 +1,4 @@
-# WorkBuddy Web V2：异步任务与多次消息返回（第一阶段）
+# Agent Web V2：统一运行与多次消息返回（当前 WorkBuddy 适配器）
 
 此实现使用独立的 Local Bridge Native Host + 新通用 Chrome 插件；不迁移 CloudFile V1，也不修改 etech-bpm。
 
@@ -6,9 +6,9 @@
 
 Chrome Native Messaging 的一次性调用不能可靠承载多次 WorkBuddy 回复。**目前主链改成** Chrome 仅完成一次本地短期授权 → Web 直接 HTTP 提交 → SSE 增量读取，Native 只用于直连失败的兼容回退。HTTP/SSE 与 Native fallback 消费同一份短期本机任务记录：
 
-1. `agent.start`（Chrome V2）→ `web.v2.agent.start`（Native V2），提交唯一 `client_key` 和界限内的文本，回复 `status=accepted, task_id`。
+1. `agent.run`（Chrome V2）→ `web.v2.agent.run`（Native V2），提交 `api_version=2`、唯一 `client_key`、文本及可选 `agent/model/thinkMode/agentMode`，回复 `status=accepted, task_id`。
 2. 独立 WorkBuddy worker 通过用户既有 WorkBuddy Desktop 的 WBIPC + bundled CLI/ACP 运行，所有本机工具与 MCP 禁用；收到的 `session/update` 转为有序事件。
-3. `agent.poll`（浏览器 V2）→ `web.v2.agent.poll`，提交 `task_id + cursor`，返回最多 40 个新增事件、`next_seq`、`has_more`、`status` 与 `terminal`；跨窗口/刷新可续读。
+3. `agent.read`（浏览器 V2）→ `web.v2.agent.read`，提交 `task_id + cursor`，返回最多 40 个新增事件、`next_seq`、`has_more`、`status` 与 `terminal`；跨窗口/刷新可续读。
 4. 单次 WorkBuddy assistant 回复可包含多段 `message.delta`；每条逻辑回复以 `message.final` 标记。工具信息是 `tool.update`，最终只在 ACP `session/prompt` 的 `stopReason=end_turn` 确认并且有真实助手输出后产生 `task.completed`。文本/工具事件都**不是**整个任务完成。
 5. `task.failed` 或超过运行期限无终判则显示 `unknown`；**不自动重试、不切换 Codex/Pi**。网络回执丢失时使用同一个 `client_key`，服务端寻找原 task，不重新提交。
 
@@ -38,7 +38,7 @@ local-bridge web-v2 revoke-workbuddy https://your-etech-web.example
 
 Chrome Service Worker 必须以真实 sender.origin 验证来源和 top-frame；Native Host 按 origin 二次核验本机授权。任何网站/Profile/LLM 文本都无法自行授权，也不能传命令、工具列表、工作目录或 WorkBuddy 凭据。用户点击元枢新面板才发起任务，默认仅文本，无法读写文件、执行 Shell/MCP。**由 WorkBuddy 本人既有登录与权限处理模型费用和实际响应。**
 
-当前只对已验证过 ACP 实验的 **macOS WorkBuddy Desktop + Node 24+** 开放，且仍需安装软件的真实用户机验证。无 WorkBuddy 时显示不可用，原 Etech Web 和 Chrome v1 Popup 不受影响。Node 仅为可选 WorkBuddy Adapter 使用，不成为 Local Bridge 核心依赖。
+当前执行器只对已验证过 ACP 实验的 **macOS WorkBuddy Desktop + Node 24+** 开放，且仍需安装软件的真实用户机验证。无 WorkBuddy 时显示不可用，原 Etech Web 和 Chrome v1 Popup 不受影响。Node 仅为可选 WorkBuddy Adapter 使用，不成为 Local Bridge 核心依赖。
 
 ## 3. 本地事件记录与生命周期
 
@@ -53,3 +53,6 @@ Chrome Service Worker 必须以真实 sender.origin 验证来源和 top-frame；
 - P2：本地企业定制套壳元枢；CloudFile 独立评估稳定后迁移。
 
 关联：[Local Bridge #6](https://github.com/eaopen/local-bridge/issues/6)、[#22](https://github.com/eaopen/local-bridge/issues/22)、[EAP #44](https://github.com/jcetech/etech-eap/issues/44)。
+
+
+**V2 已删除未上线的厂商专用 Web task 路由**。公开合同是 `runAgent/readAgent`、`POST /v2/agents/tasks` 和 `GET /v2/agents/tasks/{id}/events|stream`；底层 WorkBuddy worker 可以继续使用自身实现与结果记录。Codex/Pi 的真实 Web adapter 尚待逐个验收，不能因支持统一参数就宣称完成。

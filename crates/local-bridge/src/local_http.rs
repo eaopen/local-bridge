@@ -60,6 +60,21 @@ fn strong_token() -> Result<String> {
         bail!("loopback session bootstrap not yet enabled on this OS")
     }
 }
+/// Plain 127.0.0.1 HTTP is the default. TLS is *not* required for a
+/// same-machine Bridge, and Chrome LNA permission is distinct from TLS trust.
+/// An operator-managed HTTPS reverse proxy is optional, with an OS/browser
+/// trusted certificate. No auto CA install and no skipping certificate checks.
+fn advertised_endpoint() -> Result<String> {
+    let configured = std::env::var("LOCAL_BRIDGE_WEB_V2_HTTPS_ENDPOINT").unwrap_or_default();
+    if configured.is_empty() {
+        return Ok(format!("http://127.0.0.1:{PORT}"));
+    }
+    match configured.as_str() {
+        "https://localhost:48294" | "https://127.0.0.1:48294" => Ok(configured),
+        _ => bail!("unsupported HTTPS loopback proxy endpoint; TLS is optional"),
+    }
+}
+
 fn token_id(token: &str) -> bool {
     token.len() == 64
         && token
@@ -80,6 +95,7 @@ pub fn issue_session(origin: &str) -> Result<Value> {
     {
         bail!("OS user has not permitted this site to use local capabilities");
     }
+    let endpoint = advertised_endpoint()?;
     let path = session_dir()?;
     private_dir(&path)?;
     // Lazy bounded cleanup at new bootstrap; never keep stale credentials forever.
@@ -123,7 +139,7 @@ pub fn issue_session(origin: &str) -> Result<Value> {
                 f.sync_all()?;
                 return Ok(json!({
                     "transport":"local-bridge-http-sse-v2",
-                    "endpoint":format!("http://127.0.0.1:{PORT}"),
+                    "endpoint":endpoint,
                     "token":token,
                     "expires_in":TTL_SEC,
                     "scope":"local-bridge-v2-authorized-capabilities",
@@ -296,7 +312,7 @@ fn cursor(path: &str) -> Result<u64> {
 }
 fn task_from_url(path: &str, suffix: &str) -> Option<String> {
     let clean = path.split('?').next()?;
-    let rest = clean.strip_prefix("/v2/workbuddy/tasks/")?;
+    let rest = clean.strip_prefix("/v2/agents/tasks/")?;
     let task = rest.strip_suffix(suffix)?;
     if task.is_empty() || task.contains('/') {
         return None;
@@ -343,7 +359,7 @@ fn stream_events(stream: &mut TcpStream, origin: &str, task_id: &str, from: u64)
     stream.flush()?;
     let mut next = from;
     for _ in 0..30 {
-        let result = workbuddy_web::poll(origin, task_id, next)?;
+        let result = agent_options::poll(origin, task_id, next)?;
         let events = result["events"]
             .as_array()
             .context("invalid worker events")?;
@@ -463,7 +479,7 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
             }
         }
         // Unified Agent entry point: Bridge resolves the caller's hints
-        // before any Provider task starts. Legacy WorkBuddy path unchanged.
+        // before any Provider task starts. No vendor-specific V2 task endpoint.
         ("POST", "/v2/agents/tasks") => {
             if !req.content_type.starts_with("application/json") {
                 reply(
@@ -509,60 +525,10 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
                 }
             }
         }
-        ("POST", "/v2/workbuddy/tasks") => {
-            if !req.content_type.starts_with("application/json") {
-                reply(
-                    &mut stream,
-                    400,
-                    Some(&req.origin),
-                    &json!({"error":"content_type"}),
-                )?;
-            } else {
-                let data: Value = match serde_json::from_slice(&req.body) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        reply(
-                            &mut stream,
-                            400,
-                            Some(&req.origin),
-                            &json!({"error":"invalid_json"}),
-                        )?;
-                        return Ok(());
-                    }
-                };
-                if !data.is_object() || data.as_object().is_some_and(|x| x.len() != 2) {
-                    reply(
-                        &mut stream,
-                        400,
-                        Some(&req.origin),
-                        &json!({"error":"invalid_task"}),
-                    )?;
-                } else if let (Some(key), Some(prompt)) =
-                    (data["client_key"].as_str(), data["prompt"].as_str())
-                {
-                    match workbuddy_web::start(&req.origin, key, prompt) {
-                        Ok(value) => reply(&mut stream, 202, Some(&req.origin), &value)?,
-                        Err(_) => reply(
-                            &mut stream,
-                            503,
-                            Some(&req.origin),
-                            &json!({"error":"workbuddy_unavailable_or_busy"}),
-                        )?,
-                    }
-                } else {
-                    reply(
-                        &mut stream,
-                        400,
-                        Some(&req.origin),
-                        &json!({"error":"invalid_task"}),
-                    )?;
-                }
-            }
-        }
         ("GET", other) if task_from_url(other, "/events").is_some() => {
             let task = task_from_url(other, "/events").unwrap_or_default();
             match cursor(&req.path)
-                .and_then(|cursor| workbuddy_web::poll(&req.origin, &task, cursor))
+                .and_then(|cursor| agent_options::poll(&req.origin, &task, cursor))
             {
                 Ok(value) => reply(&mut stream, 200, Some(&req.origin), &value)?,
                 Err(_) => reply(
@@ -576,7 +542,7 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
         ("GET", other) if task_from_url(other, "/stream").is_some() => {
             let task = task_from_url(other, "/stream").unwrap_or_default();
             if let Ok(seq) = cursor(&req.path) {
-                if workbuddy_web::poll(&req.origin, &task, seq).is_ok() {
+                if agent_options::poll(&req.origin, &task, seq).is_ok() {
                     let _ = stream_events(&mut stream, &req.origin, &task, seq);
                 } else {
                     reply(
@@ -646,15 +612,24 @@ mod tests {
     }
 
     #[test]
+    fn default_http_loopback_does_not_require_tls_certificate() {
+        // The normal user path is HTTP on loopback, with a browser LNA grant
+        // and Native-issued per-origin session token. No TLS by default.
+        if std::env::var("LOCAL_BRIDGE_WEB_V2_HTTPS_ENDPOINT").is_err() {
+            assert_eq!(advertised_endpoint().unwrap(), "http://127.0.0.1:48293");
+        }
+    }
+
+    #[test]
     fn bound_host_and_cursor_are_strict() {
         assert!(safe_host(&format!("127.0.0.1:{PORT}")));
         assert!(!safe_host("attacker.example"));
         assert!(!safe_host(&format!("attacker.example:{}", PORT)));
         assert_eq!(
-            cursor("/v2/workbuddy/tasks/wb-1/events?cursor=24").unwrap(),
+            cursor("/v2/agents/tasks/wb-1/events?cursor=24").unwrap(),
             24
         );
-        assert!(cursor("/v2/workbuddy/tasks/wb-1/events?cursor=x").is_err());
+        assert!(cursor("/v2/agents/tasks/wb-1/events?cursor=x").is_err());
     }
 
     #[test]

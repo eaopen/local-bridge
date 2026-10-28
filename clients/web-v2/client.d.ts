@@ -1,8 +1,10 @@
+export declare const AGENT_API_VERSION: 2
 export type BridgeAgent = 'auto' | 'workbuddy' | 'codex' | 'pi'
 export type BridgeThinkMode = 'auto' | 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export type BridgeAgentMode = 'prefer' | 'require'
 /** Agent, model and thinkMode are optional hints/constraints, resolved by Bridge. */
 export interface BridgeAgentRequest {
+  apiVersion?: 2
   clientKey: string
   prompt: string
   agent?: BridgeAgent
@@ -11,6 +13,7 @@ export interface BridgeAgentRequest {
   agentMode?: BridgeAgentMode
 }
 export interface BridgeAgentAccepted {
+  api_version?: 2
   task_id: string
   status: string
   selected_agent: string
@@ -24,7 +27,8 @@ export interface BridgeAgentAccepted {
 /** Local Bridge Web SDK V2: build-time, version-pinned browser client. */
 export type BridgeTransport = 'direct' | 'native-fallback' | 'unavailable'
 export interface BridgeSession {
-  endpoint: 'http://127.0.0.1:48293'
+  endpoint: 'http://127.0.0.1:48293' | 'http://localhost:48293' |
+    'https://localhost:48294' | 'https://127.0.0.1:48294'
   token: string
   expires_in: number
   scope?: string
@@ -87,13 +91,9 @@ export declare class LocalBridgeWebClient {
   runAgent(task: BridgeAgentRequest): Promise<BridgeAgentAccepted>
   readAgent(taskId: string, cursor?: number,
     onEvent?: (event: BridgeEvent) => void, signal?: AbortSignal): Promise<BridgeTaskPage>
-  startWorkbuddy(task: {clientKey: string; prompt: string}): Promise<{
-    task_id: string; status: string; reused?: boolean; provider?: string
-  }>
-  pollWorkbuddy(taskId: string, cursor?: number): Promise<BridgeTaskPage>
+  pollAgent(taskId: string, cursor?: number): Promise<BridgeTaskPage>
   mcpStatus(provider: string, tool: string): Promise<unknown>
-  readWorkbuddy(taskId: string, cursor?: number,
-    onEvent?: (event: BridgeEvent) => void, signal?: AbortSignal): Promise<BridgeTaskPage>
+
 }
 export declare function createLocalBridgeClient(
   options?: ConstructorParameters<typeof LocalBridgeWebClient>[0]

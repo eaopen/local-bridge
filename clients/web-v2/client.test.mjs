@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  CLIENT_VERSION, createLocalBridgeClient, directJson, directStream
+  CLIENT_VERSION, AGENT_API_VERSION, createLocalBridgeClient, directJson, directStream
 } from './client.js'
 
 const ENDPOINT = 'http://127.0.0.1:48293'
@@ -54,7 +54,8 @@ function streamReply(frames) {
 }
 
 test('SDK is a build-time, versioned, zero-dependency ESM browser client',()=>{
-  assert.equal(CLIENT_VERSION,'2.0.0-preview.2')
+  assert.equal(CLIENT_VERSION,'2.0.0-preview.3')
+  assert.equal(AGENT_API_VERSION,2)
 })
 test('one Chrome bootstrap then direct HTTP capabilities and MCP data',async()=>{
   const {page,calls}=browser(req=>({
@@ -80,29 +81,33 @@ test('one Chrome bootstrap then direct HTTP capabilities and MCP data',async()=>
   assert.equal(routes[1].opts.credentials,'omit')
   assert.ok(!routes[1].url.includes(TOKEN))
 })
-test('submit WorkBuddy directly; network failure falls back with identical key',async()=>{
+test('submit with unified Agent API; transport fallback retains exact logical task',async()=>{
   const {page,calls}=browser(req=>({
     ok:true,result:req.action==='local.connect'?SESSION:
-      req.action==='agent.start'?
-        {task_id:TASK,status:'accepted',client_key:req.params.client_key}:capabilities()
+      req.action==='agent.run'?
+        {task_id:TASK,status:'accepted',selected_agent:'workbuddy',
+          client_key:req.params.client_key,api_version:2}:capabilities()
   }))
   let failStart=false
   const client=createLocalBridgeClient({page,fetchImpl:async(url,opts)=>{
     if(url.endsWith('/v2/capabilities'))return jsonResponse(capabilities())
-    if(url.endsWith('/v2/workbuddy/tasks')){
+    if(url.endsWith('/v2/agents/tasks')){
       if(failStart)throw new TypeError('Connection reset after accept')
       assert.equal(JSON.parse(opts.body).client_key,'key_123')
-      return jsonResponse({task_id:TASK,status:'accepted'},202)
+      assert.equal(JSON.parse(opts.body).api_version,2)
+      return jsonResponse({task_id:TASK,status:'accepted',selected_agent:'workbuddy'},202)
     }
     throw Error(url)
   }})
   await client.connect()
-  assert.equal((await client.startWorkbuddy({clientKey:'key_123',prompt:'Synthetic task'})).status,'accepted')
-  assert.equal(calls.filter(x=>x.action==='agent.start').length,0)
+  const first=await client.runAgent({clientKey:'key_123',prompt:'Synthetic task'})
+  assert.equal(first.status,'accepted')
+  assert.equal(calls.filter(x=>x.action==='agent.run').length,0)
   failStart=true
-  const second=await client.startWorkbuddy({clientKey:'key_123',prompt:'Synthetic task'})
+  const second=await client.runAgent({clientKey:'key_123',prompt:'Synthetic task'})
   assert.equal(second.client_key,'key_123')
-  assert.equal(calls.filter(x=>x.action==='agent.start').length,1)
+  assert.equal(calls.filter(x=>x.action==='agent.run').length,1)
+  assert.equal(calls.at(-1).params.api_version,2)
   assert.equal(client.mode,'native-fallback')
 })
 test('no plugin or Host is feature unavailable rather than a broken enterprise page',async()=>{
@@ -124,7 +129,7 @@ test('multi-message SSE retains per-message events and separate terminal event',
   const events=[]
   const seq=await directStream(SESSION,TASK,0,e=>events.push(e),
     undefined, async(url,opts)=>{
-      assert.equal(url,ENDPOINT+'/v2/workbuddy/tasks/'+TASK+'/stream?cursor=0')
+      assert.equal(url,ENDPOINT+'/v2/agents/tasks/'+TASK+'/stream?cursor=0')
       assert.equal(opts.headers.Authorization,'Bearer '+TOKEN)
       return streamReply(raw)
     })
@@ -137,7 +142,7 @@ test('stream disconnect after one message, native poll resumes at last seq witho
   const first='id: 1\nevent: message.delta\ndata: {"seq":1,"type":"message.delta","message_id":"m1","text":"part"}\n\n'
   const {page,calls}=browser(req=>({
     ok:true,result:req.action==='local.connect'?SESSION:
-      req.action==='agent.poll'?{
+      req.action==='agent.read'?{
         task_id:TASK,status:'completed',terminal:true,next_seq:2,
         has_more:false,events:[{seq:2,type:'task.completed'}]
       }:capabilities()
@@ -157,9 +162,9 @@ test('stream disconnect after one message, native poll resumes at last seq witho
   }})
   await client.connect()
   const received=[]
-  const res=await client.readWorkbuddy(TASK,0,e=>received.push(e))
+  const res=await client.readAgent(TASK,0,e=>received.push(e))
   assert.deepEqual(received.map(e=>e.seq),[1,2])
-  assert.equal(calls.find(c=>c.action==='agent.poll').params.cursor,1)
+  assert.equal(calls.find(c=>c.action==='agent.read').params.cursor,1)
   assert.equal(res.status,'completed')
   assert.equal(res.transport,'native-fallback')
 })
@@ -170,8 +175,8 @@ test('fixed loopback, capability and task validation block arbitrary URLs and to
   const client=createLocalBridgeClient({page,fetchImpl:async()=>jsonResponse(capabilities())})
   await client.connect()
   await assert.rejects(()=>client.mcpStatus('wechat','wechat_send_message'),/invalid_mcp_status/)
-  await assert.rejects(()=>client.startWorkbuddy({clientKey:'../../',prompt:'hi'}),/invalid_client_key/)
-  await assert.rejects(()=>client.pollWorkbuddy('../unscoped',0),/invalid_task_id/)
+  await assert.rejects(()=>client.runAgent({clientKey:'../../',prompt:'hi'}),/invalid_client_key/)
+  await assert.rejects(()=>client.pollAgent('../unscoped',0),/invalid_task_id/)
 })
 
 test('unified runAgent defaults selectors, Bridge decides actual Agent',async()=>{
@@ -194,7 +199,7 @@ test('unified runAgent defaults selectors, Bridge decides actual Agent',async()=
   const output=await bridge.runAgent({clientKey:'abc_123',prompt:'Synthetic only',
     agent:'codex',agentMode:'prefer'})
   assert.equal(output.selected_agent,'workbuddy')
-  assert.deepEqual(requests[0],{client_key:'abc_123',prompt:'Synthetic only',
+  assert.deepEqual(requests[0],{api_version:2,client_key:'abc_123',prompt:'Synthetic only',
     agent:'codex',model:'auto',think_mode:'auto',agent_mode:'prefer'})
   assert.equal(calls.filter(x=>x.action==='agent.run').length,0)
 })
@@ -237,10 +242,44 @@ test('unified Agent fallback preserves exact options and clientKey',async()=>{
     agent:'pi',agentMode:'prefer'})
   assert.equal(task.selected_agent,'workbuddy')
   const fallback=calls.find(x=>x.action==='agent.run')
+  assert.equal(fallback.params.api_version,2)
   assert.equal(fallback.params.client_key,'idempotent-1')
   assert.equal(fallback.params.agent,'pi')
   assert.equal(fallback.params.model,'auto')
   assert.equal(fallback.params.think_mode,'auto')
   assert.equal(fallback.params.agent_mode,'prefer')
   assert.equal(bridge.mode,'native-fallback')
+})
+
+test('HTTP(S) loopback bootstrap accepts only fixed local origins',async()=>{
+  const endpoints=[
+    'http://127.0.0.1:48293','http://localhost:48293',
+    'https://127.0.0.1:48294','https://localhost:48294'
+  ]
+  for(const endpoint of endpoints){
+    const r=await directJson({...SESSION,endpoint},'/v2/capabilities',{},
+      async(url,opts)=>{
+        assert.equal(url,endpoint+'/v2/capabilities')
+        assert.equal(opts.credentials,'omit')
+        assert.equal(opts.headers.Authorization,'Bearer '+TOKEN)
+        return jsonResponse({protocol:'local-bridge-http-sse-v2'})
+      })
+    assert.equal(r.protocol,'local-bridge-http-sse-v2')
+  }
+  for(const endpoint of [
+    'https://example.org:48294','http://127.0.0.1:48294',
+    'https://127.0.0.1:48293','https://localhost:48295',
+    'https://user:password@localhost:48294','http://0.0.0.0:48293'
+  ]) await assert.rejects(()=>directJson({...SESSION,endpoint},
+    '/v2/capabilities',{},async()=>jsonResponse({})),/invalid_local_session/)
+})
+
+test('Agent API version rejects unsupported schema and old public WorkBuddy methods',async()=>{
+  const client=createLocalBridgeClient({page:browser(()=>({ok:false,code:'no_plugin'})).page})
+  assert.equal(typeof client.startWorkbuddy,'undefined')
+  assert.equal(typeof client.readWorkbuddy,'undefined')
+  assert.equal(typeof client.pollWorkbuddy,'undefined')
+  await assert.rejects(()=>client.runAgent({
+    apiVersion:1,clientKey:'safe_key',prompt:'Synthetic'
+  }),/invalid_agent_options/)
 })

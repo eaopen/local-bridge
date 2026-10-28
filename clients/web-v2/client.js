@@ -6,11 +6,20 @@
  * Chrome: one-time trusted Origin + session bootstrap, compatibility fallback.
  * Bridge: primary HTTP / SSE data plane and MCP/Agent task authority.
  */
-export const CLIENT_VERSION = '2.0.0-preview.2'
+export const CLIENT_VERSION = '2.0.0-preview.3'
+export const AGENT_API_VERSION = 2
 export const WEB_CHANNEL = 'local-tool-bridge:web:v2'
-const LOOPBACK = 'http://127.0.0.1:48293'
+// These are trusted *local Native Host* session origins only. Port 48294 is
+// reserved for an operator-installed HTTPS reverse proxy using a certificate
+// already trusted by the browser. Bridge itself still binds plain HTTP 48293.
+const LOOPBACKS = new Set([
+  'http://127.0.0.1:48293',
+  'http://localhost:48293',
+  'https://localhost:48294',
+  'https://127.0.0.1:48294'
+])
 const DEFAULT_TIMEOUT = 3500
-const TASK_ID = /^wb-[a-f0-9-]{1,92}$/
+const TASK_ID = /^(?:wb|codex|pi)-[a-z0-9-]{1,92}$/
 const CLIENT_KEY = /^[A-Za-z0-9_.-]{1,80}$/
 const TOKEN = /^[a-f0-9]{64}$/
 
@@ -38,7 +47,7 @@ function requireCursor(value) {
   return value
 }
 function requireSession(session) {
-  if (!session || session.endpoint !== LOOPBACK ||
+  if (!session || !LOOPBACKS.has(session.endpoint) ||
     typeof session.token !== 'string' || !TOKEN.test(session.token) ||
     !Number.isSafeInteger(session.expires_in) ||
     session.expires_in < 1 || session.expires_in > 600)
@@ -51,7 +60,7 @@ function urlFor(session, path) {
     !path.startsWith('/') || path.startsWith('//') || path.includes('..'))
     throw new LocalBridgeError('invalid_local_path')
   const url = new URL(path, session.endpoint)
-  if (url.origin !== LOOPBACK) throw new LocalBridgeError('invalid_local_origin')
+  if (url.origin !== session.endpoint) throw new LocalBridgeError('invalid_local_origin')
   return url.toString()
 }
 function validMcp(provider, tool) {
@@ -66,15 +75,15 @@ function agentRequest(options) {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw new LocalBridgeError('invalid_agent_options')
   if (Object.keys(options).some(k =>
-    !['clientKey','prompt','agent','model','thinkMode','agentMode'].includes(k)))
+    !['apiVersion','clientKey','prompt','agent','model','thinkMode','agentMode'].includes(k)))
     throw new LocalBridgeError('invalid_agent_options')
-  const {clientKey, prompt, agent='auto', model='auto',
+  const {apiVersion=AGENT_API_VERSION, clientKey, prompt, agent='auto', model='auto',
     thinkMode='auto', agentMode='prefer'} = options
   requireClientKey(clientKey)
   if (typeof prompt !== 'string' || !prompt.trim() ||
       new TextEncoder().encode(prompt).length > 12000)
     throw new LocalBridgeError('invalid_agent_prompt')
-  if (!AGENTS.has(agent) ||
+  if (apiVersion !== AGENT_API_VERSION || !AGENTS.has(agent) ||
       !['prefer','require'].includes(agentMode) ||
       (agent === 'auto' && agentMode === 'require') ||
       typeof model !== 'string' || model.length < 1 || model.length > 128 ||
@@ -83,7 +92,7 @@ function agentRequest(options) {
       !THINK_MODES.has(thinkMode))
     throw new LocalBridgeError('invalid_agent_options')
   return {
-    client_key:clientKey, prompt, agent, model,
+    api_version:AGENT_API_VERSION, client_key:clientKey, prompt, agent, model,
     think_mode:thinkMode, agent_mode:agentMode
   }
 }
@@ -126,6 +135,7 @@ export async function directJson(session, path, options = {}, fetchImpl = fetch)
     ...(options.body ? {body: options.body} : {}),
     ...(options.signal ? {signal: options.signal} : {}),
     credentials: 'omit', mode: 'cors', redirect: 'error',
+    targetAddressSpace: 'loopback',
     referrerPolicy: 'no-referrer', cache: 'no-store'
   })
   if (!response.ok) throw new LocalBridgeError('local_http_' + response.status)
@@ -147,10 +157,11 @@ export async function directStream(session, taskId, cursor, onEvent,
   let seen = cursor
   try {
     const response = await fetchImpl(urlFor(session,
-      '/v2/workbuddy/tasks/' + taskId + '/stream?cursor=' + cursor), {
+      '/v2/agents/tasks/' + taskId + '/stream?cursor=' + cursor), {
       method: 'GET',
       headers: {Authorization: 'Bearer ' + session.token},
       credentials: 'omit', mode: 'cors', redirect: 'error',
+    targetAddressSpace: 'loopback',
       cache: 'no-store', referrerPolicy: 'no-referrer',
       signal: controller.signal
     })
@@ -263,38 +274,14 @@ export class LocalBridgeWebClient {
     }
     return this.requestChrome('agent.run', req)
   }
-  // Multi-event reads currently use WorkBuddy task IDs. Keep the semantic
-  // alias until additional adapters and their event types are available.
-  async readAgent(taskId, cursor = 0, onEvent = () => {}, signal) {
-    return this.readWorkbuddy(taskId, cursor, onEvent, signal)
-  }
-  async startWorkbuddy({clientKey, prompt}) {
-    requireClientKey(clientKey)
-    if (typeof prompt !== 'string' || !prompt.trim() ||
-      new TextEncoder().encode(prompt).length > 12000)
-      throw new LocalBridgeError('invalid_agent_prompt')
-    if (this.session && this.mode === 'direct') {
-      try {
-        return await directJson(this.session, '/v2/workbuddy/tasks',
-          {method: 'POST', body: JSON.stringify({client_key: clientKey, prompt})},
-          this.fetchImpl)
-      } catch (e) {
-        // One logical submission; fallback keeps the exact same idempotency key.
-        if (e.code === 'local_http_400' || e.code === 'local_http_403')
-          throw e
-        this.mode = 'native-fallback'
-      }
-    }
-    return this.requestChrome('agent.start',
-      {provider: 'workbuddy', client_key: clientKey, prompt})
-  }
-  async pollWorkbuddy(taskId, cursor = 0) {
+  /** Read an existing Agent task without binding the Web SDK to a vendor. */
+  async pollAgent(taskId, cursor = 0) {
     requireTaskId(taskId)
     requireCursor(cursor)
     if (this.session && this.mode === 'direct') {
       try {
         return await directJson(this.session,
-          '/v2/workbuddy/tasks/' + taskId + '/events?cursor=' + cursor,
+          '/v2/agents/tasks/' + taskId + '/events?cursor=' + cursor,
           {}, this.fetchImpl)
       } catch (e) {
         if (e.code === 'local_http_403' || e.code === 'local_http_404')
@@ -302,7 +289,7 @@ export class LocalBridgeWebClient {
         this.mode = 'native-fallback'
       }
     }
-    return this.requestChrome('agent.poll', {task_id: taskId, cursor})
+    return this.requestChrome('agent.read', {task_id:taskId,cursor})
   }
   async mcpStatus(provider, tool) {
     if (!validMcp(provider, tool)) throw new LocalBridgeError('invalid_mcp_status')
@@ -322,7 +309,7 @@ export class LocalBridgeWebClient {
    * The caller controls retry interval and cancellation, avoiding a hidden
    * always-on browser timer or a second task state engine.
    */
-  async readWorkbuddy(taskId, cursor = 0, onEvent = () => {}, signal) {
+  async readAgent(taskId, cursor = 0, onEvent = () => {}, signal) {
     requireTaskId(taskId)
     requireCursor(cursor)
     let next = cursor
@@ -350,7 +337,7 @@ export class LocalBridgeWebClient {
         this.mode = 'native-fallback'
       }
     }
-    const result = await this.pollWorkbuddy(taskId, next)
+    const result = await this.pollAgent(taskId, next)
     if (result.task_id !== taskId || !Number.isSafeInteger(result.next_seq) ||
       result.next_seq < next || !Array.isArray(result.events))
       throw new LocalBridgeError('invalid_task_events')
