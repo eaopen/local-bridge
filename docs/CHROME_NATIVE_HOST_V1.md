@@ -45,6 +45,8 @@ The separate `context.summarize` action does not create an inbox entry. If the C
 
 Items are retained until the user deletes them. The inbox is created under the OS user data directory in `LocalBridge/inbox` (or `local-bridge/inbox` on Linux). On Unix the directory is private (0700), saved files private (0600). No browser token/cookie is collected or sent to the cloud by Bridge. Do not share confidential content unless it is appropriate for the user's machine and account.
 
+On macOS, a Chrome app launched from Finder may not inherit Homebrew's shell `PATH`. The user-invoked Codex runner now checks existing standard Homebrew launcher paths and makes the same directories available for the Node interpreter, without requiring a new setup parameter or modifying the user's environment. Uninstalled/unavailable Codex still returns an error.
+
 The existing `local-bridge agent codex <prompt|->` remains separate. To avoid copying text between programs, the user can now explicitly invoke:
 
 ```sh
