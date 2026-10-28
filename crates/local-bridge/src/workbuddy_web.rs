@@ -1,9 +1,9 @@
 //! WorkBuddy Web V2: one macOS native-account text-only job, cursor-based replies.
 //! Browser AND OS-user grants are required. No tool calls, shell or auto retry.
 use crate::{inbox, state_file};
-use anyhow::{bail, Result};
 #[cfg(target_os = "macos")]
 use anyhow::Context;
+use anyhow::{bail, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
