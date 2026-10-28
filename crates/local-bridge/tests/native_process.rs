@@ -93,6 +93,41 @@ fn native_host_status_and_explicit_inbox_handoff() {
     assert_eq!(listing["items"][0]["id"], id);
     let item = command(&root, &["inbox", "read", id]);
     assert_eq!(item["context"]["selection"], "User-selected example text");
+    let relay = send_native(
+        json!({
+            "protocol_version":1,"request_id":"relay_1",
+            "action":"relay.return",
+            "payload":{
+                "relay_id":"rel-0123456789abcdef0123456789abcdef",
+                "task_ref":id,
+                "web_ai":"chatgpt",
+                "source":{"title":"Project note","url":"https://example.org/project"},
+                "reply":{"title":"ChatGPT","url":"https://chatgpt.com",
+                         "selection":"Suggested changes, not executed."}
+            }
+        }),
+        &root,
+    );
+    assert_eq!(relay["ok"], true);
+    assert_eq!(relay["result"]["status"], "received");
+    let returned_id = relay["result"]["task_id"].as_str().unwrap();
+    let returned = command(&root, &["inbox", "read", returned_id]);
+    assert_eq!(returned["source"], "web-ai-relay");
+    assert_eq!(returned["relay"]["task_ref"], id);
+    assert_eq!(
+        returned["context"]["selection"],
+        "Suggested changes, not executed."
+    );
+    assert_eq!(
+        command(&root, &["inbox", "delete", returned_id])["deleted"],
+        true
+    );
+    let prepared = command(&root, &["relay", "prepare", id]);
+    assert_eq!(prepared["task_ref"], id);
+    assert!(prepared["prompt"]
+        .as_str()
+        .unwrap()
+        .contains("User-selected example text"));
     assert_eq!(command(&root, &["inbox", "delete", id])["deleted"], true);
     assert!(command(&root, &["inbox", "list"])["items"]
         .as_array()

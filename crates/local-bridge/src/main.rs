@@ -51,6 +51,9 @@ fn run() -> Result<()> {
         {
             println!("{}", native::install_host(id, true)?);
         }
+        [x, action, id] if x == "relay" && action == "prepare" => {
+            println!("{}", inbox::relay_prepare(id)?);
+        }
         [x, action] if x == "inbox" && action == "list" => {
             println!("{}", inbox::list()?);
         }
@@ -124,7 +127,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | agent codex <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
