@@ -282,7 +282,9 @@ pub fn run(origin: &str, request: RunAgentRequest) -> Result<Value> {
         )?,
         _ => bail!("unsupported Agent adapter"),
     };
-    let id = output["task_id"].as_str().context("missing Agent task ID")?;
+    let id = output["task_id"]
+        .as_str()
+        .context("missing Agent task ID")?;
     Ok(accepted(id, chosen, &request, output["reused"] == true))
 }
 pub fn poll(origin: &str, id: &str, cursor: u64) -> Result<Value> {
@@ -306,9 +308,15 @@ mod tests {
     use super::*;
     #[test]
     fn selection_and_strictness_are_shared_by_all_adapters() {
-        assert_eq!(pick_agent("auto", "prefer", &["codex", "pi"]).unwrap(), "codex");
+        assert_eq!(
+            pick_agent("auto", "prefer", &["codex", "pi"]).unwrap(),
+            "codex"
+        );
         assert_eq!(pick_agent("pi", "require", &["codex", "pi"]).unwrap(), "pi");
-        assert_eq!(pick_agent("workbuddy", "prefer", &["codex", "pi"]).unwrap(), "codex");
+        assert_eq!(
+            pick_agent("workbuddy", "prefer", &["codex", "pi"]).unwrap(),
+            "codex"
+        );
         assert!(pick_agent("workbuddy", "require", &["codex", "pi"]).is_err());
         assert!(pick_agent("auto", "prefer", &[]).is_err());
     }
@@ -326,9 +334,18 @@ mod tests {
         let base = json!({"api_version":2,"client_key":"task-123","prompt":"synthetic task"});
         assert!(from_value(&base).is_ok());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"synthetic"})).is_err());
-        assert!(from_value(&json!({"api_version":1,"client_key":"task-123","prompt":"synthetic"})).is_err());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test","shell":"rm"})).is_err());
+        assert!(
+            from_value(&json!({"api_version":1,"client_key":"task-123","prompt":"synthetic"}))
+                .is_err()
+        );
+        assert!(from_value(
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test","shell":"rm"})
+        )
+        .is_err());
         assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test","agent":"auto","agent_mode":"require"})).is_err());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test","model":"../secret"})).is_err());
+        assert!(from_value(
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test","model":"../secret"})
+        )
+        .is_err());
     }
 }
