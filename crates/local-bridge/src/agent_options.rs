@@ -262,7 +262,7 @@ pub fn run(origin: &str, request: RunAgentRequest) -> Result<Value> {
         }
         return Ok(accepted(&id, &provider, &request, true));
     }
-    let candidates: Vec<&str> = ["codex", "workbuddy", "pi"]
+    let candidates: Vec<&str> = ["workbuddy", "codex", "pi"]
         .into_iter()
         .filter(|name| {
             options_supported(name, &request.model, &request.think_mode)
