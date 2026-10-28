@@ -193,7 +193,7 @@ pub fn handle_native(request: &Value) -> Value {
         }
         Some("web.v2.agent.run")
             if p.as_object()
-                .is_some_and(|o| (3..=7).contains(&o.len()) && o.contains_key("origin")) =>
+                .is_some_and(|o| (3..=8).contains(&o.len()) && o.contains_key("origin")) =>
         {
             let mut options = p.clone();
             options.as_object_mut().unwrap().remove("origin");
@@ -207,22 +207,10 @@ pub fn handle_native(request: &Value) -> Value {
                 Err(_) => return fail("invalid_agent_options"),
             }
         }
-        Some("web.v2.agent.start") if p.as_object().is_some_and(|o| o.len() == 4) => {
-            match (
-                p["provider"].as_str(),
-                p["client_key"].as_str(),
-                p["prompt"].as_str(),
-            ) {
-                (Some("workbuddy"), Some(key), Some(prompt)) => {
-                    workbuddy_web::start(origin, key, prompt)
-                }
-                _ => return fail("invalid_agent_request"),
-            }
-        }
-        Some("web.v2.agent.poll") if p.as_object().is_some_and(|o| o.len() == 3) => {
+        Some("web.v2.agent.read") if p.as_object().is_some_and(|o| o.len() == 3) => {
             match (p["task_id"].as_str(), p["cursor"].as_u64()) {
-                (Some(id), Some(cursor)) => workbuddy_web::poll(origin, id, cursor),
-                _ => return fail("invalid_agent_poll"),
+                (Some(id), Some(cursor)) => agent_options::poll(origin, id, cursor),
+                _ => return fail("invalid_agent_read"),
             }
         }
         _ => return fail("unsupported_v2_action"),
