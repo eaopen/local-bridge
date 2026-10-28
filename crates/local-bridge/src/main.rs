@@ -81,13 +81,19 @@ fn run() -> Result<()> {
                 })
             );
         }
-        [agent, provider, prompt] if agent == "agent" && provider == "codex" => {
+        [agent, provider, prompt]
+            if agent == "agent" && (provider == "codex" || provider == "codebuddy") =>
+        {
             let input = if prompt == "-" {
                 agent::prompt_from_stdin()?
             } else {
                 prompt.clone()
             };
-            let output = agent::run_codex(&input)?;
+            let output = if provider == "codex" {
+                agent::run_codex(&input)?
+            } else {
+                agent::run_codebuddy(&input)?
+            };
             println!("{}", output);
         }
         [command, filename] if command == "validate-channel" => {
@@ -127,7 +133,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex|codebuddy <prompt|-> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }
