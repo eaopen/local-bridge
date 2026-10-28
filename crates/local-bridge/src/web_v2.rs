@@ -199,9 +199,7 @@ pub fn handle_native(request: &Value) -> Value {
             let mut options = p.clone();
             options.as_object_mut().unwrap().remove("origin");
             match agent_options::from_value(&options) {
-                Ok(request) => {
-                    agent_options::run(origin, request)
-                }
+                Ok(request) => agent_options::run(origin, request),
                 Err(_) => return fail("invalid_agent_options"),
             }
         }
