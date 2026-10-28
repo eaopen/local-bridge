@@ -191,6 +191,58 @@ fn status(e: &[Value], age: u64) -> &'static str {
         "running"
     }
 }
+// Serializes only the short "find existing client_key / create new task"
+// transaction across separate Native Host and HTTP processes. Never keep this
+// lock for the actual long-running ACP task.
+#[cfg(target_os = "macos")]
+struct StartLock(PathBuf);
+
+#[cfg(target_os = "macos")]
+impl StartLock {
+    fn acquire(dir: &Path) -> Result<Self> {
+        let path = dir.join(".start.lock");
+        let mut opts = OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        match opts.open(&path) {
+            Ok(mut file) => {
+                let lock = Self(path);
+                file.write_all(b"workbuddy-start\\n")?;
+                file.sync_all()?;
+                Ok(lock)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                let meta = fs::symlink_metadata(&path)?;
+                if !meta.file_type().is_file() {
+                    bail!("invalid task start lock");
+                }
+                if meta.modified()?.elapsed().unwrap_or_default()
+                    > std::time::Duration::from_secs(60)
+                {
+                    // A crashed short-lived starter may leave a stale lock.
+                    // Clear but fail closed; the user retries with the SAME
+                    // client_key only after this operation has completed.
+                    let _ = fs::remove_file(&path);
+                    bail!("stale task start lock cleared; retry same client key");
+                }
+                bail!("WorkBuddy task submission already in progress")
+            }
+            Err(error) => Err(error).context("cannot lock WorkBuddy task submission"),
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for StartLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn assets(dir: &Path) -> Result<()> {
     private_write(
@@ -239,6 +291,7 @@ pub fn start(origin: &str, client_key: &str, prompt: &str) -> Result<Value> {
         }
         let base = root()?;
         private_dir(&base)?;
+        let _start_lock = StartLock::acquire(&base)?;
         let now = timestamp()?;
         let mut count = 0;
         for item in fs::read_dir(&base)? {
@@ -345,6 +398,23 @@ pub fn poll(origin: &str, task_id: &str, cursor: u64) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn concurrent_submission_is_rejected_until_original_start_releases_lock() {
+        let path = std::env::temp_dir().join(format!(
+            "local-bridge-workbuddy-lock-{}-{}",
+            std::process::id(),
+            timestamp().unwrap()
+        ));
+        private_dir(&path).unwrap();
+        let first = StartLock::acquire(&path).unwrap();
+        assert!(StartLock::acquire(&path).is_err());
+        drop(first);
+        let second = StartLock::acquire(&path).unwrap();
+        drop(second);
+        fs::remove_dir_all(&path).unwrap();
+    }
+
     #[test]
     fn multiple_messages_are_not_completion() {
         let mut items = vec![
