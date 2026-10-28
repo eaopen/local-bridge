@@ -173,11 +173,12 @@ pub fn validate_profile_v2_shape(v2: &ApplicationProfileV2) -> Result<()> {
 
     if let Some(policy) = &v2.agent_policy {
         if policy.preferred_providers.len() > 8
+            || policy.preferred_providers.iter().any(|p| !valid_id(p))
             || policy
                 .preferred_providers
                 .iter()
-                .any(|p| !valid_id(p))
-            || policy.preferred_providers.iter().collect::<BTreeSet<_>>().len()
+                .collect::<BTreeSet<_>>()
+                .len()
                 != policy.preferred_providers.len()
             || (policy.mode == AgentSelectionMode::FirstReady
                 && policy.preferred_providers.is_empty())
@@ -246,12 +247,14 @@ pub fn choose_agent<'a>(
         return None;
     }
     if let Some(requested) = explicit_user_choice {
-        if !policy.allow_user_choice
-            || !policy.preferred_providers.iter().any(|id| id == requested)
+        if !policy.allow_user_choice || !policy.preferred_providers.iter().any(|id| id == requested)
         {
             return None;
         }
-        return personal.agents.iter().find(|x| x.id == requested && x.ready());
+        return personal
+            .agents
+            .iter()
+            .find(|x| x.id == requested && x.ready());
     }
     policy
         .preferred_providers
@@ -309,67 +312,92 @@ mod tests {
 
     fn agent(id: &str, ready: bool) -> AgentReadiness {
         AgentReadiness {
-            id:id.into(), installed:true, authenticated:true,
-            api_ready:ready, task_compatible:true, user_allowed:true
+            id: id.into(),
+            installed: true,
+            authenticated: true,
+            api_ready: ready,
+            task_compatible: true,
+            user_allowed: true,
         }
     }
 
     #[test]
     fn v1_is_not_affected_and_v2_rejects_unexpected_input() {
-        let profile=sample();
+        let profile = sample();
         validate_profile_v2_shape(&profile).unwrap();
         validate_profile_v2_fresh(&profile, 4000).unwrap();
-        assert!(serde_json::from_value::<ApplicationProfile>(serde_json::to_value(&profile).unwrap()).is_err());
-        let mut invalid=serde_json::to_value(&profile).unwrap();
-        invalid["mixed_context"]["shell"]="run";
+        assert!(serde_json::from_value::<ApplicationProfile>(
+            serde_json::to_value(&profile).unwrap()
+        )
+        .is_err());
+        let mut invalid = serde_json::to_value(&profile).unwrap();
+        invalid["mixed_context"]["shell"] = "run";
         assert!(serde_json::from_value::<ApplicationProfileV2>(invalid).is_err());
     }
 
     #[test]
     fn v2_validation_rejects_external_paths_duplicates_and_unsafe_http_ai() {
-        let mut p=sample();
-        p.agent_policy.as_mut().unwrap().preferred_providers=vec!["pi".into(),"pi".into()];
+        let mut p = sample();
+        p.agent_policy.as_mut().unwrap().preferred_providers = vec!["pi".into(), "pi".into()];
         assert!(validate_profile_v2_shape(&p).is_err());
-        p=sample(); p.enterprise_ai_api.as_mut().unwrap().api_path="//evil/ai".into();
+        p = sample();
+        p.enterprise_ai_api.as_mut().unwrap().api_path = "//evil/ai".into();
         assert!(validate_profile_v2_shape(&p).is_err());
-        p=sample(); p.enterprise_ai_api.as_mut().unwrap().enabled=true;
+        p = sample();
+        p.enterprise_ai_api.as_mut().unwrap().enabled = true;
         validate_profile_v2_shape(&p).unwrap();
-        p.origin="http://intranet.example.test".into();
+        p.origin = "http://intranet.example.test".into();
         assert!(validate_profile_v2_shape(&p).is_err());
-        p=sample(); p.mixed_context.mode=MixedMode::EnterpriseOnly;
+        p = sample();
+        p.mixed_context.mode = MixedMode::EnterpriseOnly;
         assert!(validate_profile_v2_shape(&p).is_err());
     }
 
     #[test]
     fn order_checks_workbuddy_then_codex_then_pi_and_respects_manual_choice() {
-        let p=sample();
-        let state=PersonalRuntime{
-            agents:vec![agent("pi",true),agent("workbuddy",false),agent("codex",true)],
-            mcp:Vec::new()
+        let p = sample();
+        let state = PersonalRuntime {
+            agents: vec![
+                agent("pi", true),
+                agent("workbuddy", false),
+                agent("codex", true),
+            ],
+            mcp: Vec::new(),
         };
-        assert_eq!(choose_agent(&p,&state,None).unwrap().id,"codex");
-        assert_eq!(choose_agent(&p,&state,Some("pi")).unwrap().id,"pi");
-        assert!(choose_agent(&p,&state,Some("workbuddy")).is_none());
-        let state=PersonalRuntime{
-            agents:vec![agent("pi",true),agent("workbuddy",true),agent("codex",true)],
-            mcp:Vec::new()
+        assert_eq!(choose_agent(&p, &state, None).unwrap().id, "codex");
+        assert_eq!(choose_agent(&p, &state, Some("pi")).unwrap().id, "pi");
+        assert!(choose_agent(&p, &state, Some("workbuddy")).is_none());
+        let state = PersonalRuntime {
+            agents: vec![
+                agent("pi", true),
+                agent("workbuddy", true),
+                agent("codex", true),
+            ],
+            mcp: Vec::new(),
         };
-        assert_eq!(choose_agent(&p,&state,None).unwrap().id,"workbuddy");
-        assert!(choose_agent(&p,&state,Some("not-configured")).is_none());
+        assert_eq!(choose_agent(&p, &state, None).unwrap().id, "workbuddy");
+        assert!(choose_agent(&p, &state, Some("not-configured")).is_none());
     }
 
     #[test]
     fn personal_wechat_is_optional_and_never_authorized_by_profile_alone() {
-        let p=sample();
-        let mut local=PersonalRuntime{ agents:Vec::new(),
-           mcp:vec![McpReadiness{id:"wechat".into(),registered:true,api_ready:true,user_allowed:false}]};
-        assert!(available_personal_mcp(&p,&local).is_empty());
-        local.mcp[0].user_allowed=true;
-        assert_eq!(available_personal_mcp(&p,&local),vec!["wechat"]);
-        local.mcp[0].api_ready=false;
-        assert!(available_personal_mcp(&p,&local).is_empty());
+        let p = sample();
+        let mut local = PersonalRuntime {
+            agents: Vec::new(),
+            mcp: vec![McpReadiness {
+                id: "wechat".into(),
+                registered: true,
+                api_ready: true,
+                user_allowed: false,
+            }],
+        };
+        assert!(available_personal_mcp(&p, &local).is_empty());
+        local.mcp[0].user_allowed = true;
+        assert_eq!(available_personal_mcp(&p, &local), vec!["wechat"]);
+        local.mcp[0].api_ready = false;
+        assert!(available_personal_mcp(&p, &local).is_empty());
         // The Profile's "suggested" entry neither installs nor authorizes it.
         local.mcp.clear();
-        assert!(available_personal_mcp(&p,&local).is_empty());
+        assert!(available_personal_mcp(&p, &local).is_empty());
     }
 }
