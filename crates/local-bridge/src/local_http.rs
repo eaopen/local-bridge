@@ -9,9 +9,9 @@ use anyhow::{bail, Context, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs::{self, OpenOptions};
 #[cfg(unix)]
 use std::fs::File;
+use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -61,7 +61,10 @@ fn strong_token() -> Result<String> {
     }
 }
 fn token_id(token: &str) -> bool {
-    token.len() == 64 && token.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    token.len() == 64
+        && token
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 fn token_file(token: &str) -> Result<PathBuf> {
     if !token_id(token) {
@@ -72,7 +75,9 @@ fn token_file(token: &str) -> Result<PathBuf> {
 
 /// Invoked by Chrome's trusted Native Host once per page; never by HTTP.
 pub fn issue_session(origin: &str) -> Result<Value> {
-    if !valid_origin(origin) || !(workbuddy_web::allowed(origin)? || web_v2::has_status_grant(origin)?) {
+    if !valid_origin(origin)
+        || !(workbuddy_web::allowed(origin)? || web_v2::has_status_grant(origin)?)
+    {
         bail!("OS user has not permitted this site to use local capabilities");
     }
     let path = session_dir()?;
@@ -149,7 +154,9 @@ fn read_request(stream: &mut TcpStream) -> Result<Request> {
     while bytes.len() < MAX_HEADER_BYTES {
         let mut buf = [0u8; 2048];
         let n = stream.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         bytes.extend_from_slice(&buf[..n]);
         if let Some(i) = bytes.windows(4).position(|x| x == b"\r\n\r\n") {
             end = Some(i + 4);
@@ -157,19 +164,24 @@ fn read_request(stream: &mut TcpStream) -> Result<Request> {
         }
     }
     let stop = end.context("missing HTTP header terminator")?;
-    if stop > MAX_HEADER_BYTES { bail!("request headers too large"); }
+    if stop > MAX_HEADER_BYTES {
+        bail!("request headers too large");
+    }
     let text = std::str::from_utf8(&bytes[..stop])?;
     let mut lines = text.split("\r\n");
     let first = lines.next().context("missing HTTP request line")?;
     let request_line: Vec<&str> = first.split(' ').collect();
-    if request_line.len() != 3 || request_line[2] != "HTTP/1.1"
-        || !matches!(request_line[0], "GET"|"POST"|"OPTIONS")
+    if request_line.len() != 3
+        || request_line[2] != "HTTP/1.1"
+        || !matches!(request_line[0], "GET" | "POST" | "OPTIONS")
     {
         bail!("unsupported local HTTP request");
     }
     let mut headers = std::collections::BTreeMap::new();
     for line in lines {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         let (name, value) = line.split_once(':').context("invalid header")?;
         let key = name.to_ascii_lowercase();
         if headers.insert(key, value.trim().to_owned()).is_some() {
@@ -179,25 +191,37 @@ fn read_request(stream: &mut TcpStream) -> Result<Request> {
     if headers.contains_key("transfer-encoding") {
         bail!("chunked requests not supported");
     }
-    let length = headers.get("content-length")
+    let length = headers
+        .get("content-length")
         .map(|v| v.parse::<usize>())
-        .transpose()?.unwrap_or(0);
-    if length > MAX_REQUEST_BYTES { bail!("local request too large"); }
+        .transpose()?
+        .unwrap_or(0);
+    if length > MAX_REQUEST_BYTES {
+        bail!("local request too large");
+    }
     let mut body = bytes[stop..].to_vec();
-    if body.len() > length { bail!("HTTP framing mismatch"); }
+    if body.len() > length {
+        bail!("HTTP framing mismatch");
+    }
     while body.len() < length {
         let mut chunk = [0u8; 2048];
         let n = stream.read(&mut chunk)?;
-        if n == 0 { bail!("truncated local HTTP body"); }
+        if n == 0 {
+            bail!("truncated local HTTP body");
+        }
         body.extend_from_slice(&chunk[..n]);
-        if body.len() > length { bail!("HTTP body too long"); }
+        if body.len() > length {
+            bail!("HTTP body too long");
+        }
     }
     Ok(Request {
-        method: request_line[0].into(), path: request_line[1].into(),
+        method: request_line[0].into(),
+        path: request_line[1].into(),
         origin: headers.remove("origin").unwrap_or_default(),
         authorization: headers.remove("authorization").unwrap_or_default(),
         host: headers.remove("host").unwrap_or_default(),
-        private_network: headers.get("access-control-request-private-network")
+        private_network: headers
+            .get("access-control-request-private-network")
             .is_some_and(|x| x == "true"),
         content_type: headers.remove("content-type").unwrap_or_default(),
         body,
@@ -207,22 +231,35 @@ fn safe_host(value: &str) -> bool {
     value == format!("127.0.0.1:{PORT}") || value == format!("localhost:{PORT}")
 }
 fn header_lines(origin: &str) -> String {
-    format!("Access-Control-Allow-Origin: {origin}\r\nVary: Origin\r\n\
+    format!(
+        "Access-Control-Allow-Origin: {origin}\r\nVary: Origin\r\n\
         Cache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\
-        Referrer-Policy: no-referrer\r\n")
+        Referrer-Policy: no-referrer\r\n"
+    )
 }
 fn reply(stream: &mut TcpStream, code: u16, origin: Option<&str>, value: &Value) -> Result<()> {
     let bytes = serde_json::to_vec(value)?;
     let text = match code {
-        200=>"OK", 202=>"Accepted", 204=>"No Content",400=>"Bad Request",
-        401=>"Unauthorized",403=>"Forbidden",404=>"Not Found",
-        405=>"Method Not Allowed",429=>"Too Many Requests",503=>"Service Unavailable",
-        _=>"Error",
+        200 => "OK",
+        202 => "Accepted",
+        204 => "No Content",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        403 => "Forbidden",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        429 => "Too Many Requests",
+        503 => "Service Unavailable",
+        _ => "Error",
     };
     let cors = origin.map(header_lines).unwrap_or_default();
-    write!(stream,"HTTP/1.1 {code} {text}\r\n\
+    write!(
+        stream,
+        "HTTP/1.1 {code} {text}\r\n\
         Content-Type: application/json\r\nContent-Length: {}\r\n\
-        Connection: close\r\n{cors}\r\n",bytes.len())?;
+        Connection: close\r\n{cors}\r\n",
+        bytes.len()
+    )?;
     stream.write_all(&bytes)?;
     stream.flush()?;
     Ok(())
@@ -239,25 +276,36 @@ fn task_from_url(path: &str, suffix: &str) -> Option<String> {
     let clean = path.split('?').next()?;
     let rest = clean.strip_prefix("/v2/workbuddy/tasks/")?;
     let task = rest.strip_suffix(suffix)?;
-    if task.is_empty() || task.contains('/') { return None; }
+    if task.is_empty() || task.contains('/') {
+        return None;
+    }
     Some(task.to_owned())
 }
 fn parse_auth(header: &str) -> Result<&str> {
     let raw = header.strip_prefix("Bearer ").context("missing Bearer")?;
-    if !token_id(raw) { bail!("invalid Bearer"); }
+    if !token_id(raw) {
+        bail!("invalid Bearer");
+    }
     Ok(raw)
 }
 fn require_session(req: &Request) -> Result<()> {
     verify_session(&req.origin, parse_auth(&req.authorization)?)
 }
 fn preflight(stream: &mut TcpStream, req: &Request) -> Result<()> {
-    let extra = if req.private_network { "Access-Control-Allow-Private-Network: true\r\n" } else { "" };
+    let extra = if req.private_network {
+        "Access-Control-Allow-Private-Network: true\r\n"
+    } else {
+        ""
+    };
     let cors = header_lines(&req.origin);
-    write!(stream,"HTTP/1.1 204 No Content\r\n\
+    write!(
+        stream,
+        "HTTP/1.1 204 No Content\r\n\
       Content-Length: 0\r\nConnection: close\r\n{cors}\
       Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
       Access-Control-Allow-Headers: Authorization, Content-Type\r\n\
-      Access-Control-Max-Age: 60\r\n{extra}\r\n")?;
+      Access-Control-Max-Age: 60\r\n{extra}\r\n"
+    )?;
     stream.flush()?;
     Ok(())
 }
@@ -265,16 +313,23 @@ fn stream_events(stream: &mut TcpStream, origin: &str, task_id: &str, from: u64)
     // No URL bearer tokens; the Authorization header was checked before this
     // function starts, and origin permission is rechecked for every poll.
     let cors = header_lines(origin);
-    write!(stream,"HTTP/1.1 200 OK\r\n\
-        Content-Type: text/event-stream\r\nConnection: close\r\n{cors}\r\n")?;
+    write!(
+        stream,
+        "HTTP/1.1 200 OK\r\n\
+        Content-Type: text/event-stream\r\nConnection: close\r\n{cors}\r\n"
+    )?;
     stream.flush()?;
     let mut next = from;
     for _ in 0..30 {
         let result = workbuddy_web::poll(origin, task_id, next)?;
-        let events = result["events"].as_array().context("invalid worker events")?;
+        let events = result["events"]
+            .as_array()
+            .context("invalid worker events")?;
         for event in events {
             let seq = event["seq"].as_u64().context("missing seq")?;
-            if seq <= next { bail!("duplicate or stale worker event"); }
+            if seq <= next {
+                bail!("duplicate or stale worker event");
+            }
             let name = event["type"].as_str().context("missing event type")?;
             let serialized = serde_json::to_string(event)?;
             write!(stream, "id: {seq}\nevent: {name}\ndata: {serialized}\n\n")?;
@@ -288,7 +343,7 @@ fn stream_events(stream: &mut TcpStream, origin: &str, task_id: &str, from: u64)
             let summary = serde_json::to_string(&json!({
                 "type":"task.status","status":status,"terminal":true
             }))?;
-            write!(stream,"event: task.status\ndata: {summary}\n\n")?;
+            write!(stream, "event: task.status\ndata: {summary}\n\n")?;
             stream.flush()?;
             return Ok(());
         }
@@ -322,7 +377,12 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
         return Ok(());
     }
     if require_session(&req).is_err() {
-        reply(&mut stream, 401, Some(&req.origin), &json!({"error":"invalid_local_session"}))?;
+        reply(
+            &mut stream,
+            401,
+            Some(&req.origin),
+            &json!({"error":"invalid_local_session"}),
+        )?;
         return Ok(());
     }
     let path = req.path.split('?').next().unwrap_or("");
@@ -336,66 +396,127 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
         }
         ("POST", "/v2/mcp/status") => {
             if !req.content_type.starts_with("application/json") {
-                reply(&mut stream,400,Some(&req.origin),&json!({"error":"content_type"}))?;
+                reply(
+                    &mut stream,
+                    400,
+                    Some(&req.origin),
+                    &json!({"error":"content_type"}),
+                )?;
             } else {
                 match serde_json::from_slice::<Value>(&req.body) {
-                    Ok(data) if data.as_object().is_some_and(|o|o.len()==2) => {
-                        match (data["provider"].as_str(),data["tool"].as_str()) {
-                            (Some(provider),Some(tool)) => {
-                                match web_v2::status_tool(&req.origin,provider,tool) {
-                                    Ok(value)=>reply(&mut stream,200,Some(&req.origin),&value)?,
-                                    Err(_)=>reply(&mut stream,403,Some(&req.origin),
-                                        &json!({"error":"local_mcp_tool_not_granted_or_unavailable"}))?,
+                    Ok(data) if data.as_object().is_some_and(|o| o.len() == 2) => {
+                        match (data["provider"].as_str(), data["tool"].as_str()) {
+                            (Some(provider), Some(tool)) => {
+                                match web_v2::status_tool(&req.origin, provider, tool) {
+                                    Ok(value) => {
+                                        reply(&mut stream, 200, Some(&req.origin), &value)?
+                                    }
+                                    Err(_) => reply(
+                                        &mut stream,
+                                        403,
+                                        Some(&req.origin),
+                                        &json!({"error":"local_mcp_tool_not_granted_or_unavailable"}),
+                                    )?,
                                 }
                             }
-                            _ => reply(&mut stream,400,Some(&req.origin),&json!({"error":"invalid_tool"}))?,
+                            _ => reply(
+                                &mut stream,
+                                400,
+                                Some(&req.origin),
+                                &json!({"error":"invalid_tool"}),
+                            )?,
                         }
                     }
-                    _ => reply(&mut stream,400,Some(&req.origin),&json!({"error":"invalid_tool"}))?,
+                    _ => reply(
+                        &mut stream,
+                        400,
+                        Some(&req.origin),
+                        &json!({"error":"invalid_tool"}),
+                    )?,
                 }
             }
         }
         ("POST", "/v2/workbuddy/tasks") => {
             if !req.content_type.starts_with("application/json") {
-                reply(&mut stream, 400, Some(&req.origin), &json!({"error":"content_type"}))?;
+                reply(
+                    &mut stream,
+                    400,
+                    Some(&req.origin),
+                    &json!({"error":"content_type"}),
+                )?;
             } else {
                 let data: Value = serde_json::from_slice(&req.body)?;
                 if !data.is_object() || data.as_object().is_some_and(|x| x.len() != 2) {
-                    reply(&mut stream, 400, Some(&req.origin), &json!({"error":"invalid_task"}))?;
-                } else if let (Some(key),Some(prompt)) =
-                    (data["client_key"].as_str(),data["prompt"].as_str())
+                    reply(
+                        &mut stream,
+                        400,
+                        Some(&req.origin),
+                        &json!({"error":"invalid_task"}),
+                    )?;
+                } else if let (Some(key), Some(prompt)) =
+                    (data["client_key"].as_str(), data["prompt"].as_str())
                 {
-                    match workbuddy_web::start(&req.origin,key,prompt) {
-                        Ok(value) => reply(&mut stream, 202,Some(&req.origin), &value)?,
-                        Err(_) => reply(&mut stream,503,Some(&req.origin),
-                            &json!({"error":"workbuddy_unavailable_or_busy"}))?,
+                    match workbuddy_web::start(&req.origin, key, prompt) {
+                        Ok(value) => reply(&mut stream, 202, Some(&req.origin), &value)?,
+                        Err(_) => reply(
+                            &mut stream,
+                            503,
+                            Some(&req.origin),
+                            &json!({"error":"workbuddy_unavailable_or_busy"}),
+                        )?,
                     }
                 } else {
-                    reply(&mut stream,400,Some(&req.origin),&json!({"error":"invalid_task"}))?;
+                    reply(
+                        &mut stream,
+                        400,
+                        Some(&req.origin),
+                        &json!({"error":"invalid_task"}),
+                    )?;
                 }
             }
         }
         ("GET", other) if task_from_url(other, "/events").is_some() => {
             let task = task_from_url(other, "/events").unwrap_or_default();
-            match cursor(&req.path).and_then(|cursor|workbuddy_web::poll(&req.origin,&task,cursor)) {
-                Ok(value) => reply(&mut stream,200,Some(&req.origin),&value)?,
-                Err(_) => reply(&mut stream,404,Some(&req.origin),
-                    &json!({"error":"unknown_task_or_cursor"}))?,
+            match cursor(&req.path)
+                .and_then(|cursor| workbuddy_web::poll(&req.origin, &task, cursor))
+            {
+                Ok(value) => reply(&mut stream, 200, Some(&req.origin), &value)?,
+                Err(_) => reply(
+                    &mut stream,
+                    404,
+                    Some(&req.origin),
+                    &json!({"error":"unknown_task_or_cursor"}),
+                )?,
             }
         }
         ("GET", other) if task_from_url(other, "/stream").is_some() => {
             let task = task_from_url(other, "/stream").unwrap_or_default();
             if let Ok(seq) = cursor(&req.path) {
-                if workbuddy_web::poll(&req.origin,&task,seq).is_ok() {
-                    let _ = stream_events(&mut stream,&req.origin,&task,seq);
+                if workbuddy_web::poll(&req.origin, &task, seq).is_ok() {
+                    let _ = stream_events(&mut stream, &req.origin, &task, seq);
                 } else {
-                    reply(&mut stream,404,Some(&req.origin),&json!({"error":"unknown_task"}))?;
+                    reply(
+                        &mut stream,
+                        404,
+                        Some(&req.origin),
+                        &json!({"error":"unknown_task"}),
+                    )?;
                 }
             } else {
-                reply(&mut stream,400,Some(&req.origin),&json!({"error":"invalid_cursor"}))?;
+                reply(
+                    &mut stream,
+                    400,
+                    Some(&req.origin),
+                    &json!({"error":"invalid_cursor"}),
+                )?;
             }
         }
-        _ => reply(&mut stream,404,Some(&req.origin),&json!({"error":"unknown_route"}))?,
+        _ => reply(
+            &mut stream,
+            404,
+            Some(&req.origin),
+            &json!({"error":"unknown_route"}),
+        )?,
     }
     let _ = stream.shutdown(Shutdown::Both);
     Ok(())
@@ -434,7 +555,7 @@ mod tests {
             let a = strong_token().unwrap();
             let b = strong_token().unwrap();
             assert!(token_id(&a));
-            assert_ne!(a,b);
+            assert_ne!(a, b);
         }
         assert!(!token_id("test"));
         assert!(!token_id("../etc/passwd"));
@@ -444,8 +565,11 @@ mod tests {
     fn bound_host_and_cursor_are_strict() {
         assert!(safe_host(&format!("127.0.0.1:{PORT}")));
         assert!(!safe_host("attacker.example"));
-        assert!(!safe_host(&format!("attacker.example:{}",PORT)));
-        assert_eq!(cursor("/v2/workbuddy/tasks/wb-1/events?cursor=24").unwrap(),24);
+        assert!(!safe_host(&format!("attacker.example:{}", PORT)));
+        assert_eq!(
+            cursor("/v2/workbuddy/tasks/wb-1/events?cursor=24").unwrap(),
+            24
+        );
         assert!(cursor("/v2/workbuddy/tasks/wb-1/events?cursor=x").is_err());
     }
 
