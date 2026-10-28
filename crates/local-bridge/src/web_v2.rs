@@ -136,7 +136,7 @@ pub fn capabilities(origin: &str) -> Result<Value> {
     Ok(json!({"origin":origin,"mcp_status_grants":grants,
         "workbuddy":workbuddy_web::capability(origin)?,
         "agents":agent_options::capabilities(origin)?,
-        "agent_web_run_supported":cfg!(target_os="macos"),"profile_trusted":false}))
+        "agent_web_run_supported":true,"profile_trusted":false}))
 }
 /// Presence of a local OS-user grant; execution still rechecks an exact tool.
 pub fn has_status_grant(origin: &str) -> Result<bool> {
