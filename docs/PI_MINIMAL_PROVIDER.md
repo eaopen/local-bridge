@@ -2,6 +2,13 @@
 
 **定位（2026-10-28）：** 这是**已配置 Pi 用户的可选使用指引**，不是要求每个人再办理模型账号的安装步骤，更不是企业 Web 必须走的默认 Agent。企业已有 AI 服务/API 时由企业应用后端负责模型、认证、额度和费用，Bridge 只连接获准的本地能力。个人优先复用 Codex/WorkBuddy 等原有登录；没有 Pi 模型 API 时直接使用现有 Chrome Web AI Relay 手动接力。只有明确需要自动调用 Pi、且用户自己已有或愿意配置官方模型 API 时，才使用下列可选 CLI。
 
+## 企业用户：从既有企业会话获得模型，无需个人 Pi 账号
+
+当企业应用已通过自身登录和后台许可向本机**受信调用环境**提供模型服务时，可调用
+`local-bridge agent pi enterprise <prompt|->`，Pi 的模型 ID、兼容 API 地址和短期票据均由企业调用方提供，自动生成只在本次任务存活的私有 `models.json`，任务结束删除；**用户不必打开 Pi 的 /login，也不必申请自己的模型 API Key**。这是一个可验证的进程级接口，尚未完成从浏览器自动领取应用票据的可信通道，不能把无票据状态当作自动可用。
+
+Web AI Relay 则只提供用户参与的对话交接，不能被当作 Pi 的后台自动模型接口。若企业 API 缺失，继续用已登录 ChatGPT 等网站的 Relay 手动接力，不要求用户为此安装 Pi。
+
 ## 1. 先在 Pi 自己的设置里连接模型
 
 当前 [Pi 官方 Providers](https://pi.dev/docs/latest/providers) 支持 DeepSeek、Google Gemini、Groq、OpenRouter、OpenCode Zen/Go 及其他 Provider 的独立 API Key；也支持部分原有订阅登录。**先用 Pi 自己的 `/login` 或运行该进程的环境变量配置，不要在 Local Bridge 中再增加模型 API Key、路由规则和用户账号仓库。**

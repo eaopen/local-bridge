@@ -4,4 +4,5 @@ pub mod agent;
 pub mod inbox;
 pub mod mcp_provider;
 pub mod native;
+pub mod pi_enterprise;
 pub mod workbuddy;

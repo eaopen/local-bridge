@@ -4,6 +4,7 @@
 //! Codex is the user's existing installed/authenticated CLI; no credentials,
 //! file versions, or agent sessions are owned by Local Bridge.
 
+use crate::pi_enterprise;
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 use std::io::{self, Read, Write};
@@ -211,6 +212,22 @@ fn pi_command(provider: &str, model: &str) -> Result<Command> {
         bail!("invalid Pi provider or model ID");
     }
     let mut command = Command::new("pi");
+    #[cfg(target_os = "macos")]
+    {
+        // Finder/Chrome GUI processes normally omit Homebrew from PATH.
+        use std::path::PathBuf;
+        let raw = std::env::var_os("PATH").unwrap_or_default();
+        let mut dirs: Vec<PathBuf> = std::env::split_paths(&raw).collect();
+        for name in ["/opt/homebrew/bin", "/usr/local/bin"] {
+            let dir = PathBuf::from(name);
+            if dir.is_dir() && !dirs.contains(&dir) {
+                dirs.push(dir);
+            }
+        }
+        if let Ok(paths) = std::env::join_paths(dirs) {
+            command.env("PATH", paths);
+        }
+    }
     command.args([
         "--print",
         "--no-session",
@@ -237,12 +254,34 @@ fn pi_command(provider: &str, model: &str) -> Result<Command> {
 /// API key or OAuth from its own login/configuration. Missing auth is an error,
 /// not an automatic switch to a different provider or a web-chat quota.
 pub fn run_pi(provider: &str, model: &str, prompt: &str) -> Result<Value> {
+    run_pi_command(pi_command(provider, model)?, provider, model, prompt)
+}
+
+/// Enterprise app provides one already-authenticated compatible model session.
+/// No per-user Pi model/account setup, global Pi changes or Bridge model router.
+pub fn run_pi_enterprise(prompt: &str) -> Result<Value> {
+    let binding = pi_enterprise::EnterprisePiSession::from_environment()?;
+    let mut command = pi_command(pi_enterprise::PROVIDER, &binding.model)?;
+    command.env("PI_CODING_AGENT_DIR", &binding.agent_dir);
+    // Skip remote Pi catalog/config updates; this still calls the enterprise API.
+    command.env("PI_OFFLINE", "1");
+    let mut result = run_pi_command(command, pi_enterprise::PROVIDER, &binding.model, prompt)?;
+    result["model_source"] = json!("enterprise_session");
+    Ok(result)
+}
+
+fn run_pi_command(
+    mut command: Command,
+    provider: &str,
+    model: &str,
+    prompt: &str,
+) -> Result<Value> {
     if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
         bail!("Pi prompt must contain 1..65536 bytes of text");
     }
-    let mut child = pi_command(provider, model)?
+    let mut child = command
         .spawn()
-        .context("Pi CLI unavailable; install Pi and configure a model with pi /login")?;
+        .context("Pi CLI unavailable, or enterprise model session not available")?;
     let stdout = child.stdout.take().context("Pi stdout unavailable")?;
     let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
         let mut output = Vec::new();
