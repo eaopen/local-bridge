@@ -238,7 +238,9 @@ mod tests {
                 "think_mode":"high","agent_mode":"prefer"}
         }));
         assert_eq!(reply["ok"], false);
-        assert_eq!(reply["error"], "agent_option_not_supported");
+        // A preferred WorkBuddy may fall back before submission if another
+        // authorized adapter supports high. In CI no Origin grant exists.
+        assert_eq!(reply["error"], "not_granted_or_provider_unavailable");
         let invalid = handle_native(&json!({
             "protocol_version":2,"request_id":"agent-run-2",
             "action":"web.v2.agent.run",
