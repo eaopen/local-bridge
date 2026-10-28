@@ -3,7 +3,7 @@
 //! The local user grants an exact (origin, installed provider, status tool) tuple.
 //! This is not a remote-profile permission, nor generic provider.call.
 use crate::{agent_options, inbox, local_http, mcp_provider, state_file, workbuddy_web};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
