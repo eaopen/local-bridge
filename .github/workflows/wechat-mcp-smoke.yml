@@ -1,11 +1,10 @@
 name: WeChat Provider MCP integration smoke
 
+# Optional integration example, not part of the core release / PR check path.
+# Run manually when validating WeChat interoperability. Missing this external
+# Python project must never block Local Bridge's ordinary builds and releases.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/wechat-mcp-smoke.yml
-      - crates/local-bridge/src/mcp_provider.rs
 
 jobs:
   mcp-transport:

@@ -22,7 +22,7 @@ Local Bridge 提供**最小的本机能力连接层**：
 
 Profile 用于来源、账号上下文与任务归属，**不默认作为个人/企业数据墙**。已有应用负责 SSO、业务权限与文件版本；Bridge 只承担自身可信调用、能力分发与任务交接，不建设新 DLP 或企业认证中心。
 
-**可选本机 MCP Provider 接入：**已安装的独立 [WeChat Provider](https://github.com/eaopen/wechat-provider) 可通过本机用户显式注册后，由 Local Bridge 以 MCP stdio 调用读取、搜索、发送等现有工具。微信登录、GUI/RPA、消息索引及实际发送状态仍归原 Provider。参见 [Provider 对接说明](docs/LOCAL_MCP_PROVIDER_V1.md)；这不表示真实微信 4.x 实机兼容已验收。
+**可选 MCP Provider 示例（非默认功能）：** Local Bridge 的通用 MCP Client 可以连接多种由用户自行安装和注册的本地 Provider，[WeChat Provider](https://github.com/eaopen/wechat-provider) 只是其中一个示例。**不安装微信、不安装 Python/微信依赖、不注册任何通讯 Provider，Local Bridge 也应独立构建、启动、更新，并正常提供其余功能。** 只有用户明确安装和注册微信 Provider 后，才尝试使用其读写工具；消息、账号与发送状态仍由独立 Provider 管理。参见 [可选 Provider 接入](docs/LOCAL_MCP_PROVIDER_V1.md)。真实微信 4.x 实机兼容尚未验收。
 
 ## 通用 Profile 与长期演进合同
 
@@ -31,7 +31,7 @@ Profile 用于来源、账号上下文与任务归属，**不默认作为个人/
 - [ApplicationProfile V1](docs/APPLICATION_PROFILE_V1.md)：应用配置、可信来源、Dev/Prod、更新及稳定身份
 - [BridgeTask V1](docs/BRIDGE_TASK_V1.md)：统一文件/企业/AI 任务中心合同
 - [Capability / MCP V1](docs/CAPABILITY_AND_MCP_V1.md)：通用工具与 MCP 权限
-- [Agent Providers / Local Communications V1](docs/AI_AGENT_AND_LOCAL_COMMUNICATION_V1.md)：WorkBuddy / Codex / Pi 本地选择、微信优先通讯
+- [Agent Providers / Local Communications V1](docs/AI_AGENT_AND_LOCAL_COMMUNICATION_V1.md)：WorkBuddy / Codex / Pi 本地选择、可选通讯连接器
 - [CloudFile → Bridge 迁移](docs/CLOUDFILE_TO_BRIDGE_MIGRATION.md)：并行开发不接管或破坏现有文件能力
 - [Chrome Native Messaging V1](docs/CHROME_NATIVE_HOST_V1.md)：可选 Local Tool Bridge 原生 Host、安装和本机收件箱
 - [个人/企业/混合场景与诉求](docs/PRODUCT_POSITIONING_AND_USE_CASES.md)：按真实用户任务组织需求与验收

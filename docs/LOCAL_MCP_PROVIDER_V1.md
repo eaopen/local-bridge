@@ -1,6 +1,6 @@
-# 本机 MCP Provider V1：微信 Provider 实际接入
+# 本机 MCP Provider V1：可选微信接入示例
 
-**状态：** Local Bridge 提供可选的、用户主动注册的本机 MCP stdio Provider 调用；WeChat Provider 自己提供六个工具、SQLite 索引、图形界面自动化与消息发送账本。两者可独立安装和使用。
+**状态：** 本文仅介绍**一个可选实例**，不是 Local Bridge 核心依赖、默认安装项、启动条件或发布门禁。Local Bridge 的通用 MCP stdio Client 独立提供注册与调用能力；WeChat Provider 只有在用户明确选择并安装后才被注册和运行。无微信、无 Python、无聊天账号时，Bridge 的其他功能以及正常 Rust CI 不受影响。WeChat Provider 自己提供六个工具、SQLite 索引、图形界面自动化与消息发送账本，两者可以分别独立安装和使用。
 
 ## 使用步骤（用户本机操作）
 
@@ -42,5 +42,5 @@ local-bridge provider call wechat wechat_get_send_status '{"task_id":"<the-origi
 ## 验收与剩余事项
 
 - Rust CI 应通过 Linux、macOS 和 Windows 的 fmt、Clippy、unit/build，独立检验本机配置与 JSON-RPC 结果约束。
-- **已验证：**独立 Python WeChat Provider 与 Rust Bridge 的跨进程 MCP handshake、六工具声明、`wechat_status`、空数据库 `wechat_search` 和未知工具拒绝；见 [实际 CI 记录](https://github.com/eaopen/local-bridge/actions/runs/40563141307) 与 [测试方法](WECHAT_PROVIDER_MCP_SMOKE.md)。**仍未验证：**Windows/macOS 已登录微信账号的真实 GUI 会话读取、发送对象身份与送达情况。
+- **可选验证：**独立 Python WeChat Provider 与 Rust Bridge 的跨进程 MCP handshake、六工具声明、`wechat_status`、空数据库 `wechat_search` 和未知工具拒绝已通过；见 [实际 CI 记录](https://github.com/eaopen/local-bridge/actions/runs/40563141307) 与 [手动触发的独立烟测](WECHAT_PROVIDER_MCP_SMOKE.md)。该跨仓工作流**不随通用 MCP 代码变动自动运行**，也不要求每个 Local Bridge 用户安装微信。**仍未验证：**Windows/macOS 已登录微信账号的真实 GUI 会话读取、发送对象身份与送达情况。
 - 下一步再做用户显式启用的**工具级 Agent 授权与状态交接**，不要直接把所有六个 WeChat 工具无筛选交给网页或模型。
