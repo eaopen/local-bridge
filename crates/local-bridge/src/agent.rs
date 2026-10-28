@@ -1,5 +1,6 @@
-//! Explicit user-invoked Codex CLI integration. This is intentionally **not**
-//! a remote-callable MCP tool: a webpage/message cannot start local processes.
+//! Explicit user-invoked Codex CLI integration. It is **not** a remote
+//! callable MCP tool: only a local CLI command or a deliberate click in the
+//! trusted Chrome extension popup may start this fixed read-only task.
 //! Codex is the user's existing installed/authenticated CLI; no credentials,
 //! file versions, or agent sessions are owned by Local Bridge.
 

@@ -3,7 +3,7 @@
 //!
 //! Only user-initiated extension popup context is accepted. The real handoff
 //! is a local user-owned inbox item, NOT an AI/file operation completion.
-use crate::inbox;
+use crate::{agent, inbox};
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -14,6 +14,7 @@ use std::path::PathBuf;
 
 const MAX_REQUEST: usize = 128 * 1024;
 const MAX_RESPONSE: usize = 256 * 1024;
+const MAX_SUMMARY_BYTES: usize = 48 * 1024;
 const HOST_NAME: &str = "com.eaopen.browser_bridge";
 
 #[derive(Deserialize)]
@@ -64,6 +65,15 @@ fn validate_context(value: &Value) -> Result<Value> {
 }
 
 pub fn handle(request: &Value) -> Value {
+    handle_with_summary(request, agent::run_codex)
+}
+
+// Keep the actual AI invocation behind a single tested user-action route.
+// Tests inject a fake runner; host.status and context.share need no Codex.
+fn handle_with_summary(
+    request: &Value,
+    runner: impl FnOnce(&str) -> Result<Value>,
+) -> Value {
     let id = request["request_id"].as_str().unwrap_or("");
     let public_id = if valid_request_id(id) { id } else { "" };
     let failure = |error: &'static str| {
@@ -83,9 +93,11 @@ pub fn handle(request: &Value) -> Value {
                 "provider":"local-bridge",
                 "connected_to_local_bridge":true,
                 "native_protocol":1,
-                "capabilities":["host.status","context.share"],
+                "capabilities":["host.status","context.share","context.summarize"],
                 "handoff":"local-inbox",
-                "ai_run_enabled":false
+                "ai_run_supported":true,
+                "ai_run_enabled":"user_click_only",
+                "agent_readiness":"not_checked; Codex must be installed and logged in"
             }})
         }
         Some("context.share") => {
@@ -109,6 +121,45 @@ pub fn handle(request: &Value) -> Value {
                     }
                 }),
                 Err(_) => failure("local_inbox_unavailable"),
+            }
+        }
+        Some("context.summarize") => {
+            // Only the trusted extension popup can send this typed action;
+            // the extension service worker explicitly rejects website calls.
+            // No arbitrary prompt, executable, model or tool name is accepted.
+            let Some(payload) = request.get("payload") else {
+                return failure("invalid_context");
+            };
+            let Ok(ctx) = validate_context(payload) else {
+                return failure("invalid_context");
+            };
+            let Ok(prompt) = inbox::summarize_context(&ctx) else {
+                return failure("invalid_context");
+            };
+            match runner(&prompt) {
+                Ok(result) => {
+                    let answer = result["result"].as_str().unwrap_or("");
+                    if result["status"] != "completed" || answer.trim().is_empty() {
+                        return failure("agent_incomplete");
+                    }
+                    if answer.len() > MAX_SUMMARY_BYTES {
+                        return failure("agent_result_too_large");
+                    }
+                    json!({
+                        "protocol_version":1,"request_id":id,"ok":true,
+                        "result":{
+                            "provider":"local-bridge",
+                            "agent":"codex",
+                            "status":"completed",
+                            "summary":answer,
+                            "stored":false,
+                            "forwarded_to_agent":true,
+                            "sent_by_user_click":true,
+                            "note":"User invoked their existing Codex CLI; the model backend is configured in Codex."
+                        }
+                    })
+                }
+                Err(_) => failure("agent_unavailable_or_failed"),
             }
         }
         _ => failure("unsupported_action"),
@@ -267,6 +318,51 @@ mod tests {
             }))["ok"],
             false
         );
+    }
+
+    #[test]
+    fn explicit_popup_summary_uses_fixed_prompt_and_reports_real_completion() {
+        use std::cell::Cell;
+        let called = Cell::new(false);
+        let reply = handle_with_summary(
+            &json!({
+                "protocol_version":1,"request_id":"sum_1",
+                "action":"context.summarize",
+                "payload":{"title":"Project","url":"https://example.org/page",
+                           "selection":"Please summarize today's project notes"}
+            }),
+            |prompt| {
+                called.set(true);
+                assert!(prompt.contains("untrusted data"));
+                assert!(prompt.contains("summarize"));
+                assert!(prompt.contains("Please summarize today's project notes"));
+                Ok(json!({"status":"completed","result":"Two useful points."}))
+            },
+        );
+        assert!(called.get());
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["result"]["summary"], "Two useful points.");
+        assert_eq!(reply["result"]["stored"], false);
+
+        let rejected = handle_with_summary(
+            &json!({
+                "protocol_version":1,"request_id":"sum_2","action":"context.summarize",
+                "payload":{"title":"t","url":"https://example.org/?secret=x","selection":"x"}
+            }),
+            |_| panic!("must reject invalid context before starting a model"),
+        );
+        assert_eq!(rejected["ok"], false);
+        assert_eq!(rejected["error"], "invalid_context");
+
+        let failed = handle_with_summary(
+            &json!({
+                "protocol_version":1,"request_id":"sum_3","action":"context.summarize",
+                "payload":{"title":"t","url":"","selection":"x"}
+            }),
+            |_| anyhow::bail!("Codex not installed"),
+        );
+        assert_eq!(failed["ok"], false);
+        assert_eq!(failed["error"], "agent_unavailable_or_failed");
     }
 
     #[test]

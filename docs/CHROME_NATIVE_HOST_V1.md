@@ -29,6 +29,7 @@ In the popup click **Capture**, inspect/edit the text, then **Send to local host
 
 - `host.status`: real native provider readiness and capabilities.
 - `context.share`: bounded `{title,url,selection}` explicitly sent by the popup. Sanitized context is persisted to the **current OS user's local inbox**; never sent to Codex or CloudFile automatically.
+- `context.summarize` (**optional, explicit popup click only**): accepts the same bounded, user-reviewed context. Only when the user selects the AI action does the Host run their existing logged-in Codex CLI with its fixed summary prompt and read-only ephemeral mode, returning a short summary or an honest unavailable/error status. The Host does not auto-run AI after `context.share`, does not save the summary in an extra database, and does not expose this action through the Web page API. Native Host V1 includes this extra capability only in providers that support it.
 
 A successful handoff returns `{received:true,stored:true,forwarded:false,status:"received",task_id:"ctx-..."}`. This means saved to an inbox, **not** an AI turn or file publish.
 
@@ -39,6 +40,8 @@ local-bridge inbox list
 local-bridge inbox read ctx-...
 local-bridge inbox delete ctx-...
 ```
+
+The separate `context.summarize` action does not create an inbox entry. If the Chrome popup closes before it receives the result, the user can invoke a separate explicit CLI task from a previously saved inbox item; future background tasks may be added only when needed.
 
 Items are retained until the user deletes them. The inbox is created under the OS user data directory in `LocalBridge/inbox` (or `local-bridge/inbox` on Linux). On Unix the directory is private (0700), saved files private (0600). No browser token/cookie is collected or sent to the cloud by Bridge. Do not share confidential content unless it is appropriate for the user's machine and account.
 

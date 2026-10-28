@@ -22,6 +22,8 @@ Local Bridge 提供**最小的本机能力连接层**：
 
 Profile 用于来源、账号上下文与任务归属，**不默认作为个人/企业数据墙**。已有应用负责 SSO、业务权限与文件版本；Bridge 只承担自身可信调用、能力分发与任务交接，不建设新 DLP 或企业认证中心。
 
+**可选 Chrome → 本地 Codex 摘要（需主动点击）：** 本机 Native Host 可接收已安装的独立 Local Tool Bridge Chrome 扩展提交的 `context.summarize`，调用用户已有、已登录的 Codex CLI，并将结果回传 Popup；浏览器网页无法直接调用，Bridge 不预装 Codex，扩展无本机 Provider 时仍能独立采集/复制。此功能是可选的显式用户动作，Chrome/macOS/Windows 实机联动仍需验收，详见 [Native Host V1](docs/CHROME_NATIVE_HOST_V1.md)。
+
 **可选 MCP Provider 示例（非默认功能）：** Local Bridge 的通用 MCP Client 可以连接多种由用户自行安装和注册的本地 Provider，[WeChat Provider](https://github.com/eaopen/wechat-provider) 只是其中一个示例。**不安装微信、不安装 Python/微信依赖、不注册任何通讯 Provider，Local Bridge 也应独立构建、启动、更新，并正常提供其余功能。** 只有用户明确安装和注册微信 Provider 后，才尝试使用其读写工具；消息、账号与发送状态仍由独立 Provider 管理。参见 [可选 Provider 接入](docs/LOCAL_MCP_PROVIDER_V1.md)。真实微信 4.x 实机兼容尚未验收。
 
 ## 通用 Profile 与长期演进合同

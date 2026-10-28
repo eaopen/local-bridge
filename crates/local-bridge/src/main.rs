@@ -1,9 +1,8 @@
-mod agent;
 mod cloudfile;
 mod mcp;
 
 use anyhow::{bail, Context, Result};
-use local_bridge::{inbox, mcp_provider, native};
+use local_bridge::{agent, inbox, mcp_provider, native};
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::{
     validate_manifest, visible_channels, ChannelManifest, AVAILABLE_CAPABILITIES,
