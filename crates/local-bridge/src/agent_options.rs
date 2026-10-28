@@ -36,7 +36,8 @@ fn valid_id(s: &str, max: usize) -> bool {
 }
 impl RunAgentRequest {
     pub fn check(&self) -> Result<()> {
-        if self.api_version != 2 || !valid_id(&self.client_key, 80)
+        if self.api_version != 2
+            || !valid_id(&self.client_key, 80)
             || self.client_key.contains('/')
             || self.client_key.contains(':')
             || self.prompt.trim().is_empty()
@@ -155,23 +156,39 @@ mod tests {
         let base = json!({"api_version":2,"client_key":"task-123","prompt":"synthetic task"});
         assert!(from_value(&base).is_ok());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"synthetic"})).is_err());
-        assert!(from_value(&json!({"api_version":1,"client_key":"task-123","prompt":"synthetic"})).is_err());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"synthetic"})).is_ok());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test",
+        assert!(
+            from_value(&json!({"api_version":1,"client_key":"task-123","prompt":"synthetic"}))
+                .is_err()
+        );
+        assert!(
+            from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"synthetic"}))
+                .is_ok()
+        );
+        assert!(from_value(
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
            "agent":"workbuddy","model":"auto","think_mode":"high",
-           "agent_mode":"prefer"}))
+           "agent_mode":"prefer"})
+        )
         .is_ok());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "agent":"auto","agent_mode":"require"}))
+        assert!(from_value(
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
+           "agent":"auto","agent_mode":"require"})
+        )
         .is_err());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "model":"https://secret.example/path?token=abc"}))
+        assert!(from_value(
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
+           "model":"https://secret.example/path?token=abc"})
+        )
         .is_err());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "think_mode":"unlimited"}))
+        assert!(from_value(
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
+           "think_mode":"unlimited"})
+        )
         .is_err());
-        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "shell":"rm -rf"}))
+        assert!(from_value(
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
+           "shell":"rm -rf"})
+        )
         .is_err());
     }
 }

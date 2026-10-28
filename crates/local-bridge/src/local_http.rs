@@ -70,8 +70,7 @@ fn advertised_endpoint() -> Result<String> {
         return Ok(format!("http://127.0.0.1:{PORT}"));
     }
     match configured.as_str() {
-        "https://localhost:48294" | "https://127.0.0.1:48294" =>
-            Ok(configured),
+        "https://localhost:48294" | "https://127.0.0.1:48294" => Ok(configured),
         _ => bail!("unsupported HTTPS loopback proxy endpoint; TLS is optional"),
     }
 }
@@ -617,8 +616,7 @@ mod tests {
         // The normal user path is HTTP on loopback, with a browser LNA grant
         // and Native-issued per-origin session token. No TLS by default.
         if std::env::var("LOCAL_BRIDGE_WEB_V2_HTTPS_ENDPOINT").is_err() {
-            assert_eq!(advertised_endpoint().unwrap(),
-                "http://127.0.0.1:48293");
+            assert_eq!(advertised_endpoint().unwrap(), "http://127.0.0.1:48293");
         }
     }
 
