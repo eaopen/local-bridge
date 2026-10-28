@@ -109,7 +109,9 @@ fn extension_id(value: &Value) -> Option<&str> {
 /// Same-directory staging prevents an interrupted write from truncating Chrome's
 /// live manifest. No other host name or data directory is ever modified.
 fn write_manifest(path: &Path, data: &[u8]) -> Result<()> {
-    let dir = path.parent().context("missing native host manifest parent")?;
+    let dir = path
+        .parent()
+        .context("missing native host manifest parent")?;
     fs::create_dir_all(dir)?;
     let unique = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let tmp = dir.join(format!(".{HOST_NAME}.{}-{unique}.tmp", std::process::id()));
@@ -234,9 +236,9 @@ fn registry_location() -> Result<Option<PathBuf>> {
 }
 #[cfg(windows)]
 fn same_path(a: &Path, b: &Path) -> bool {
-    a.to_string_lossy().replace('/', "\\").eq_ignore_ascii_case(
-        &b.to_string_lossy().replace('/', "\\"),
-    )
+    a.to_string_lossy()
+        .replace('/', "\\")
+        .eq_ignore_ascii_case(&b.to_string_lossy().replace('/', "\\"))
 }
 #[cfg(windows)]
 fn guard_registry_path(path: &Path) -> Result<()> {
@@ -289,8 +291,7 @@ fn rollback_at(dir: &Path) -> Result<Value> {
         bail!("a foreign Native Host manifest cannot be replaced by rollback");
     }
     let previous = previous_path(dir);
-    let value = read_manifest(&previous)?
-        .context("no previous Native Host manifest to restore")?;
+    let value = read_manifest(&previous)?.context("no previous Native Host manifest to restore")?;
     if value["name"] != HOST_NAME || value["type"] != "stdio" {
         bail!("previous Native Host manifest is invalid");
     }
@@ -341,7 +342,10 @@ mod tests {
         let name = format!(
             "bridge-host-test-{}-{}",
             std::process::id(),
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         );
         let path = env::temp_dir().join(name);
         fs::create_dir_all(&path).unwrap();
@@ -366,7 +370,10 @@ mod tests {
         let binary = fake_binary(&dir);
         let a = install_at(&dir, &binary, A, false).unwrap();
         assert_eq!(a["installed"], true);
-        assert_eq!(status_at(&dir).unwrap()["state"], "manifest_ready_browser_not_verified");
+        assert_eq!(
+            status_at(&dir).unwrap()["state"],
+            "manifest_ready_browser_not_verified"
+        );
         assert_eq!(status_at(&dir).unwrap()["extension_id"], A);
         assert!(!previous_path(&dir).exists());
         let again = install_at(&dir, &binary, A, false).unwrap();

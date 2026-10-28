@@ -19,7 +19,10 @@ fn data_check() -> Value {
             fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
         }
         let at = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-        let file = dir.join(format!(".local-bridge-self-test-{}-{at}", std::process::id()));
+        let file = dir.join(format!(
+            ".local-bridge-self-test-{}-{at}",
+            std::process::id()
+        ));
         let mut opts = OpenOptions::new();
         opts.write(true).create_new(true);
         #[cfg(unix)]
@@ -32,7 +35,10 @@ fn data_check() -> Value {
             out.write_all(b"local-bridge-self-test")?;
             out.sync_all()?;
             let back = fs::read(&file)?;
-            anyhow::ensure!(back == b"local-bridge-self-test", "local state readback failed");
+            anyhow::ensure!(
+                back == b"local-bridge-self-test",
+                "local state readback failed"
+            );
             Ok(())
         })();
         drop(out);
@@ -41,7 +47,11 @@ fn data_check() -> Value {
     })();
     check(
         "private-state",
-        if result.is_ok() { "read_write_ok" } else { "unavailable" },
+        if result.is_ok() {
+            "read_write_ok"
+        } else {
+            "unavailable"
+        },
         result.is_ok(),
     )
 }
@@ -53,7 +63,10 @@ pub fn run() -> Value {
             check(
                 "native-host-manifest",
                 host_state,
-                matches!(host_state, "not_installed" | "manifest_ready_browser_not_verified"),
+                matches!(
+                    host_state,
+                    "not_installed" | "manifest_ready_browser_not_verified"
+                ),
             )
         }
         Err(_) => check("native-host-manifest", "invalid_or_unreadable", false),
