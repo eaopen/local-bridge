@@ -40,7 +40,9 @@ fn root() -> Result<PathBuf> {
 fn safe_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 96
-        && value.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
 fn private_dir(path: &Path) -> Result<()> {
     fs::create_dir_all(path)?;
@@ -228,7 +230,11 @@ pub fn start(
         .spawn();
     if worker.is_err() {
         // Persist a terminal record: a lost start response must never re-run.
-        append(&dir, 1, json!({"type":"task.failed","code":"worker_spawn_failed"}))?;
+        append(
+            &dir,
+            1,
+            json!({"type":"task.failed","code":"worker_spawn_failed"}),
+        )?;
     }
     Ok(json!({"task_id":id,"status":"accepted","reused":false,"provider":provider}))
 }
@@ -256,7 +262,10 @@ pub fn poll(origin: &str, id: &str, cursor: u64) -> Result<Value> {
         .take(40)
         .cloned()
         .collect();
-    let next = page.last().and_then(|e| e["seq"].as_u64()).unwrap_or(cursor);
+    let next = page
+        .last()
+        .and_then(|e| e["seq"].as_u64())
+        .unwrap_or(cursor);
     let status = state(&all, age);
     Ok(json!({
         "task_id":id,"status":status,"events":page,"next_seq":next,
@@ -284,15 +293,33 @@ pub fn worker(id: &str) -> Result<()> {
     let _ = fs::remove_file(dir.join("request.json"));
     match result {
         Ok(value) if value["status"] == "completed" => {
-            let text = value["result"].as_str().context("Agent completed without text")?;
+            let text = value["result"]
+                .as_str()
+                .context("Agent completed without text")?;
             if text.trim().is_empty() {
                 bail!("Agent completed with empty output");
             }
-            append(&dir, 2, json!({"type":"message.delta","message_id":"result","text":text}))?;
-            append(&dir, 3, json!({"type":"message.final","message_id":"result"}))?;
-            append(&dir, 4, json!({"type":"task.completed","stop_reason":"cli_completed"}))?;
+            append(
+                &dir,
+                2,
+                json!({"type":"message.delta","message_id":"result","text":text}),
+            )?;
+            append(
+                &dir,
+                3,
+                json!({"type":"message.final","message_id":"result"}),
+            )?;
+            append(
+                &dir,
+                4,
+                json!({"type":"task.completed","stop_reason":"cli_completed"}),
+            )?;
         }
-        _ => append(&dir, 2, json!({"type":"task.failed","code":"agent_execution_failed"}))?,
+        _ => append(
+            &dir,
+            2,
+            json!({"type":"task.failed","code":"agent_execution_failed"}),
+        )?,
     }
     Ok(())
 }
@@ -301,7 +328,10 @@ mod tests {
     use super::*;
     #[test]
     fn terminal_is_not_inferred_from_message_final() {
-        let mut events = vec![json!({"type":"task.started"}), json!({"type":"message.final"})];
+        let mut events = vec![
+            json!({"type":"task.started"}),
+            json!({"type":"message.final"}),
+        ];
         assert_eq!(state(&events, 100), "running");
         events.push(json!({"type":"task.completed"}));
         assert_eq!(state(&events, 100), "completed");
