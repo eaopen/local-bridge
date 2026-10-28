@@ -85,7 +85,8 @@ fn codex_command(program: &str, model: &str, think_mode: &str) -> Result<Command
     }
     // No Web-supplied arguments, shell, write approvals or working directory.
     command.arg("-");
-    command.stdin(Stdio::piped())
+    command
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     #[cfg(target_os = "macos")]
@@ -283,9 +284,7 @@ fn pi_web_command(model: &str, think_mode: &str) -> Result<Command> {
     if model != "auto" && !pi_id(model, true) {
         bail!("invalid Pi model");
     }
-    if think_mode != "auto"
-        && !["off", "low", "medium", "high", "xhigh"].contains(&think_mode)
-    {
+    if think_mode != "auto" && !["off", "low", "medium", "high", "xhigh"].contains(&think_mode) {
         bail!("unsupported Pi think mode");
     }
     // Finder-launched Chrome Hosts may not inherit Homebrew's PATH.
@@ -327,7 +326,8 @@ fn pi_web_command(model: &str, think_mode: &str) -> Result<Command> {
     if think_mode != "auto" {
         command.args(["--thinking", think_mode]);
     }
-    command.stdin(Stdio::piped())
+    command
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     Ok(command)
@@ -497,12 +497,20 @@ mod tests {
     #[test]
     fn web_cli_options_keep_existing_tools_bounded() {
         let codex = codex_command("codex", "gpt-6", "high").unwrap();
-        let args: Vec<_> = codex.get_args().map(|v| v.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = codex
+            .get_args()
+            .map(|v| v.to_string_lossy().to_string())
+            .collect();
         assert!(args.windows(2).any(|s| s == ["--model", "gpt-6"]));
-        assert!(args.windows(2).any(|s| s == ["-c", "model_reasoning_effort=high"]));
+        assert!(args
+            .windows(2)
+            .any(|s| s == ["-c", "model_reasoning_effort=high"]));
         assert!(codex_command("codex", "auto", "off").is_err());
         let pi = pi_web_command("9router/m3cn/MiniMax-M2.7", "medium").unwrap();
-        let args: Vec<_> = pi.get_args().map(|v| v.to_string_lossy().to_string()).collect();
+        let args: Vec<_> = pi
+            .get_args()
+            .map(|v| v.to_string_lossy().to_string())
+            .collect();
         assert!(args.iter().any(|s| s == "--no-tools"));
         assert!(!args.iter().any(|s| s == "--no-extensions"));
         assert!(args.windows(2).any(|s| s == ["--thinking", "medium"]));
