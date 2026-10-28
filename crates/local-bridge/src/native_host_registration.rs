@@ -2,6 +2,7 @@
 //! Adapted from the proven Agent2 Host lifecycle: inspect, preserve one previous
 //! manifest, install/repair, rollback, and remove only what Local Bridge owns.
 //! No file-task, Journal, desktop, or OS-admin privileges are involved.
+#[cfg(target_os = "windows")]
 use crate::inbox;
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
