@@ -3,7 +3,7 @@ mod mcp;
 
 use anyhow::{bail, Context, Result};
 use local_bridge::{
-    agent, agent_grants, agent_task, diagnostics, inbox, local_http, mcp_provider, native,
+    agent, agent_grants, agent_preferences, agent_task, diagnostics, inbox, local_http, mcp_provider, native,
     native_host_registration, task_center, web_v2, workbuddy, workbuddy_web,
 };
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
@@ -42,6 +42,21 @@ fn run() -> Result<()> {
             }
         }
         [x] if x == "mcp" => mcp::serve()?,
+        [x, action] if x == "agent-preferences" && action == "get" => {
+            println!("{}", agent_preferences::get_value()?);
+        }
+        [x, action, json_input] if x == "agent-preferences" && action == "set" => {
+            let data = if json_input == "-" {
+                agent::prompt_from_stdin()?
+            } else {
+                json_input.clone()
+            };
+            if data.len() > 4096 {
+                bail!("Agent preferences JSON exceeds size limit");
+            }
+            let parsed: serde_json::Value = serde_json::from_str(&data)?;
+            println!("{}", agent_preferences::save_value(parsed)?);
+        },
         [x, action] if x == "tasks" && action == "list" => {
             println!("{}", task_center::list(false));
         }
@@ -272,7 +287,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | tasks list [--cloudfile] | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host status|uninstall|rollback | native-host install <extension-id> [--replace] | self-test | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 serve | web-v2 grant-agent <origin> <workbuddy|codex|pi> | web-v2 revoke-agent <origin> <workbuddy|codex|pi> | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
+                "Local Bridge {}\nCommands: status | mcp | agent-preferences get|set <json|-> | tasks list [--cloudfile] | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host status|uninstall|rollback | native-host install <extension-id> [--replace] | self-test | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 serve | web-v2 grant-agent <origin> <workbuddy|codex|pi> | web-v2 revoke-agent <origin> <workbuddy|codex|pi> | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

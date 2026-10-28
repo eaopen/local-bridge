@@ -123,12 +123,20 @@ pub fn allowed(origin: &str) -> Result<bool> {
     }
     Ok(read_grants()?.iter().any(|x| x == origin))
 }
+pub fn installed() -> bool {
+    #[cfg(target_os="macos")]
+    {
+        Path::new("/Applications/WorkBuddy.app/Contents/Resources/app.asar.unpacked/cli/dist/codebuddy-lite-wb.mjs").is_file()
+    }
+    #[cfg(not(target_os="macos"))]
+    {
+        false
+    }
+}
+
 pub fn capability(origin: &str) -> Result<Value> {
     let granted = allowed(origin)?;
-    #[cfg(target_os="macos")]
-    let installed=Path::new("/Applications/WorkBuddy.app/Contents/Resources/app.asar.unpacked/cli/dist/codebuddy-lite-wb.mjs").is_file();
-    #[cfg(not(target_os = "macos"))]
-    let installed = false;
+    let installed = installed();
     Ok(
         json!({"provider":"workbuddy","installed":installed,"local_grant":granted,
         "ready":false,"auth_verified":false,"run_supported":cfg!(target_os="macos"),
