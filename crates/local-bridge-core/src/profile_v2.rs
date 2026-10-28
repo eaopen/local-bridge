@@ -331,7 +331,7 @@ mod tests {
         )
         .is_err());
         let mut invalid = serde_json::to_value(&profile).unwrap();
-        invalid["mixed_context"]["shell"] = "run";
+        invalid["mixed_context"]["shell"] = "run".into();
         assert!(serde_json::from_value::<ApplicationProfileV2>(invalid).is_err());
     }
 
