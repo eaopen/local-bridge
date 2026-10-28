@@ -133,6 +133,63 @@ fn state(items: &[Value], age: u64) -> &'static str {
         "running"
     }
 }
+
+/// Project existing CLI Agent task metadata into a local-only read model.
+/// Never include prompts, model answers, site origins or provider credentials.
+/// This does not mutate or prune the original worker/task directories.
+fn summaries_from(base: &Path, time: u64) -> Result<Vec<Value>> {
+    if !base.exists() {
+        return Ok(Vec::new());
+    }
+    let mut result = Vec::new();
+    let mut scanned = 0;
+    for entry in fs::read_dir(base)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        scanned += 1;
+        if scanned > 256 {
+            bail!("too many Agent task directories for summary");
+        }
+        let id = entry.file_name().to_string_lossy().into_owned();
+        if !safe_id(&id) || !(id.starts_with("codex-") || id.starts_with("pi-")) {
+            continue;
+        }
+        let Ok(meta) = metadata(&entry.path()) else {
+            continue; // A newly accepted task may not have committed metadata.
+        };
+        if meta.id != id || !matches!(meta.agent.as_str(), "codex" | "pi") {
+            bail!("invalid Agent task summary metadata");
+        }
+        let age = time.saturating_sub(meta.created);
+        if age > TTL_MS {
+            continue;
+        }
+        let status = state(&events(&entry.path())?, age);
+        result.push(json!({
+            "task_id":id,
+            "owner_module":"ai",
+            "kind":"ai",
+            "provider":meta.agent,
+            "title":format!("{} task", meta.agent),
+            "status":status,
+            "created_at_unix_ms":meta.created,
+            "available_actions":[],
+        }));
+    }
+    result.sort_by(|a, b| {
+        b["created_at_unix_ms"]
+            .as_u64()
+            .cmp(&a["created_at_unix_ms"].as_u64())
+    });
+    result.truncate(40);
+    Ok(result)
+}
+pub fn summaries() -> Result<Vec<Value>> {
+    summaries_from(&root()?, now()?)
+}
+
 /// Lookup is shared by HTTP and short-lived Native Host callers. The caller
 /// holds agent_options' cross-process start lock; never launch a second worker
 /// for a reused client_key.
@@ -336,6 +393,53 @@ mod tests {
         events.push(json!({"type":"task.completed"}));
         assert_eq!(state(&events, 100), "completed");
         assert_eq!(state(&events[..2], UNKNOWN_AFTER_MS + 1), "unknown");
+    }
+
+    #[test]
+    fn local_summary_uses_real_terminal_state_without_prompt_or_origin() {
+        let home = std::env::temp_dir().join(format!(
+            "local-bridge-ai-summary-{}-{}",
+            std::process::id(),
+            now().unwrap()
+        ));
+        let id = "codex-1234-a-b";
+        let dir = home.join(id);
+        private_dir(&dir).unwrap();
+        let meta = Meta {
+            id: id.into(),
+            origin: "https://private.example".into(),
+            client_key: "private-key".into(),
+            agent: "codex".into(),
+            created: now().unwrap(),
+            model: "secret-model".into(),
+            think_mode: "high".into(),
+        };
+        private_write(&dir.join("meta.json"), &serde_json::to_vec(&meta).unwrap()).unwrap();
+        append(&dir, 1, json!({"type":"task.started"})).unwrap();
+        append(
+            &dir,
+            2,
+            json!({"type":"message.final","text":"private answer"}),
+        )
+        .unwrap();
+        let rows = summaries_from(&home, meta.created + 100).unwrap();
+        assert_eq!(rows[0]["status"], "running");
+        assert_eq!(rows[0]["task_id"], id);
+        assert_eq!(rows[0]["available_actions"], json!([]));
+        for secret in [
+            "private.example",
+            "private-key",
+            "secret-model",
+            "private answer",
+        ] {
+            assert!(!rows[0].to_string().contains(secret));
+        }
+        append(&dir, 3, json!({"type":"task.completed"})).unwrap();
+        assert_eq!(
+            summaries_from(&home, meta.created + 200).unwrap()[0]["status"],
+            "completed"
+        );
+        fs::remove_dir_all(home).unwrap();
     }
     #[test]
     fn ids_reject_path_traversal() {

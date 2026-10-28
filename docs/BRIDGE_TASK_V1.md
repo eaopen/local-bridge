@@ -1,6 +1,8 @@
 # BridgeTask V1 — 跨模块任务中心合同
 
-状态：**接口与显示语义固定，任务聚合运行时尚未实现**。文件、企业应用、个人 AI 与通讯任务可以进入**第二套 Local Bridge 产品**自己的任务中心，不创建第二份文件编辑/AI 执行账本。**Bridge 通过获准的 Provider 只读展示同一份 Agent2 文件任务，绝不新建第二套文件数据目录或状态账本**；见[两套独立产品边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
+状态：**本机只读 CLI 聚合已在独立功能分支实现；Web/跨来源任务 UI、订阅与动作转发仍未实现**。文件、企业应用、个人 AI 与通讯任务可以进入**第二套 Local Bridge 产品**自己的任务中心，不创建第二份文件编辑/AI 执行账本。**Bridge 通过获准的 Provider 只读展示同一份 Agent2 文件任务，绝不新建第二套文件数据目录或状态账本**；见[两套独立产品边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
+
+**已实现的本机只读使用说明**：[任务聚合 P1](TASK_CENTER_P1.md)。CLI 汇总既有 AI/Inbox，并在本机明确指定 `--cloudfile` 时访问 Agent2 Provider 的脱敏任务摘要；不开放 Web/MCP 通用任务读取权限。CloudFile Agent2 dev 未合并 Provider P1 前，该来源如实标为不可用。
 
 ## 1. 所有权
 

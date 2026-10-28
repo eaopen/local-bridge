@@ -43,5 +43,5 @@
 
 1. 先使用现有用户日志/故障验证 Host 安装、回退行为，若有 Windows Manifest/Registry 争用再做小范围修正。
 2. 本地状态可靠性：只在发现并发更新或异常中断导致真实状态损坏时，引入统一原子写入/锁（关注 Origin grants、Agent task/Provider config）。不要一开始把所有目录迁移一遍。
-3. 任务中心只读聚合 AI/Inbox/CloudFile Provider 状态，保持各自 Owner 与真实终态/未知语义；Agent2 文件路径和 Journal 不进 Bridge。
+3. **本轮 P1 已实现本机 CLI 只读聚合**：AI/Inbox 状态以及显式 `--cloudfile` 下的 Agent2 Provider 脱敏任务。Web UI、HTTP/MCP 通用任务查询仍未交付；保持各自 Owner 与终态/未知语义，Agent2 文件路径和 Journal 不进 Bridge。见 [任务中心 P1](TASK_CENTER_P1.md)。
 4. 常驻/托盘/自启与独立签名发版按实际使用需求进入后续批次；不把“迁移公用能力”变成大型平台重构。

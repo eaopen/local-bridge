@@ -102,6 +102,14 @@ fn native_host_status_and_explicit_inbox_handoff() {
 
     let listing = command(&root, &["inbox", "list"]);
     assert_eq!(listing["items"][0]["id"], id);
+    let aggregate = command(&root, &["tasks", "list"]);
+    assert_eq!(aggregate["read_only"], true);
+    assert_eq!(aggregate["local_cli_only"], true);
+    assert_eq!(aggregate["complete"], true);
+    assert!(aggregate["items"].as_array().unwrap().iter().any(|item| {
+        item["task_id"] == id && item["owner_module"] == "inbox" && item["status"] == "needs_action"
+    }));
+    assert_eq!(aggregate["sources"][3]["state"], "not_requested");
     let item = command(&root, &["inbox", "read", id]);
     assert_eq!(item["context"]["selection"], "User-selected example text");
     let relay = send_native(
