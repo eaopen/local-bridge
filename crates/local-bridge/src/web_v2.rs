@@ -2,7 +2,7 @@
 //! Chrome must validate the real sender origin and a separate website permission.
 //! The local user grants an exact (origin, installed provider, status tool) tuple.
 //! This is not a remote-profile permission, nor generic provider.call.
-use crate::{inbox, local_http, mcp_provider, workbuddy_web};
+use crate::{agent_options, inbox, local_http, mcp_provider, workbuddy_web};
 use anyhow::{bail, Context, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
@@ -191,6 +191,22 @@ pub fn handle_native(request: &Value) -> Value {
         Some("web.v2.session.issue") if p.as_object().is_some_and(|o| o.len() == 1) => {
             local_http::issue_session(origin)
         }
+        Some("web.v2.agent.run")
+            if p.as_object()
+                .is_some_and(|o| (3..=7).contains(&o.len()) && o.contains_key("origin")) =>
+        {
+            let mut options = p.clone();
+            options.as_object_mut().unwrap().remove("origin");
+            match agent_options::from_value(&options) {
+                Ok(request) => {
+                    if request.model != "auto" || request.think_mode != "auto" {
+                        return fail("agent_option_not_supported");
+                    }
+                    agent_options::run(origin, request)
+                }
+                Err(_) => return fail("invalid_agent_options"),
+            }
+        }
         Some("web.v2.agent.start") if p.as_object().is_some_and(|o| o.len() == 4) => {
             match (
                 p["provider"].as_str(),
@@ -226,6 +242,28 @@ mod tests {
         assert!(checked("https://app.example.test", "wechat", "wechat_send_message").is_err());
         assert!(checked("https://app.example.test", "wechat", "wechat_get_messages").is_err());
         assert!(checked("https://app.example.test/path", "wechat", "wechat_status").is_err());
+    }
+    #[test]
+    fn explicit_unverified_think_mode_fails_before_workbuddy_launch() {
+        let reply = handle_native(&json!({
+            "protocol_version":2,"request_id":"agent-run-1",
+            "action":"web.v2.agent.run",
+            "payload":{"origin":"https://app.example.test",
+                "client_key":"task_123","prompt":"synthetic prompt",
+                "agent":"workbuddy","model":"auto",
+                "think_mode":"high","agent_mode":"prefer"}
+        }));
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"], "agent_option_not_supported");
+        let invalid = handle_native(&json!({
+            "protocol_version":2,"request_id":"agent-run-2",
+            "action":"web.v2.agent.run",
+            "payload":{"origin":"https://app.example.test",
+                "client_key":"task_123","prompt":"synthetic prompt",
+                "agent":"pi","model":"https://evil.example",
+                "think_mode":"auto","agent_mode":"prefer"}
+        }));
+        assert_eq!(invalid["error"], "invalid_agent_options");
     }
     #[test]
     fn browser_cannot_run_shell_or_personal_messages() {

@@ -4,7 +4,7 @@
 //! A short-lived token is created only by the trusted Native Host after an
 //! explicit local OS-user site grant. No Profile, web page, or CORS preflight
 //! can mint authorization. This service never binds to a LAN interface.
-use crate::{inbox, web_v2, workbuddy_web};
+use crate::{agent_options, inbox, web_v2, workbuddy_web};
 use anyhow::{bail, Context, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
@@ -269,6 +269,7 @@ fn reply(stream: &mut TcpStream, code: u16, origin: Option<&str>, value: &Value)
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        422 => "Unprocessable Content",
         429 => "Too Many Requests",
         503 => "Service Unavailable",
         _ => "Error",
@@ -457,6 +458,53 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
                         400,
                         Some(&req.origin),
                         &json!({"error":"invalid_tool"}),
+                    )?,
+                }
+            }
+        }
+        // Unified Agent entry point: Bridge resolves the caller's hints
+        // before any Provider task starts. Legacy WorkBuddy path unchanged.
+        ("POST", "/v2/agents/tasks") => {
+            if !req.content_type.starts_with("application/json") {
+                reply(
+                    &mut stream,
+                    400,
+                    Some(&req.origin),
+                    &json!({"error":"content_type"}),
+                )?;
+            } else {
+                match serde_json::from_slice::<Value>(&req.body)
+                    .ok()
+                    .and_then(|v| agent_options::from_value(&v).ok())
+                {
+                    Some(options) => {
+                        if options.model != "auto" || options.think_mode != "auto" {
+                            // The only currently executable Web adapter cannot
+                            // override model or reasoning config yet. Fail
+                            // explicitly instead of quietly ignoring it.
+                            reply(
+                                &mut stream,
+                                422,
+                                Some(&req.origin),
+                                &json!({"error":"agent_option_not_supported"}),
+                            )?;
+                        } else {
+                            match agent_options::run(&req.origin, options) {
+                                Ok(task) => reply(&mut stream, 202, Some(&req.origin), &task)?,
+                                Err(_) => reply(
+                                    &mut stream,
+                                    503,
+                                    Some(&req.origin),
+                                    &json!({"error":"no_authorized_compatible_agent"}),
+                                )?,
+                            }
+                        }
+                    }
+                    None => reply(
+                        &mut stream,
+                        400,
+                        Some(&req.origin),
+                        &json!({"error":"invalid_agent_options"}),
                     )?,
                 }
             }

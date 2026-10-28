@@ -90,3 +90,21 @@ The first Web V2 implementation uses the existing generic Chrome extension and i
 - Personal WeChat Provider is **optional**; only `wechat_status` can participate in this first browser slice, not `wechat_list_chats`, `wechat_get_messages`, `wechat_send_message`, or arbitrary tools. Status-only response does not imply WeChat logged in or an AI Agent run is possible.
 - V2 `profile-v2 inspect` remains offline, unauthenticated declaration/registration inspection (`trusted:false`, `activated:false`, `authorized:false`). Future trusted enrollment, full Web Agent dispatch, business-object grants, desktop shell and V1 CloudFile migration remain distinct tasks.
 - Chrome branch: [Chrome V2 draft PR](https://github.com/eaopen/local-bridge-chrome-extension/pull/4). This source path has Rust CI / Chrome Node test coverage but **not real Chrome + Native Host + Etech SSO + signed-in WeChat acceptance**.
+
+
+## Unified Agent request contract (preview.2, 2026-10-28)
+
+Agent policy is declared by the enterprise Profile; optional per-task preferences arrive through the generic Web SDK:
+
+~~~json
+{
+  "client_key": "stable-task-id",
+  "prompt": "Summarize the selected notes",
+  "agent": "workbuddy",
+  "agent_mode": "prefer",
+  "model": "auto",
+  "think_mode": "auto"
+}
+~~~
+
+agent is one of auto, workbuddy, codex, pi; agent_mode is prefer (default) or require. model is either auto or a provider-valid model identifier. think_mode is auto, off, low, medium, high, xhigh or max. Any omitted optional field defaults to auto/prefer, and Bridge is authoritative for selected_agent. A model override is an **exact constraint**; a non-auto think mode must be verifiably applied. The Bridge must not silently ignore unsupported settings or switch Agent after accepting/starting a task. Only the currently verified Web adapter is WorkBuddy text-only; other providers and explicit overrides return an unavailable error until their runtime integration is validated. ApplicationProfile does not grant local execution permissions.

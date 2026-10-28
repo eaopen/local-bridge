@@ -1,3 +1,26 @@
+export type BridgeAgent = 'auto' | 'workbuddy' | 'codex' | 'pi'
+export type BridgeThinkMode = 'auto' | 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export type BridgeAgentMode = 'prefer' | 'require'
+/** Agent, model and thinkMode are optional hints/constraints, resolved by Bridge. */
+export interface BridgeAgentRequest {
+  clientKey: string
+  prompt: string
+  agent?: BridgeAgent
+  model?: string
+  thinkMode?: BridgeThinkMode
+  agentMode?: BridgeAgentMode
+}
+export interface BridgeAgentAccepted {
+  task_id: string
+  status: string
+  selected_agent: string
+  requested_agent?: string
+  selection?: 'automatic' | 'preferred' | 'fallback_before_execution'
+  applied_model: string | null
+  applied_think_mode: BridgeThinkMode | null
+  reused?: boolean
+}
+
 /** Local Bridge Web SDK V2: build-time, version-pinned browser client. */
 export type BridgeTransport = 'direct' | 'native-fallback' | 'unavailable'
 export interface BridgeSession {
@@ -61,6 +84,9 @@ export declare class LocalBridgeWebClient {
   readonly capabilities: BridgeCapabilities | null
   connect(): Promise<BridgeConnection>
   disconnect(): void
+  runAgent(task: BridgeAgentRequest): Promise<BridgeAgentAccepted>
+  readAgent(taskId: string, cursor?: number,
+    onEvent?: (event: BridgeEvent) => void, signal?: AbortSignal): Promise<BridgeTaskPage>
   startWorkbuddy(task: {clientKey: string; prompt: string}): Promise<{
     task_id: string; status: string; reused?: boolean; provider?: string
   }>
