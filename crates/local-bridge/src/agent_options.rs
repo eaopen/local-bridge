@@ -7,7 +7,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::Path;
 use std::time::Duration;
 
 fn default_auto() -> String {
