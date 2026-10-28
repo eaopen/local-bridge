@@ -139,8 +139,10 @@ pub fn capabilities(origin: &str) -> Result<Value> {
 }
 /// Presence of a local OS-user grant; execution still rechecks an exact tool.
 pub fn has_status_grant(origin: &str) -> Result<bool> {
-    if !valid_origin(origin) { bail!("invalid site origin"); }
-    Ok(load()?.iter().any(|grant|grant.origin==origin))
+    if !valid_origin(origin) {
+        bail!("invalid site origin");
+    }
+    Ok(load()?.iter().any(|grant| grant.origin == origin))
 }
 pub fn status_tool(origin: &str, provider: &str, tool: &str) -> Result<Value> {
     checked(origin, provider, tool)?;
