@@ -33,16 +33,16 @@ fn load() -> Result<Vec<Grant>> {
         bail!("invalid Agent grant file");
     }
     let grants: Vec<Grant> = serde_json::from_slice(&fs::read(p)?)?;
-    if grants.len() > 96
-        || grants.iter().any(|g| check(&g.origin, &g.agent).is_err())
-    {
+    if grants.len() > 96 || grants.iter().any(|g| check(&g.origin, &g.agent).is_err()) {
         bail!("invalid Agent grants");
     }
     Ok(grants)
 }
 fn save(grants: &[Grant]) -> Result<()> {
     let p = path()?;
-    let dir = p.parent().ok_or_else(|| anyhow::anyhow!("invalid grant directory"))?;
+    let dir = p
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("invalid grant directory"))?;
     fs::create_dir_all(dir)?;
     #[cfg(unix)]
     {
@@ -72,7 +72,9 @@ pub fn allowed(origin: &str, agent: &str) -> Result<bool> {
     if agent == "workbuddy" && workbuddy_web::allowed(origin)? {
         return Ok(true);
     }
-    Ok(load()?.iter().any(|g| g.origin == origin && g.agent == agent))
+    Ok(load()?
+        .iter()
+        .any(|g| g.origin == origin && g.agent == agent))
 }
 pub fn any(origin: &str) -> Result<bool> {
     if !valid_origin(origin) {
@@ -89,7 +91,10 @@ pub fn grant(origin: &str, agent: &str) -> Result<Value> {
         return workbuddy_web::grant(origin);
     }
     let mut grants = load()?;
-    if !grants.iter().any(|g| g.origin == origin && g.agent == agent) {
+    if !grants
+        .iter()
+        .any(|g| g.origin == origin && g.agent == agent)
+    {
         if grants.len() >= 96 {
             bail!("too many Agent grants");
         }
