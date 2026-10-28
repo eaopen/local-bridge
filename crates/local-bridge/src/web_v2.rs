@@ -237,7 +237,7 @@ mod tests {
             "protocol_version":2,"request_id":"agent-run-1",
             "action":"web.v2.agent.run",
             "payload":{"origin":"https://app.example.test",
-                "client_key":"task_123","prompt":"synthetic prompt",
+                "api_version":2,"client_key":"task_123","prompt":"synthetic prompt",
                 "agent":"workbuddy","model":"auto",
                 "think_mode":"high","agent_mode":"prefer"}
         }));
@@ -247,7 +247,7 @@ mod tests {
             "protocol_version":2,"request_id":"agent-run-2",
             "action":"web.v2.agent.run",
             "payload":{"origin":"https://app.example.test",
-                "client_key":"task_123","prompt":"synthetic prompt",
+                "api_version":2,"client_key":"task_123","prompt":"synthetic prompt",
                 "agent":"pi","model":"https://evil.example",
                 "think_mode":"auto","agent_mode":"prefer"}
         }));
