@@ -338,8 +338,15 @@ mod tests {
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
-        for arg in ["--print", "--no-tools", "--no-session", "--no-extensions",
-                    "--no-context-files", "--provider", "--model"] {
+        for arg in [
+            "--print",
+            "--no-tools",
+            "--no-session",
+            "--no-extensions",
+            "--no-context-files",
+            "--provider",
+            "--model",
+        ] {
             assert!(args.iter().any(|a| a == arg), "missing Pi option {arg}");
         }
         assert!(!args.iter().any(|a| a == "--api-key"));

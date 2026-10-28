@@ -102,9 +102,7 @@ fn run() -> Result<()> {
             };
             println!("{}", output);
         }
-        [x, agent_name, model_provider, model_id, prompt]
-            if x == "agent" && agent_name == "pi" =>
-        {
+        [x, agent_name, model_provider, model_id, prompt] if x == "agent" && agent_name == "pi" => {
             // User explicitly selects Pi's model; Pi owns the credentials.
             // Do not silently route to Codex, 9Router, or a Web AI session.
             let input = if prompt == "-" {
