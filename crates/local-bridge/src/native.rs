@@ -19,6 +19,24 @@ const HOST_NAME: &str = "com.eaopen.browser_bridge";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct RelaySource {
+    title: String,
+    url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RelayReturn {
+    relay_id: String,
+    #[serde(default)]
+    task_ref: String,
+    web_ai: String,
+    source: RelaySource,
+    reply: BrowserContext,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BrowserContext {
     title: String,
     url: String,
@@ -64,6 +82,45 @@ fn validate_context(value: &Value) -> Result<Value> {
     }))
 }
 
+fn validate_relay(value: &Value) -> Result<(Value, Value)> {
+    if serde_json::to_vec(value)?.len() > 64 * 1024 {
+        bail!("payload_too_large");
+    }
+    let raw: RelayReturn = serde_json::from_value(value.clone()).context("invalid_relay")?;
+    if raw.relay_id.len() != 36
+        || !raw.relay_id.starts_with("rel-")
+        || !raw.relay_id[4..].bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        bail!("invalid_relay_id");
+    }
+    if raw.web_ai.is_empty()
+        || raw.web_ai.len() > 32
+        || !raw.web_ai.bytes().all(|b| b.is_ascii_lowercase() || b == b'-')
+    {
+        bail!("invalid_provider_name");
+    }
+    if raw.task_ref.len() > 96
+        || !raw.task_ref.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b':' | b'.' | b'-' | b'_'))
+    {
+        bail!("invalid_task_ref");
+    }
+    let source = validate_context(&json!({
+        "title":raw.source.title,"url":raw.source.url,"selection":"source"
+    }))?;
+    let reply = validate_context(&json!({
+        "title":raw.reply.title,
+        "url":raw.reply.url,
+        "selection":raw.reply.selection
+    }))?;
+    let relation = json!({
+        "relay_id":raw.relay_id,
+        "task_ref":raw.task_ref,
+        "web_ai":raw.web_ai,
+        "source":{"title":source["title"],"url":source["url"]}
+    });
+    Ok((reply, relation))
+}
+
 pub fn handle(request: &Value) -> Value {
     handle_with_summary(request, agent::run_codex)
 }
@@ -90,7 +147,7 @@ fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Valu
                 "provider":"local-bridge",
                 "connected_to_local_bridge":true,
                 "native_protocol":1,
-                "capabilities":["host.status","context.share","context.summarize"],
+                "capabilities":["host.status","context.share","context.summarize","relay.return"],
                 "handoff":"local-inbox",
                 "ai_run_supported":true,
                 "ai_run_enabled":false,
@@ -119,6 +176,33 @@ fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Valu
                     }
                 }),
                 Err(_) => failure("local_inbox_unavailable"),
+            }
+        }
+        Some("relay.return") => {
+            // A human-selected Web AI reply is DATA, not a tool call.
+            // Store it in the existing inbox with an optional task reference.
+            let Some(payload) = request.get("payload") else {
+                return failure("invalid_relay");
+            };
+            let Ok((reply, relation)) = validate_relay(payload) else {
+                return failure("invalid_relay");
+            };
+            match inbox::save_relay(reply, relation.clone()) {
+                Ok(task_id) => json!({
+                    "protocol_version":1,"request_id":id,"ok":true,
+                    "result":{
+                        "provider":"local-bridge",
+                        "received":true,
+                        "stored":true,
+                        "forwarded":false,
+                        "status":"received",
+                        "task_id":task_id,
+                        "relay_id":relation["relay_id"],
+                        "related_task_ref":relation["task_ref"],
+                        "note":"Web AI reply stored for human review; no local tool was executed."
+                    }
+                }),
+                Err(_) => failure("local_inbox_unavailable")
             }
         }
         Some("context.summarize") => {
@@ -363,6 +447,31 @@ mod tests {
         );
         assert_eq!(failed["ok"], false);
         assert_eq!(failed["error"], "agent_unavailable_or_failed");
+    }
+
+    #[test]
+    fn relay_return_requires_typed_manual_reply() {
+        let good = json!({
+            "relay_id":"rel-0123456789abcdef0123456789abcdef",
+            "task_ref":"ctx-abcdef012345",
+            "web_ai":"chatgpt",
+            "source":{"title":"Original task","url":"https://example.org/article"},
+            "reply":{"title":"ChatGPT","url":"https://chatgpt.com",
+                     "selection":"Proposed steps (not executed)."}
+        });
+        let (reply, relation) = validate_relay(&good).unwrap();
+        assert_eq!(reply["selection"], "Proposed steps (not executed).");
+        assert_eq!(relation["task_ref"], "ctx-abcdef012345");
+        assert_eq!(relation["source"]["url"], "https://example.org/article");
+        let mut bad = good.clone();
+        bad["reply"]["url"] = json!("https://chatgpt.com/?token=secret");
+        assert!(validate_relay(&bad).is_err());
+        bad = good.clone();
+        bad["relay_id"] = json!("../secrets");
+        assert!(validate_relay(&bad).is_err());
+        bad = good.clone();
+        bad["task_ref"] = json!("../secret");
+        assert!(validate_relay(&bad).is_err());
     }
 
     #[test]
