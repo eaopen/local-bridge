@@ -93,6 +93,15 @@ cargo run -p local-bridge -- agent codex "Summarize the current working director
 printf 'Meeting notes...' | cargo run -p local-bridge -- agent codex -
 ```
 
+**可选 CodeBuddy Code CLI（不同于 WorkBuddy Desktop GUI）：** 已安装 CodeBuddy Code 且用户自行登录相同 Buddy 账号后，可显式调用本机 CLI，复用官方共享的 WorkBuddy/CodeBuddy 积分，不需要把 WorkBuddy 桌面凭据复制给 Bridge：
+
+```sh
+local-bridge agent codebuddy "请只回复 LOCAL_BRIDGE_OK"
+printf '整理以下经过用户确认的网页内容：...\n' | local-bridge agent codebuddy -
+```
+
+此入口只做真实的一次性文本 Agent 运行并解析 CLI 的最终 JSON；**不启用文件、命令或 MCP 工具执行**，不使用 `-y`，不开放给任意网页，且不会自动安装/登录。CodeBuddy CLI 需**单独登录一次**（同账号积分共享，但登录态、桌面 Skills、专家、会话和 GUI 权限不共享）。**尚未在带 WorkBuddy 的目标电脑上实机验收**，不能声称 Bridge 已能驱动 WorkBuddy Desktop 的普通任务。后者继续通过官方 Local Assistant API 或用户授权 GUI 适配单独验收。
+
 Configure the first optional CloudFile integration **locally** (not from an AI prompt):
 
 ```bash
