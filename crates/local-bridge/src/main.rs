@@ -3,7 +3,8 @@ mod mcp;
 
 use anyhow::{bail, Context, Result};
 use local_bridge::{
-    agent, agent_grants, agent_task, inbox, local_http, mcp_provider, native, web_v2, workbuddy, workbuddy_web,
+    agent, agent_grants, agent_task, inbox, local_http, mcp_provider, native, web_v2, workbuddy,
+    workbuddy_web,
 };
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::profile_v2::{validate_profile_v2_shape, ApplicationProfileV2};
