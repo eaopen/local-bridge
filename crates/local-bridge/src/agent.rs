@@ -191,6 +191,128 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
     }))
 }
 
+/// The user chooses one *already configured* Pi model. Local Bridge does
+/// not own API keys, manage provider routes, or convert Web Chat into an API.
+/// V1 only returns model text; there are deliberately no filesystem/shell tools.
+fn pi_id(value: &str, allow_slash: bool) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && !value.starts_with('-')
+        && !value.contains("..")
+        && value.bytes().all(|b| {
+            b.is_ascii_alphanumeric()
+                || matches!(b, b'-' | b'_' | b'.' | b':')
+                || (allow_slash && b == b'/')
+        })
+}
+
+fn pi_command(provider: &str, model: &str) -> Result<Command> {
+    if !pi_id(provider, false) || !pi_id(model, true) {
+        bail!("invalid Pi provider or model ID");
+    }
+    let mut command = Command::new("pi");
+    command.args([
+        "--print",
+        "--no-session",
+        "--no-tools",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+        "--no-approve",
+        "--provider",
+        provider,
+        "--model",
+        model,
+    ]);
+    // Piped stdin avoids turning user text into Pi @file command-line arguments.
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    Ok(command)
+}
+
+/// One explicit, text-only Pi task. Pi itself resolves the chosen provider's
+/// API key or OAuth from its own login/configuration. Missing auth is an error,
+/// not an automatic switch to a different provider or a web-chat quota.
+pub fn run_pi(provider: &str, model: &str, prompt: &str) -> Result<Value> {
+    if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
+        bail!("Pi prompt must contain 1..65536 bytes of text");
+    }
+    let mut child = pi_command(provider, model)?
+        .spawn()
+        .context("Pi CLI unavailable; install Pi and configure a model with pi /login")?;
+    let stdout = child.stdout.take().context("Pi stdout unavailable")?;
+    let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
+        let mut output = Vec::new();
+        let mut stream = stdout;
+        let mut buffer = [0_u8; 8192];
+        let mut too_large = false;
+        loop {
+            let n = stream.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            if !too_large {
+                if output.len() + n > MAX_EVENTS {
+                    output.clear();
+                    too_large = true;
+                } else {
+                    output.extend_from_slice(&buffer[..n]);
+                }
+            }
+        }
+        Ok((!too_large).then_some(output))
+    });
+    let sent = child
+        .stdin
+        .take()
+        .context("Pi stdin unavailable")?
+        .write_all(prompt.as_bytes());
+    if sent.is_err() {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = reader.join();
+        bail!("Pi could not accept the prompt");
+    }
+    let deadline = Instant::now() + RUN_TIMEOUT;
+    let status = loop {
+        if let Some(status) = child.try_wait().context("Pi process status unavailable")? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = reader.join();
+            bail!("Pi timed out; result not confirmed and no automatic retry was made");
+        }
+        thread::sleep(Duration::from_millis(100));
+    };
+    let bytes = reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("Pi output reader failed"))??
+        .context("Pi response exceeded size limit")?;
+    if !status.success() {
+        bail!("Pi did not complete; check the selected model and Pi's own /login or API key configuration");
+    }
+    let text = std::str::from_utf8(&bytes).context("Pi output was not UTF-8")?;
+    if text.trim().is_empty() {
+        bail!("Pi exited without a confirmed text response");
+    }
+    Ok(json!({
+        "source":"local-cli",
+        "owner_module":"ai.pi",
+        "provider":provider,
+        "model":model,
+        "status":"completed",
+        "result":text.trim(),
+        "tools_enabled":false,
+        "session_persisted":false,
+        "persisted_by_bridge":false
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +329,24 @@ mod tests {
         if std::path::Path::new("/opt/homebrew/bin").is_dir() {
             assert!(dirs.contains(&std::path::PathBuf::from("/opt/homebrew/bin")));
         }
+    }
+
+    #[test]
+    fn pi_fallback_requires_explicit_safe_model_and_disables_local_tools() {
+        let command = pi_command("deepseek", "deepseek-flash").unwrap();
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        for arg in ["--print", "--no-tools", "--no-session", "--no-extensions",
+                    "--no-context-files", "--provider", "--model"] {
+            assert!(args.iter().any(|a| a == arg), "missing Pi option {arg}");
+        }
+        assert!(!args.iter().any(|a| a == "--api-key"));
+        assert!(pi_command("--malicious", "model").is_err());
+        assert!(pi_command("deepseek", "--dangerous").is_err());
+        assert!(pi_command("deepseek", "../secret").is_err());
+        assert!(pi_command("deepseek", "deepseek-v4-pro").is_ok());
     }
 
     #[test]
