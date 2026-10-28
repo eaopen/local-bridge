@@ -90,9 +90,7 @@ fn token_file(token: &str) -> Result<PathBuf> {
 
 /// Invoked by Chrome's trusted Native Host once per page; never by HTTP.
 pub fn issue_session(origin: &str) -> Result<Value> {
-    if !valid_origin(origin)
-        || !(agent_grants::any(origin)? || web_v2::has_status_grant(origin)?)
-    {
+    if !valid_origin(origin) || !(agent_grants::any(origin)? || web_v2::has_status_grant(origin)?) {
         bail!("OS user has not permitted this site to use local capabilities");
     }
     let endpoint = advertised_endpoint()?;
@@ -494,17 +492,15 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
                     .ok()
                     .and_then(|v| agent_options::from_value(&v).ok())
                 {
-                    Some(options) => {
-                        match agent_options::run(&req.origin, options) {
-                            Ok(task) => reply(&mut stream, 202, Some(&req.origin), &task)?,
-                            Err(_) => reply(
-                                &mut stream,
-                                503,
-                                Some(&req.origin),
-                                &json!({"error":"no_authorized_compatible_agent"}),
-                            )?,
-                        }
-                    }
+                    Some(options) => match agent_options::run(&req.origin, options) {
+                        Ok(task) => reply(&mut stream, 202, Some(&req.origin), &task)?,
+                        Err(_) => reply(
+                            &mut stream,
+                            503,
+                            Some(&req.origin),
+                            &json!({"error":"no_authorized_compatible_agent"}),
+                        )?,
+                    },
                     None => reply(
                         &mut stream,
                         400,
