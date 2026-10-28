@@ -72,7 +72,7 @@ impl EnterprisePiSession {
         Self::from_values(&base, &model, &token)
     }
 
-    fn from_values(base: &str, model: &str, token: &str) -> Result<Self> {
+    pub(crate) fn from_values(base: &str, model: &str, token: &str) -> Result<Self> {
         check_endpoint(base)?;
         if !valid_model(model) {
             bail!("enterprise AI model identifier is invalid");

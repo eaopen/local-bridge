@@ -270,6 +270,26 @@ pub fn run_pi_enterprise(prompt: &str) -> Result<Value> {
     Ok(result)
 }
 
+/// Trusted Web caller's enterprise backend supplies a short-lived bearer.
+/// A Web page cannot call this directly: the registered Chrome extension must
+/// verify its own sender origin and a separate site-specific AI grant first.
+pub fn run_pi_enterprise_ticket(
+    base_url: &str,
+    model: &str,
+    token: &str,
+    prompt: &str,
+) -> Result<Value> {
+    let binding = pi_enterprise::EnterprisePiSession::from_values(base_url, model, token)?;
+    let mut command = pi_command(pi_enterprise::PROVIDER, &binding.model)?;
+    command
+        .env("PI_CODING_AGENT_DIR", &binding.agent_dir)
+        .env(pi_enterprise::TOKEN_ENV, token)
+        .env("PI_OFFLINE", "1");
+    let mut result = run_pi_command(command, pi_enterprise::PROVIDER, &binding.model, prompt)?;
+    result["model_source"] = json!("enterprise_session");
+    Ok(result)
+}
+
 fn run_pi_command(
     mut command: Command,
     provider: &str,

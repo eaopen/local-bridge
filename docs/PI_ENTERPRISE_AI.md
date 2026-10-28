@@ -42,3 +42,11 @@ The independent [Chrome Web AI Relay](https://github.com/eaopen/local-bridge-chr
 **Do not create a background ChatGPT Web scraper, headless consumer-chat API, cookie exporter or free-quota bypass.** Where a service offers a supported API, use it with the appropriate authorization. Where it does not, expose `needs_action` and a low-friction user handoff, rather than marking Pi ready when the model is unavailable.
 
 The feature is optional. Normal Codex/WorkBuddy, Pi with the user's own models, CloudFile Agent2, and an extension-only Relay continue to work independently.
+
+## Optional trusted Web entry (separately approved)
+
+A generic, previously authenticated enterprise Web app can offer the `enterprise.pi.run` capability **only after** the user has separately enabled **local enterprise AI** for that exact Web origin in the Chrome extension. Read-only website discovery permission alone must not silently become a model execution grant. The Web app backend must independently authorize the model, current user and operation and issue a short-lived scoped ticket.
+
+The Chrome service worker derives the approved `origin` from Chrome's reported sender. A Web request may specify only a **same-origin relative** `api_path`, a model ID, a bounded prompt and the short-lived enterprise ticket. Local Bridge rejects an external HTTP API URL, path escape, absent ticket or untrusted origin. It runs Pi without local tools and sends back an actual completed text result or an error. The Chrome extension never reads browser cookies, chooses an arbitrary executable or hands permanent API keys to Pi.
+
+This avoids requiring the user to configure a separate Pi model account. The browser permission and native host installation remain explicit prerequisites. A legitimate enterprise AI endpoint must offer OpenAI-compatible streaming on the approved Web origin (or be proxied there by the enterprise server). **No specific enterprise application's endpoint or SSO has been tested**; the reference contract must be integrated with its backend and checked end to end before calling it production ready.
