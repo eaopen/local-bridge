@@ -3,8 +3,8 @@ mod mcp;
 
 use anyhow::{bail, Context, Result};
 use local_bridge::{
-    agent, agent_grants, agent_task, inbox, local_http, mcp_provider, native, web_v2, workbuddy,
-    workbuddy_web,
+    agent, agent_grants, agent_task, diagnostics, inbox, local_http, mcp_provider, native,
+    native_host_registration, web_v2, workbuddy, workbuddy_web,
 };
 use local_bridge_core::profile::{validate_profile_shape, ApplicationProfile};
 use local_bridge_core::profile_v2::{validate_profile_v2_shape, ApplicationProfileV2};
@@ -33,6 +33,13 @@ fn run() -> Result<()> {
                     "capabilities":AVAILABLE_CAPABILITIES
                 })
             );
+        }
+        [x] if x == "self-test" => {
+            let result = diagnostics::run();
+            println!("{result}");
+            if result["ok"] != true {
+                bail!("Local Bridge self-test reported failed checks");
+            }
         }
         [x] if x == "mcp" => mcp::serve()?,
         [x, action, id, executable, fixed_args @ ..] if x == "provider" && action == "add" => {
@@ -76,6 +83,15 @@ fn run() -> Result<()> {
         }
         [a, action, origin] if a == "web-v2" && action == "capabilities" => {
             println!("{}", web_v2::capabilities(origin)?);
+        }
+        [x, action] if x == "native-host" && action == "status" => {
+            println!("{}", native_host_registration::status()?);
+        }
+        [x, action] if x == "native-host" && action == "uninstall" => {
+            println!("{}", native_host_registration::uninstall_host()?);
+        }
+        [x, action] if x == "native-host" && action == "rollback" => {
+            println!("{}", native_host_registration::rollback_host()?);
         }
         [x, action, id] if x == "native-host" && action == "install" => {
             println!("{}", native::install_host(id, false)?);
@@ -250,7 +266,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host install <extension-id> [--replace] | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 serve | web-v2 grant-agent <origin> <workbuddy|codex|pi> | web-v2 revoke-agent <origin> <workbuddy|codex|pi> | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
+                "Local Bridge {}\nCommands: status | mcp | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host status|uninstall|rollback | native-host install <extension-id> [--replace] | self-test | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 serve | web-v2 grant-agent <origin> <workbuddy|codex|pi> | web-v2 revoke-agent <origin> <workbuddy|codex|pi> | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

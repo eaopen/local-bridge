@@ -10,6 +10,21 @@
 
 > **当前实现：0.1.0 核心及后续最小接线。** 已有只读 MCP Server、离线 Profile 校验、本机显式 Codex CLI run、Chrome Native Host/手动网页收件箱，以及用户注册的 MCP Client（已与独立 WeChat Provider 完成不涉及账号的协议联动）。**尚未交付**真实 Chrome/微信桌面实机验收、可信企业 SSO/Web 动作、PersonalProfile 运行时、双向通讯自动订阅、通用 BridgeTask 运行时或 CloudFile 文件编辑接管。现有文件编辑仍由 [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2) 负责。
 
+## Native Host lifecycle (user-level, optional)
+
+Borrowing the **reversible installer/diagnostic pattern** from CloudFile Agent2 without importing its file engine or Tauri:
+
+```sh
+local-bridge self-test                         # JSON: local data, Host manifest, MCP registry
+local-bridge native-host status                # inspect only this Bridge Host
+local-bridge native-host install <extension-id> # first installation; user-level
+local-bridge native-host install <extension-id> --replace # preserves previous manifest
+local-bridge native-host rollback              # restore the previous manifest
+local-bridge native-host uninstall             # only removes this Bridge Host
+```
+
+These operations use **`com.eaopen.browser_bridge` only**. The original CloudFile Chrome Host, Agent2 file data/Journal/Guard and Tauri remain untouched. `self-test` reports optional/unconfigured items without treating them as broken and does **not** verify a real Chrome GUI, Agent login or CloudFile file edit. See [Native Host lifecycle and next common-capability slices](docs/LOCAL_FOUNDATION_MIGRATION.md).
+
 ## 为什么需要 Local Bridge
 
 同一台电脑上，企业 Web、个人微信等通讯、CloudFile、Office/CAD 和已有 Codex/WorkBuddy/Pi 往往各自工作，用户要反复复制消息、下载文件、切窗口和重新登录。
