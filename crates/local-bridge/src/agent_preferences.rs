@@ -192,8 +192,10 @@ mod tests {
     }
     #[test]
     fn bad_policy_is_rejected_without_weakening_existing_authorization() {
-        let mut p = AgentPreferences::default();
-        p.priority = vec!["codex".into(), "codex".into(), "pi".into()];
+        let mut p = AgentPreferences {
+            priority: vec!["codex".into(), "codex".into(), "pi".into()],
+            ..Default::default()
+        };
         assert!(p.validate().is_err());
         p = AgentPreferences::default();
         p.agent = "workbuddy".into();
@@ -220,8 +222,10 @@ mod tests {
         let root = std::env::temp_dir().join(name);
         let path = root.join("agent-preferences-v1.json");
         assert_eq!(load_from(&path).unwrap(), AgentPreferences::default());
-        let mut p = AgentPreferences::default();
-        p.priority = vec!["pi".into(), "codex".into(), "workbuddy".into()];
+        let p = AgentPreferences {
+            priority: vec!["pi".into(), "codex".into(), "workbuddy".into()],
+            ..Default::default()
+        };
         save_to(&path, &p).unwrap();
         assert_eq!(load_from(&path).unwrap(), p);
         fs::write(&path, b"broken").unwrap();
