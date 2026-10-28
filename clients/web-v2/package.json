@@ -1,6 +1,6 @@
 {
   "name": "@eaopen/local-bridge-web-client",
-  "version": "2.0.0-preview.1",
+  "version": "2.0.0-preview.2",
   "private": true,
   "description": "Zero-dependency Web V2 client for Local Bridge loopback HTTP/SSE and Chrome bootstrap",
   "type": "module",

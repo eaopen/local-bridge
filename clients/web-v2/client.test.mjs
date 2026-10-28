@@ -54,7 +54,7 @@ function streamReply(frames) {
 }
 
 test('SDK is a build-time, versioned, zero-dependency ESM browser client',()=>{
-  assert.equal(CLIENT_VERSION,'2.0.0-preview.1')
+  assert.equal(CLIENT_VERSION,'2.0.0-preview.2')
 })
 test('one Chrome bootstrap then direct HTTP capabilities and MCP data',async()=>{
   const {page,calls}=browser(req=>({
@@ -172,4 +172,75 @@ test('fixed loopback, capability and task validation block arbitrary URLs and to
   await assert.rejects(()=>client.mcpStatus('wechat','wechat_send_message'),/invalid_mcp_status/)
   await assert.rejects(()=>client.startWorkbuddy({clientKey:'../../',prompt:'hi'}),/invalid_client_key/)
   await assert.rejects(()=>client.pollWorkbuddy('../unscoped',0),/invalid_task_id/)
+})
+
+test('unified runAgent defaults selectors, Bridge decides actual Agent',async()=>{
+  const {page,calls}=browser(req=>({ok:true,
+    result:req.action==='local.connect'?SESSION:{status:'accepted',task_id:TASK,
+      selected_agent:'workbuddy',requested_agent:req.params.agent,
+      selection:'fallback_before_execution',applied_model:null,applied_think_mode:null}}))
+  const requests=[]
+  const bridge=createLocalBridgeClient({page,fetchImpl:async(url,options)=>{
+    if(url.endsWith('/v2/capabilities')) return jsonResponse(capabilities())
+    if(url.endsWith('/v2/agents/tasks')){
+      const body=JSON.parse(options.body)
+      requests.push(body)
+      return jsonResponse({task_id:TASK,status:'accepted',selected_agent:'workbuddy',
+        selection:'fallback_before_execution',applied_model:null,applied_think_mode:null},202)
+    }
+    throw Error('unexpected URL')
+  }})
+  await bridge.connect()
+  const output=await bridge.runAgent({clientKey:'abc_123',prompt:'Synthetic only',
+    agent:'codex',agentMode:'prefer'})
+  assert.equal(output.selected_agent,'workbuddy')
+  assert.deepEqual(requests[0],{client_key:'abc_123',prompt:'Synthetic only',
+    agent:'codex',model:'auto',think_mode:'auto',agent_mode:'prefer'})
+  assert.equal(calls.filter(x=>x.action==='agent.run').length,0)
+})
+test('unified Agent options never silently downgrade a rejected model or thinkMode',async()=>{
+  const {page,calls}=browser(req=>({ok:true,
+    result:req.action==='local.connect'?SESSION:capabilities()}))
+  const bridge=createLocalBridgeClient({page,fetchImpl:async(url)=>{
+    if(url.endsWith('/v2/capabilities')) return jsonResponse(capabilities())
+    if(url.endsWith('/v2/agents/tasks'))
+      return jsonResponse({error:'agent_option_not_supported'},422)
+    throw Error(url)
+  }})
+  await bridge.connect()
+  await assert.rejects(()=>bridge.runAgent({
+    clientKey:'abc_234',prompt:'Synthetic',thinkMode:'high'
+  }),/local_http_422/)
+  assert.equal(calls.filter(x=>x.action==='agent.run').length,0)
+  for(const bad of [
+    {agent:'shell'}, {model:'https://x/?token=y'}, {thinkMode:'infinite'},
+    {agent:'auto',agentMode:'require'}, {shell:'rm -rf .'}
+  ]) {
+    await assert.rejects(()=>bridge.runAgent({
+      clientKey:'safe_task',prompt:'Synthetic',...bad
+    }),/invalid_agent_options/)
+  }
+})
+test('unified Agent fallback preserves exact options and clientKey',async()=>{
+  const {page,calls}=browser(req=>({ok:true,
+    result:req.action==='local.connect'?SESSION:
+      {task_id:TASK,status:'accepted',selected_agent:'workbuddy',
+        applied_model:null,applied_think_mode:null}}))
+  const bridge=createLocalBridgeClient({page,fetchImpl:async(url)=>{
+    if(url.endsWith('/v2/capabilities'))return jsonResponse(capabilities())
+    if(url.endsWith('/v2/agents/tasks'))
+      throw new TypeError('connection reset after task accepted')
+    throw Error(url)
+  }})
+  await bridge.connect()
+  const task=await bridge.runAgent({clientKey:'idempotent-1',prompt:'Short synthetic',
+    agent:'pi',agentMode:'prefer'})
+  assert.equal(task.selected_agent,'workbuddy')
+  const fallback=calls.find(x=>x.action==='agent.run')
+  assert.equal(fallback.params.client_key,'idempotent-1')
+  assert.equal(fallback.params.agent,'pi')
+  assert.equal(fallback.params.model,'auto')
+  assert.equal(fallback.params.think_mode,'auto')
+  assert.equal(fallback.params.agent_mode,'prefer')
+  assert.equal(bridge.mode,'native-fallback')
 })

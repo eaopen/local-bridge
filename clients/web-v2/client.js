@@ -6,7 +6,7 @@
  * Chrome: one-time trusted Origin + session bootstrap, compatibility fallback.
  * Bridge: primary HTTP / SSE data plane and MCP/Agent task authority.
  */
-export const CLIENT_VERSION = '2.0.0-preview.1'
+export const CLIENT_VERSION = '2.0.0-preview.2'
 export const WEB_CHANNEL = 'local-tool-bridge:web:v2'
 const LOOPBACK = 'http://127.0.0.1:48293'
 const DEFAULT_TIMEOUT = 3500
@@ -57,6 +57,34 @@ function urlFor(session, path) {
 function validMcp(provider, tool) {
   return typeof provider === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(provider) &&
     typeof tool === 'string' && /^(?:status|[A-Za-z0-9._-]{1,56}_status)$/.test(tool)
+}
+
+const AGENTS = new Set(['auto','workbuddy','codex','pi'])
+const THINK_MODES = new Set(['auto','off','low','medium','high','xhigh','max'])
+
+function agentRequest(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options))
+    throw new LocalBridgeError('invalid_agent_options')
+  if (Object.keys(options).some(k =>
+    !['clientKey','prompt','agent','model','thinkMode','agentMode'].includes(k)))
+    throw new LocalBridgeError('invalid_agent_options')
+  const {clientKey, prompt, agent='auto', model='auto',
+    thinkMode='auto', agentMode='prefer'} = options
+  requireClientKey(clientKey)
+  if (typeof prompt !== 'string' || !prompt.trim() ||
+      new TextEncoder().encode(prompt).length > 12000)
+    throw new LocalBridgeError('invalid_agent_prompt')
+  if (!AGENTS.has(agent) ||
+      !['prefer','require'].includes(agentMode) ||
+      (agent === 'auto' && agentMode === 'require') ||
+      typeof model !== 'string' || model.length < 1 || model.length > 128 ||
+      !/^[A-Za-z0-9_./:-]+$/.test(model) ||
+      !THINK_MODES.has(thinkMode))
+    throw new LocalBridgeError('invalid_agent_options')
+  return {
+    client_key:clientKey, prompt, agent, model,
+    think_mode:thinkMode, agent_mode:agentMode
+  }
 }
 
 /** Chrome ContentScript/ServiceWorker handles sender.origin; page cannot choose it. */
@@ -211,6 +239,33 @@ export class LocalBridgeWebClient {
     this.session = null
     this.mode = 'unavailable'
     this.capabilities = null
+  }
+  /**
+   * Provider-neutral Agent API. Bridge selects the actual ready Provider.
+   * agent is a preference, unless agentMode=require. An explicit model or
+   * thinkMode must be honored or rejected by Bridge, never silently ignored.
+   * The current Web runtime executes WorkBuddy only; other adapters follow.
+   */
+  async runAgent(options) {
+    const req = agentRequest(options)
+    if (this.session && this.mode === 'direct') {
+      try {
+        return await directJson(this.session, '/v2/agents/tasks',
+          {method:'POST', body:JSON.stringify(req)}, this.fetchImpl)
+      } catch (e) {
+        // Server rejections must never be converted into a new Agent request
+        // through another channel. Only transport breakage may use fallback,
+        // preserving the exact same client key and options.
+        if (e.code && e.code.startsWith('local_http_')) throw e
+        this.mode = 'native-fallback'
+      }
+    }
+    return this.requestChrome('agent.run', req)
+  }
+  // Multi-event reads currently use WorkBuddy task IDs. Keep the semantic
+  // alias until additional adapters and their event types are available.
+  async readAgent(taskId, cursor = 0, onEvent = () => {}, signal) {
+    return this.readWorkbuddy(taskId, cursor, onEvent, signal)
   }
   async startWorkbuddy({clientKey, prompt}) {
     requireClientKey(clientKey)

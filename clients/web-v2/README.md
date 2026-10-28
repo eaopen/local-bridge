@@ -51,3 +51,29 @@ Source: `clients/web-v2/client.js` and `client.d.ts`. No external runtime depend
 **No duplicate protocol:** the SDK exports `chromeRequest`, `directJson` and `directStream` for compatibility, and `createLocalBridgeClient()` for the recommended high-level API. Do not implement a competing Origin/token/SSE parser in Etech.
 
 **Deferred:** generic Agent Provider discovery/routing and WorkBuddy production Adapter, Windows/Mac installed-client E2E, WebSocket for interactive tool approval, desktop wrapper UI, CloudFile V1 migration. HTTP/SSE handles current one-way multi-message outputs.
+
+
+## Unified Agent API (preview.2)
+
+The Web client uses one Agent method for all providers. The execution choice is made in Local Bridge, never in enterprise Web application code:
+
+~~~js
+const task = await bridge.runAgent({
+  clientKey: 'a-stable-idempotency-key',
+  prompt: 'Summarize the selected document',
+  agent: 'workbuddy',   // optional preference; default 'auto'
+  agentMode: 'prefer',  // optional 'prefer' | 'require'
+  model: 'auto',        // optional exact model ID or 'auto'
+  thinkMode: 'auto'     // optional: auto/off/low/medium/high/xhigh/max
+})
+// task.selected_agent is authoritative, not the requested agent.
+// task.applied_model / applied_think_mode are null until verified.
+const updates = await bridge.readAgent(task.task_id, 0, onAgentEvent)
+~~~
+
+Semantics:
+- Missing agent uses the ApplicationProfile policy order and only currently available/authorized/compatible local adapters. Specifying an agent with agentMode=prefer raises its priority, but Bridge may select another ready adapter **before submission**. agentMode=require fails if the chosen provider is unavailable. The application does not maintain vendor-specific routing.
+- Missing model/thinkMode asks the selected Provider to use its existing defaults. An explicitly selected model is an **exact constraint**, not a suggestion to silently switch models; an explicit reasoning level must be verifiably applied or be rejected. The actual model and think mode, if known, should appear in the returned applied fields; null means unverified provider defaults.
+- clientKey is required and remains unchanged across HTTP errors and the Chrome Native fallback. Once accepted, fail/unknown never triggers automatic cross-provider retry. The same task_id/cursor is used to read multiple replies and independent task completion.
+- **Current executable capability (2026-10-28)**: the merged Web worker supports WorkBuddy text-only with its own default model/think mode; Codex/Pi web run, explicit model selection and explicit think mode switching are NOT yet verified. The new generic request validates all three fields and rejects unsupported overrides before running. This is an intentionally honest API foundation, not a claim of 3 fully working adapters.
+- Old startWorkbuddy/readWorkbuddy remain compatible and continue to use the existing endpoints; this addition does not change CloudFile V1 or the original YuanShu entry.
