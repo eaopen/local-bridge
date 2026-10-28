@@ -67,11 +67,16 @@ jobs:
           node-version: '24'
       - name: Build CLI and native Chrome Host
         run: cargo build --workspace --release --locked
+      - name: Write unsigned preview bundle override
+        shell: pwsh
+        working-directory: crates/local-bridge-desktop
+        run: |
+          Set-Content -Path "tauri.preview.conf.json" -Value '{"bundle":{"active":true}}'
       - name: Bundle unsigned optional Tauri desktop
         working-directory: crates/local-bridge-desktop
         run: >
           npx --yes @tauri-apps/cli@2.12.4 build --ci --no-sign
-          --bundles nsis --config "{\"bundle\":{\"active\":true}}"
+          --bundles nsis --config tauri.preview.conf.json
       - name: Stage Windows preview
         shell: pwsh
         run: |
