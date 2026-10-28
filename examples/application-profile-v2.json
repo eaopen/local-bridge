@@ -1,0 +1,48 @@
+{
+  "schema_version": 2,
+  "profile_id": "sample-web-dev",
+  "provider": "sample",
+  "environment": "dev",
+  "revision": 1,
+  "expires_at": 1999999999,
+  "application": {
+    "id": "sample-web",
+    "name": "Sample Enterprise Web"
+  },
+  "origin": "https://enterprise.example.invalid",
+  "services": {
+    "ai": "https://enterprise.example.invalid/ai"
+  },
+  "channels": [
+    {
+      "id": "enterprise-ai",
+      "title": "Enterprise AI",
+      "kind": "web",
+      "entry": "/app",
+      "capabilities": [
+        "mcp.tool.call",
+        "ai.agent.run"
+      ]
+    }
+  ],
+  "agent_policy": {
+    "mode": "first_ready",
+    "preferred_providers": [
+      "codex",
+      "pi"
+    ],
+    "allow_user_choice": true
+  },
+  "enterprise_ai_api": {
+    "enabled": false,
+    "protocol": "openai-chat-completions",
+    "api_path": "/api/local-ai/v2",
+    "grant_path": "/api/local-ai/v2/grant",
+    "auth": "scoped_ticket",
+    "stream": true
+  },
+  "update": {
+    "track": "dev",
+    "source_id": "trusted-dev"
+  }
+}
