@@ -62,6 +62,17 @@ fn native_host_status_and_explicit_inbox_handoff() {
     ));
     std::fs::create_dir_all(&root).unwrap();
 
+    // A Bridge CLI installation can be healthy without the optional Chrome Host.
+    // The doctor does not connect to a real Chrome UI or read CloudFile tasks.
+    let initial = command(&root, &["native-host", "status"]);
+    assert_eq!(initial["state"], "not_installed");
+    assert_eq!(initial["browser_verified"], false);
+    let doctor = command(&root, &["self-test"]);
+    assert_eq!(doctor["ok"], true);
+    assert_eq!(doctor["chrome_gui_verified"], false);
+    assert_eq!(doctor["agent_authentication_verified"], false);
+    assert_eq!(doctor["cloudfile_file_execution_tested"], false);
+
     let status = send_native(
         json!({
             "protocol_version":1,"request_id":"status_1",
