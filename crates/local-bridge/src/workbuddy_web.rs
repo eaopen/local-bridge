@@ -262,6 +262,61 @@ fn node_path() -> Result<String> {
     }
     bail!("Node 24+ unavailable")
 }
+
+/// Existing WorkBuddy worker metadata is the owner of task status; this
+/// read-only local projection never starts/queries WorkBuddy or reveals prompts.
+fn summaries_from(base: &Path, now: u64) -> Result<Vec<Value>> {
+    if !base.exists() {
+        return Ok(Vec::new());
+    }
+    let mut result = Vec::new();
+    let mut scanned = 0;
+    for entry in fs::read_dir(base)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        scanned += 1;
+        if scanned > 256 {
+            bail!("too many WorkBuddy task directories for summary");
+        }
+        let id = entry.file_name().to_string_lossy().into_owned();
+        if !safe_id(&id) || !id.starts_with("wb-") {
+            continue;
+        }
+        let Ok(meta) = metadata(&entry.path()) else {
+            continue;
+        };
+        if meta.id != id {
+            bail!("invalid WorkBuddy task summary metadata");
+        }
+        let age = now.saturating_sub(meta.created);
+        if age > TTL {
+            continue;
+        }
+        result.push(json!({
+            "task_id":id,
+            "owner_module":"ai",
+            "kind":"ai",
+            "provider":"workbuddy",
+            "title":"WorkBuddy task",
+            "status":status(&events(&entry.path())?, age),
+            "created_at_unix_ms":meta.created,
+            "available_actions":[],
+        }));
+    }
+    result.sort_by(|a, b| {
+        b["created_at_unix_ms"]
+            .as_u64()
+            .cmp(&a["created_at_unix_ms"].as_u64())
+    });
+    result.truncate(40);
+    Ok(result)
+}
+pub fn summaries() -> Result<Vec<Value>> {
+    summaries_from(&root()?, timestamp()?)
+}
+
 /// Existing WorkBuddy tasks participate in the common V2 client_key
 /// idempotency check before Bridge chooses another Agent.
 pub fn find(origin: &str, client_key: &str) -> Result<Option<String>> {
@@ -435,6 +490,30 @@ mod tests {
         fs::remove_dir_all(&path).unwrap();
     }
 
+
+    #[test]
+    fn read_only_summary_does_not_count_message_final_as_task_completion() {
+        let home = std::env::temp_dir().join(format!(
+            "local-bridge-wb-summary-{}-{}",
+            std::process::id(), timestamp().unwrap()
+        ));
+        let id = "wb-1234-a-b";
+        let dir = home.join(id);
+        fs::create_dir_all(&dir).unwrap();
+        let meta = Meta {
+            id:id.into(), origin:"https://private.example".into(),
+            client_key:"private-key".into(), created:timestamp().unwrap()
+        };
+        fs::write(dir.join("meta.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
+        fs::write(
+            dir.join("events.jsonl"),
+            b"{\"seq\":1,\"type\":\"task.started\"}\n{\"seq\":2,\"type\":\"message.final\",\"text\":\"private\"}\n"
+        ).unwrap();
+        let result = summaries_from(&home, meta.created + 20).unwrap();
+        assert_eq!(result[0]["status"], "running");
+        assert!(!result[0].to_string().contains("private"));
+        fs::remove_dir_all(home).unwrap();
+    }
     #[test]
     fn multiple_messages_are_not_completion() {
         let mut items = vec![
