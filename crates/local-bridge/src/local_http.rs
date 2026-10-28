@@ -466,28 +466,46 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
         // before any Provider task starts. Legacy WorkBuddy path unchanged.
         ("POST", "/v2/agents/tasks") => {
             if !req.content_type.starts_with("application/json") {
-                reply(&mut stream, 400, Some(&req.origin), &json!({"error":"content_type"}))?;
+                reply(
+                    &mut stream,
+                    400,
+                    Some(&req.origin),
+                    &json!({"error":"content_type"}),
+                )?;
             } else {
                 match serde_json::from_slice::<Value>(&req.body)
-                    .ok().and_then(|v| agent_options::from_value(&v).ok())
+                    .ok()
+                    .and_then(|v| agent_options::from_value(&v).ok())
                 {
                     Some(options) => {
                         if options.model != "auto" || options.think_mode != "auto" {
                             // The only currently executable Web adapter cannot
                             // override model or reasoning config yet. Fail
                             // explicitly instead of quietly ignoring it.
-                            reply(&mut stream, 422, Some(&req.origin),
-                                &json!({"error":"agent_option_not_supported"}))?;
+                            reply(
+                                &mut stream,
+                                422,
+                                Some(&req.origin),
+                                &json!({"error":"agent_option_not_supported"}),
+                            )?;
                         } else {
                             match agent_options::run(&req.origin, options) {
                                 Ok(task) => reply(&mut stream, 202, Some(&req.origin), &task)?,
-                                Err(_) => reply(&mut stream, 503, Some(&req.origin),
-                                    &json!({"error":"no_authorized_compatible_agent"}))?,
+                                Err(_) => reply(
+                                    &mut stream,
+                                    503,
+                                    Some(&req.origin),
+                                    &json!({"error":"no_authorized_compatible_agent"}),
+                                )?,
                             }
                         }
                     }
-                    None => reply(&mut stream, 400, Some(&req.origin),
-                        &json!({"error":"invalid_agent_options"}))?,
+                    None => reply(
+                        &mut stream,
+                        400,
+                        Some(&req.origin),
+                        &json!({"error":"invalid_agent_options"}),
+                    )?,
                 }
             }
         }

@@ -191,8 +191,10 @@ pub fn handle_native(request: &Value) -> Value {
         Some("web.v2.session.issue") if p.as_object().is_some_and(|o| o.len() == 1) => {
             local_http::issue_session(origin)
         }
-        Some("web.v2.agent.run") if p.as_object().is_some_and(|o|
-            (3..=7).contains(&o.len()) && o.contains_key("origin")) => {
+        Some("web.v2.agent.run")
+            if p.as_object()
+                .is_some_and(|o| (3..=7).contains(&o.len()) && o.contains_key("origin")) =>
+        {
             let mut options = p.clone();
             options.as_object_mut().unwrap().remove("origin");
             match agent_options::from_value(&options) {
@@ -251,8 +253,8 @@ mod tests {
                 "agent":"workbuddy","model":"auto",
                 "think_mode":"high","agent_mode":"prefer"}
         }));
-        assert_eq!(reply["ok"],false);
-        assert_eq!(reply["error"],"agent_option_not_supported");
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"], "agent_option_not_supported");
         let invalid = handle_native(&json!({
             "protocol_version":2,"request_id":"agent-run-2",
             "action":"web.v2.agent.run",
@@ -261,7 +263,7 @@ mod tests {
                 "agent":"pi","model":"https://evil.example",
                 "think_mode":"auto","agent_mode":"prefer"}
         }));
-        assert_eq!(invalid["error"],"invalid_agent_options");
+        assert_eq!(invalid["error"], "invalid_agent_options");
     }
     #[test]
     fn browser_cannot_run_shell_or_personal_messages() {
