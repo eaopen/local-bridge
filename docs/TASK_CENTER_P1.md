@@ -1,6 +1,6 @@
 # Local Bridge 通用任务中心 P1：只读任务聚合
 
-2026-10-29。**当前可执行的入口是本机 CLI，并不是一个新的数据库、Web API、MCP Tool 或 Tauri 页面。**
+2026-10-29。**已在本机 CLI 提供只读聚合，并新增独立的可选 Tauri Desktop 开发预览视图；Web API、MCP Tool、任务数据库及文件动作仍未提供。** 桌面只经本地 Rust Commands 调用相同的 `task_center::list`。
 
 ## 使用方式
 
@@ -11,7 +11,7 @@ local-bridge tasks list --cloudfile
 
 - `tasks list`：即时从本机已有 Codex/Pi Agent V2 worker、WorkBuddy worker 和 Inbox 读取状态。**不**启动 AI、访问模型、不读取提示词或模型回复、不修改任务/授权、不检查远端登录。
 - `tasks list --cloudfile`：除上述来源外，**用户显式**选择再向已安装、已注册为 `cloudfile` 的 MCP Provider 调用一次 `cloudfile_task_summaries`，展示其脱敏的现有 Agent2 文件任务。未注册或 Agent2 版本不支持该工具时，来源状态显示 `not_configured_or_unavailable`、`complete=false`；**不会假装文件任务为空或已结束**。
-- 两种命令都只在当前 OS 用户本机 CLI 上执行。网页、模型和一般 MCP 调用**没有**获得 `tasks.list` 权限，不能通过网页自动列出其他 Origin 的 AI 任务或 CloudFile 本地文件任务。
+- CLI 命令与可选 Tauri Desktop 都只在当前 OS 用户本地使用。网页、模型和一般 MCP 调用**没有**获得 `tasks.list` 权限，不能通过网页自动列出其他 Origin 的 AI 任务或 CloudFile 本地文件任务。
 - 输出统一的 `schema_version=1`、`read_only=true`、`local_cli_only=true`、`complete`、`sources` 与 `items`；每条映射原任务 `task_id`、`owner_module`、`kind`、`provider`、`status`、`created_at_unix_ms`（如果本模块有时间戳）、`available_actions=[]`。每个来源失败单独标记，不丢弃其他来源。
 - 不返回 AI prompt、对话内容、会话来源 Origin、模型访问令牌；Inbox 只返回已存储的标题（最多 80 字符）和 ID，不回显选中文本；CloudFile 只返回文件模式与原 Agent2 Task ID、冲突/待确认状态，**不返回文件名、云端路径、本地路径、服务器、库 ID、票据或设备私钥**。
 - Inbox 的 `needs_action` 只表示待用户处理的已存储内容，**不等于 AI/CloudFile 执行失败**。Agent 的 `message.final` 也**不是**任务完成信号；必须由 owner 明确产生 `task.completed`。CloudFile 本地保存/Checkout 不代表已成功云端发布，原 Journal 中未确认提交映射 `unknown`。

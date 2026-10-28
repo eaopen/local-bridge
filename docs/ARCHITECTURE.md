@@ -20,6 +20,10 @@ Target contracts: [ApplicationProfile](APPLICATION_PROFILE_V1.md), [Tasks](BRIDG
 
 See [product user scenarios](PRODUCT_POSITIONING_AND_USE_CASES.md) and [Profile/SSO/mixed collaboration](PROFILE_AUTH_AND_COLLABORATION.md).
 
+## 可选桌面壳层边界
+
+`crates/local-bridge-desktop` 是独立的 Tauri Cargo workspace，复用 Bridge Core 已有的状态、AgentPreferences 和任务汇总，只提供可信本机窗口；不修改 Web V2 Origin 权限、不把 MCP/Native Host 变成 Tauri 依赖，也不复制 CloudFile Agent2 Tauri/Journals。单窗口管理 UI 与企业 Web 应用套壳不是同一需求；后者仍可根据企业应用独立规划。开发预览版不自动启动、不签名发行，验收前不称桌面产品已完成。
+
 ## Components
 
 - **Rust Runtime**: one local capability registry, task gate, trusted clients, structured results, audit interfaces. Current repo starts with a small CLI; task supervisor and authorization are planned.

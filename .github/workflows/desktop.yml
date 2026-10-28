@@ -1,0 +1,31 @@
+name: Optional Tauri desktop
+
+on:
+  pull_request:
+    paths:
+      - 'crates/local-bridge-desktop/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+jobs:
+  static-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate static desktop JavaScript
+        run: |
+          node --check crates/local-bridge-desktop/ui/app.mjs
+          node --test crates/local-bridge-desktop/ui/preferences.test.mjs
+  desktop-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+      - name: Check isolated Tauri desktop
+        run: cargo check --manifest-path crates/local-bridge-desktop/Cargo.toml

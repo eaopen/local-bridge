@@ -50,6 +50,10 @@ Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 
 - Etech 元枢复用原 Web、SSO 与 AI API，仅添加通用 MCP/Agent 本地能力。不把企业代码或固定地址放进 Bridge 核心。
 - 可选的个人/企业隔离设置仅在真实需求下追加，不作为默认连接的 P0 阻断。
 
+## M0.4 — 可选本机 Tauri Desktop 管理入口（独立预览）
+
+基于已交付的 `tasks list`、`self-test`、Native Host 状态和 AgentPreferences，本轮建立独立 Tauri 2 单窗口管理应用（概览/只读任务/Agent 默认配置）。Desktop 只调用本机 Rust Commands，显式选择后才读取 CloudFile Provider；默认不运行 Agent、不修改文件、不安装常驻服务。它是**与 Bridge 核心解耦的开发预览**，完整 GUI/发行验收和签名自动升级未完成，也不替代 CloudFile Agent2 现有 Tauri。参见 [Desktop 说明](../crates/local-bridge-desktop/README.md)。
+
 ## M4 — 验证后才考虑统一桌面入口
 
 - 为**第二套 Chrome/Bridge 入口**逐项验证查看、普通编辑、独占编辑，经 Provider 调用原 Agent2 唯一文件执行器；两入口共用文件任务、Journal/Guard/工作副本，不独立复制。
