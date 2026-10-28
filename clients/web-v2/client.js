@@ -91,10 +91,14 @@ function agentRequest(options) {
       model.includes('://') || model.startsWith('/') ||
       !THINK_MODES.has(thinkMode))
     throw new LocalBridgeError('invalid_agent_options')
-  return {
-    api_version:AGENT_API_VERSION, client_key:clientKey, prompt, agent, model,
-    think_mode:thinkMode, agent_mode:agentMode
-  }
+  // Omitted options must remain omitted so Bridge can apply the OS user's
+  // saved preferences. Explicit "auto" remains an intentional caller choice.
+  const req = {api_version:AGENT_API_VERSION, client_key:clientKey, prompt}
+  if (Object.hasOwn(options,'agent')) req.agent = agent
+  if (Object.hasOwn(options,'model')) req.model = model
+  if (Object.hasOwn(options,'thinkMode')) req.think_mode = thinkMode
+  if (Object.hasOwn(options,'agentMode')) req.agent_mode = agentMode
+  return req
 }
 
 /** Chrome ContentScript/ServiceWorker handles sender.origin; page cannot choose it. */

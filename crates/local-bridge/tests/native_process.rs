@@ -73,7 +73,13 @@ fn native_host_status_and_explicit_inbox_handoff() {
     assert_eq!(doctor["agent_authentication_verified"], false);
     assert_eq!(doctor["cloudfile_file_execution_tested"], false);
 
-    let status = send_native(
+    let prefs = command(&root, &["agent-preferences", "get"]);
+    assert_eq!(prefs["schema_version"], 1);
+    assert_eq!(prefs["agent"], "auto");
+    let updated = command(&root, &["agent-preferences", "set",
+        r#"{"schema_version":1,"agent":"codex","agent_mode":"require","model":"auto","think_mode":"medium","priority":["codex","workbuddy","pi"]}"#]);
+    assert_eq!(updated["agent"], "codex");
+    assert_eq!(command(&root, &["agent-preferences", "get"])["priority"][0], "codex");
         json!({
             "protocol_version":1,"request_id":"status_1",
             "action":"host.status","payload":{}
