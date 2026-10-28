@@ -2,7 +2,7 @@
 
 状态：**整体仍是规划合同，但若干独立切片已落地**。Bridge 当前已有只读 MCP Server（`bridge.status`、`cloudfile.status`）、离线 Profile 校验、显式 Codex CLI run、Chrome 手动收件箱，以及可由本机用户主动注册并调用的通用 MCP Client。后者与独立 [WeChat Provider](https://github.com/eaopen/wechat-provider) 的六工具声明、`wechat_status` 和空索引 `wechat_search` 已完成无账号的跨进程 CI 验证。**未完成**可信企业 Web/SSO、自动聊天事件订阅、微信桌面真实收发验收、通用 AgentAdapter/任务中心。本文不要求安装任何特定模型/Agent，不改 CloudFile 文件引擎。
 
-参考：[ApplicationProfile V1](APPLICATION_PROFILE_V1.md)、[BridgeTask V1](BRIDGE_TASK_V1.md)、[Capability/MCP V1](CAPABILITY_AND_MCP_V1.md)、[CloudFile 迁移边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
+参考：[Codex/WorkBuddy 实测及验收矩阵](AGENT_PROVIDER_VALIDATION.md)、[ApplicationProfile V1](APPLICATION_PROFILE_V1.md)、[BridgeTask V1](BRIDGE_TASK_V1.md)、[Capability/MCP V1](CAPABILITY_AND_MCP_V1.md)、[CloudFile 迁移边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
 
 ## 1. 五项通用产品能力
 
