@@ -1,6 +1,6 @@
 # ApplicationProfile V2 — 企业 Web 本地能力合同（设计稿）
 
-**状态：规范草案（2026-10-28），不是已实现的 V2 解析器/在线执行。** 仅规范企业 Web → 本地 MCP/Agent 的声明和调用；不替换 [ApplicationProfile V1](APPLICATION_PROFILE_V1.md)。通用实现与验收见 [#6](https://github.com/eaopen/local-bridge/issues/6)。
+**状态（2026-10-29 核查）：V2 结构解析和离线校验（`validate-profile-v2` / `profile-v2 inspect`）已有代码，但可信在线 Profile 绑定与企业 Web 实际激活仍未实现。** 本规范描述企业 Web → 本地 MCP/Agent 的声明与调用；不替换 [ApplicationProfile V1](APPLICATION_PROFILE_V1.md)。验收见 [#6](https://github.com/eaopen/local-bridge/issues/6)。
 
 ## 1. 版本分离与兼容
 
@@ -107,4 +107,4 @@ Agent policy is declared by the enterprise Profile; optional per-task preference
 }
 ~~~
 
-agent is one of auto, workbuddy, codex, pi; agent_mode is prefer (default) or require. model is either auto or a provider-valid model identifier. think_mode is auto, off, low, medium, high, xhigh or max. Any omitted optional field defaults to auto/prefer, and Bridge is authoritative for selected_agent. A model override is an **exact constraint**; a non-auto think mode must be verifiably applied. The Bridge must not silently ignore unsupported settings or switch Agent after accepting/starting a task. Only the currently verified Web adapter is WorkBuddy text-only; other providers and explicit overrides return an unavailable error until their runtime integration is validated. ApplicationProfile does not grant local execution permissions.
+agent is one of auto, workbuddy, codex, pi; agent_mode is prefer (default) or require. model is either auto or a provider-valid model identifier. think_mode is auto, off, low, medium, high, xhigh or max. Any omitted optional field now uses the OS user's saved AgentPreferences V1 default (auto/prefer until configured); an explicitly passed auto/prefer stays explicit. Bridge remains authoritative for selected_agent. A model override is an **exact constraint**; a non-auto think mode must be verifiably applied. The Bridge must not silently ignore unsupported settings or switch Agent after accepting/starting a task. Only the currently verified Web adapter is WorkBuddy text-only; other providers and explicit overrides return an unavailable error until their runtime integration is validated. ApplicationProfile does not grant local execution permissions.
