@@ -81,9 +81,8 @@ fn installed_cli(name: &str) -> bool {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            return path
-                .metadata()
-                .is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0);
+            path.metadata()
+                .is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0)
         }
         #[cfg(not(unix))]
         {
@@ -162,13 +161,7 @@ pub fn capabilities(origin: &str) -> Result<Value> {
         .iter()
         .map(|name| agent_state(origin, name))
         .collect::<Result<_>>()?;
-    Ok(json!({
-        "api_version":2,
-        "agents":agents,
-        "default_order":["codex","workbuddy","pi"],
-        "readiness":"unverified_until_real_task",
-        "auto_policy":"eligible_before_execution_no_retry"
-    }))
+    Ok(json!(agents))
 }
 fn pick_agent<'a>(requested: &str, mode: &str, candidates: &'a [&'a str]) -> Result<&'a str> {
     if mode == "require" {
