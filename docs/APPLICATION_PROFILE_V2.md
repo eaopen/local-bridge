@@ -80,3 +80,13 @@
 5. DEV/PROD、原 CloudFile V1、现有业务页面及登录各自独立回归。**不为 V2 提前修改 CloudFile 或任何业务 AI 引擎。**
 
 通用离线示例：[application-profile-v2.json](../examples/application-profile-v2.json)。**示例不是正式在线配置，也没有通过尚不存在的 V2 运行时验证。**
+
+## 6. Web V2 status-only source implementation (2026-10-28)
+
+The first Web V2 implementation uses the existing generic Chrome extension and independent Native Host; CloudFile V1 file operations are not routed through it.
+
+- `local-bridge web-v2 grant-status <exact-origin> <registered-provider> <status-tool>` is an **explicit local OS-user grant** for a fixed no-argument tool named `status` or `*_status`. `revoke-status` removes the grant, `capabilities <origin>` shows the local exact-site grants. A remote Profile cannot grant itself an executable/provider.
+- Chrome V2, only after **separate local MCP website permission**, supports `local.capabilities` and `mcp.status` via `local-tool-bridge:web:v2`. The extension obtains the exact origin from Chrome's actual sender; the Host requires a second exact CLI grant. The only MCP call is the locally registered, no-argument status tool.
+- Personal WeChat Provider is **optional**; only `wechat_status` can participate in this first browser slice, not `wechat_list_chats`, `wechat_get_messages`, `wechat_send_message`, or arbitrary tools. Status-only response does not imply WeChat logged in or an AI Agent run is possible.
+- V2 `profile-v2 inspect` remains offline, unauthenticated declaration/registration inspection (`trusted:false`, `activated:false`, `authorized:false`). Future trusted enrollment, full Web Agent dispatch, business-object grants, desktop shell and V1 CloudFile migration remain distinct tasks.
+- Chrome branch: [Chrome V2 draft PR](https://github.com/eaopen/local-bridge-chrome-extension/pull/4). This source path has Rust CI / Chrome Node test coverage but **not real Chrome + Native Host + Etech SSO + signed-in WeChat acceptance**.
