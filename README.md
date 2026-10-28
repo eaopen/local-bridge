@@ -36,6 +36,7 @@ Profile 用于来源、账号上下文与任务归属，**不默认作为个人/
 - [BridgeTask V1](docs/BRIDGE_TASK_V1.md)：统一文件/企业/AI 任务中心合同
 - [Capability / MCP V1](docs/CAPABILITY_AND_MCP_V1.md)：通用工具与 MCP 权限
 - [Agent Providers / Local Communications V1](docs/AI_AGENT_AND_LOCAL_COMMUNICATION_V1.md)：WorkBuddy / Codex / Pi 本地选择、可选通讯连接器
+- [Codex / WorkBuddy Agent 实机验证](docs/AGENT_PROVIDER_VALIDATION.md)：分别记录安装、授权、官方接口、真实任务及未完成项
 - [CloudFile → Bridge 迁移](docs/CLOUDFILE_TO_BRIDGE_MIGRATION.md)：并行开发不接管或破坏现有文件能力
 - [Chrome Native Messaging V1](docs/CHROME_NATIVE_HOST_V1.md)：可选 Local Tool Bridge 原生 Host、安装和本机收件箱
 - [个人/企业/混合场景与诉求](docs/PRODUCT_POSITIONING_AND_USE_CASES.md)：按真实用户任务组织需求与验收
@@ -101,7 +102,7 @@ cargo run -p local-bridge -- status
 ```
 
 An MCP client can launch `local-bridge mcp` with **stdio**, without any listening HTTP port. Currently offered tools: `bridge.status`, `cloudfile.status`. Neither tool modifies files or checks out a repository.
-**New opt-in CLI integration:** `agent codex <prompt|->` calls the user's existing authenticated Codex CLI in ephemeral, read-only mode, and reports `completed` only after `turn.completed` and successful process exit. This does not create a BridgeTask database, use browser SSO, read arbitrary chats, provide a messaging connector, or make agent execution callable by arbitrary webpages/MCP clients. Missing Codex/login or an incomplete run reports an error. It has not yet been validated on a real user's Windows/macOS Codex installation. A missing CloudFile binary reports disconnected rather than trying an unrelated command.
+**New opt-in CLI integration:** `agent codex <prompt|->` calls the user's existing authenticated Codex CLI in ephemeral, read-only mode, and reports `completed` only after `turn.completed` and successful process exit. This does not create a BridgeTask database, use browser SSO, read arbitrary chats, provide a messaging connector, or make agent execution callable by arbitrary webpages/MCP clients. Missing Codex/login or an incomplete run reports an error. Codex CLI read-only and App Server handshake/task have been tested on one macOS development machine; the full Bridge App Server Adapter and real Chrome UI / Windows E2E are still unverified. A missing CloudFile binary reports disconnected rather than trying an unrelated command.
 
 Example Channel configuration (not authenticated or automatically fetched):
 

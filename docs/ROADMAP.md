@@ -4,7 +4,7 @@
 
 ## M0 — 当前已实现的基线
 
-Rust 0.1.0：只读 MCP stdio（bridge.status、cloudfile.status）、CloudFile 组件状态查询、旧 Channel 与 ApplicationProfile V1 的离线校验。**尚未实现**可信在线 Profile 注册、PersonalProfile 运行时、通用任务聚合、实际 Agent run、双向通讯 Adapter 和 CloudFile 文件操作 IPC。CloudFile 文件编辑仍走现有 Agent2/Hub/Server。
+Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 MCP Client、离线 Profile 结构校验、可选 Chrome Native Host/Inbox、Web AI 手动接力，以及用户主动调用既有 Codex CLI 的临时只读任务均已在代码中实现。**Codex App Server 官方协议和短任务已在一台开发 Mac 上单独实测，但尚未接入 Bridge AgentAdapter；WorkBuddy 尚无实际调用验证。**可信在线 Profile、PersonalProfile Runtime、跨 Provider 任务聚合、完整通信 Adapter、CloudFile 文件 IPC 均未交付。CloudFile 编辑仍走现有 Agent2/Hub/Server。详见 [Agent 实测矩阵](AGENT_PROVIDER_VALIDATION.md)。
 
 ## M1 — 最短 Web / 本机调用闭环（优先）
 
@@ -15,7 +15,7 @@ Rust 0.1.0：只读 MCP stdio（bridge.status、cloudfile.status）、CloudFile 
 ## M2 — 个人与企业同机工作（首个真实产品成果）
 
 - 先提供显式用户触发的 `agent codex <prompt|->` 只读 CLI 接线（完成条件与超时不可误报，需真实本机验收），再扩展到 AgentAdapter/浏览器受控调用；
-- 一次实际授权的本地 Codex/WorkBuddy 或可选 Pi Agent run；不把安装状态冒充 API 可用。
+- **Codex 与 WorkBuddy 两者都列入 P0 验证（不是运行时必装）：** Codex 继续复用实测 CLI，再以 App Server stdio 做会话/状态最小 Adapter；WorkBuddy 先在真实安装机验证本地 Connector → Bridge MCP，获得官方第三方应用 OAuth/Scope 后才验证 Bridge → WorkBuddy Local Assistant Open API。两方向不得混算；Pi 是可选备选。见 [验收标准](AGENT_PROVIDER_VALIDATION.md)。
 - CloudFile Agent2 既有任务摘要旁路接入 BridgeTask，文件本身继续由现役引擎处理。
 - 同一台公司电脑同时运行企业文件任务和个人聊天助手任务；不切换 Profile、不增加跨 Profile 审批，统一展示真实结果。
 
