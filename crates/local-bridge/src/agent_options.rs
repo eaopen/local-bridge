@@ -68,11 +68,12 @@ fn installed_cli(name: &str) -> bool {
         name.to_owned()
     };
     let paths = std::env::var_os("PATH").unwrap_or_default();
-    let mut dirs: Vec<_> = std::env::split_paths(&paths).collect();
     #[cfg(target_os = "macos")]
-    for dir in ["/opt/homebrew/bin", "/usr/local/bin"] {
-        dirs.push(dir.into());
-    }
+    let dirs: Vec<_> = std::env::split_paths(&paths)
+        .chain(["/opt/homebrew/bin", "/usr/local/bin"].into_iter().map(std::path::PathBuf::from))
+        .collect();
+    #[cfg(not(target_os = "macos"))]
+    let dirs: Vec<_> = std::env::split_paths(&paths).collect();
     dirs.iter().any(|dir| {
         let path = dir.join(&binary);
         if !path.is_file() {
