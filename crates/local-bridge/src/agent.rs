@@ -288,7 +288,16 @@ fn pi_web_command(model: &str, think_mode: &str) -> Result<Command> {
     {
         bail!("unsupported Pi think mode");
     }
-    let mut command = Command::new("pi");
+    // Finder-launched Chrome Hosts may not inherit Homebrew's PATH.
+    // Prefer a known installed executable; user profile/extensions stay Pi-owned.
+    #[cfg(target_os = "macos")]
+    let program = ["/opt/homebrew/bin/pi", "/usr/local/bin/pi"]
+        .into_iter()
+        .find(|p| std::path::Path::new(p).is_file())
+        .unwrap_or("pi");
+    #[cfg(not(target_os = "macos"))]
+    let program = "pi";
+    let mut command = Command::new(program);
     #[cfg(target_os = "macos")]
     {
         use std::path::PathBuf;
