@@ -135,6 +135,7 @@ pub fn capabilities(origin: &str) -> Result<Value> {
         .collect();
     Ok(json!({"origin":origin,"mcp_status_grants":grants,
         "workbuddy":workbuddy_web::capability(origin)?,
+        "agents":agent_options::capabilities(origin)?,
         "agent_web_run_supported":cfg!(target_os="macos"),"profile_trusted":false}))
 }
 /// Presence of a local OS-user grant; execution still rechecks an exact tool.
@@ -199,9 +200,6 @@ pub fn handle_native(request: &Value) -> Value {
             options.as_object_mut().unwrap().remove("origin");
             match agent_options::from_value(&options) {
                 Ok(request) => {
-                    if request.model != "auto" || request.think_mode != "auto" {
-                        return fail("agent_option_not_supported");
-                    }
                     agent_options::run(origin, request)
                 }
                 Err(_) => return fail("invalid_agent_options"),
