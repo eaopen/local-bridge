@@ -11,6 +11,7 @@ pub mod mcp_provider;
 pub mod native;
 pub mod native_host_registration;
 pub mod pi_enterprise;
+pub mod state_file;
 pub mod web_v2;
 pub mod workbuddy;
 pub mod workbuddy_web;
