@@ -25,5 +25,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Tests
         run: cargo test --workspace --locked
+      - name: Web V2 SDK contract
+        run: node --test clients/web-v2/client.test.mjs
       - name: Build
         run: cargo build --workspace --locked

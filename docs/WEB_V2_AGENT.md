@@ -67,3 +67,22 @@ Chrome 负责可信 Origin/用户同意/短期会话；Bridge 默认本机 `http
 **代码级完成**：统一状态 JSON、参数规则、权限、分配、双通道 idempotency、三条可运行的本地 Worker 路径、统一读取/终判；增加纯单元/合同测试。**未完成**：三个 Agent 的真实登录/模型额度/流式结果核验、Codex/Pi 的真机默认模型兼容、Pi 扩展及推理档位实际生效、Windows/macOS 的浏览器多通道端到端、企业 SSO/企业 Pi API 端到端。
 
 最小后续验收应分别在实际装有 Agent 的普通用户机进行：`not_installed` → `not_granted` → 申请授权 → 短任务 `accepted` → 确认 `completed` 或真实失败 → HTTP/SSE 中断转 Native 续读、不重复执行。不要把构建通过、安装发现、`accepted` 或单条 `message.final` 记录为 Agent 已完成。
+
+## 本机 AgentPreferences V1（可选桌面界面共用的唯一设置源）
+
+本机用户可通过 `local-bridge agent-preferences get` 查询默认设置；通过
+`local-bridge agent-preferences set '<JSON>'` 更新，不需重新注册浏览器 Host。
+持久化文件为 Bridge 用户目录的 `agent-preferences-v1.json`，复用已有的
+原子写入和跨进程锁。默认值：`agent=auto`、`model=auto`、
+`think_mode=auto`、`agent_mode=prefer`、
+`priority=[workbuddy,codex,pi]`。支持按用户顺序重排三种 Agent。
+
+Web SDK `runAgent()` 的可选字段**未填写时不再显式发送 `auto`**，由 Bridge
+解析用户保存的默认值；调用方明确提供 `auto` 等值则优先，原 `clientKey`
+去重、Origin 授权、已安装及平台能力判定完全保留。
+选择顺序只影响**任务提交前**的候选，不进行失败后的自动跨 Agent 重试。
+账户状态未核验时显示为未知，而不是根据 CLI 已安装推断已登录。
+
+桌面 UI 应直接调用同一 Rust 设置模块；不另设 Tauri Store、模型 API Key
+或企业认证账号配置。用户首选策略**不能授予任何网站 Agent 执行权限**；
+企业 Profile 的声明也不能直接覆盖 OS 用户保存的授权。

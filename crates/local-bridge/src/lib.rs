@@ -3,6 +3,7 @@
 pub mod agent;
 pub mod agent_grants;
 pub mod agent_options;
+pub mod agent_preferences;
 pub mod agent_task;
 pub mod diagnostics;
 pub mod inbox;

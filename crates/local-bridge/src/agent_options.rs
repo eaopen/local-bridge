@@ -1,7 +1,7 @@
 //! One Web V2 Agent status, selection, run and read contract for WorkBuddy,
 //! Codex and Pi. Unknown login/API readiness is NEVER reported as verified.
 //! Selection is before execution only; failed/unknown tasks never switch Agent.
-use crate::{agent_grants, agent_task, inbox, workbuddy_web};
+use crate::{agent_grants, agent_preferences, agent_task, inbox, workbuddy_web};
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -267,8 +267,13 @@ pub fn run(origin: &str, request: RunAgentRequest) -> Result<Value> {
         }
         return Ok(accepted(&id, &provider, &request, true));
     }
-    let candidates: Vec<&str> = ["workbuddy", "codex", "pi"]
-        .into_iter()
+    // Persisted user priority only changes candidate order. The exact
+    // per-origin grant and selected Agent capabilities still apply.
+    let prefs = agent_preferences::load()?;
+    let candidates: Vec<&str> = prefs
+        .priority
+        .iter()
+        .map(String::as_str)
         .filter(|name| {
             options_supported(name, &request.model, &request.think_mode)
                 && agent_state(origin, name).is_ok_and(|state| state["eligible"] == true)
@@ -304,9 +309,44 @@ pub fn poll(origin: &str, id: &str, cursor: u64) -> Result<Value> {
     Ok(page)
 }
 pub fn from_value(value: &Value) -> Result<RunAgentRequest> {
-    let parsed: RunAgentRequest = serde_json::from_value(value.clone())?;
+    let values = agent_preferences::apply_defaults(value, &agent_preferences::load()?)?;
+    let parsed: RunAgentRequest = serde_json::from_value(values)?;
     parsed.check()?;
     Ok(parsed)
+}
+
+/// Read-only OS-local installed/capability hints for the optional desktop.
+/// No origin grant, authenticated=true or API readiness is implied.
+pub fn local_inventory() -> Value {
+    json!([
+        {
+            "agent":"workbuddy",
+            "installed":workbuddy_web::installed(),
+            "run_supported":cfg!(target_os="macos"),
+            "authenticated":null,
+            "api_ready":null,
+            "supported_think_modes":["auto"],
+            "supports_model_override":false,
+        },
+        {
+            "agent":"codex",
+            "installed":installed_cli("codex"),
+            "run_supported":true,
+            "authenticated":null,
+            "api_ready":null,
+            "supported_think_modes":["auto","low","medium","high","xhigh"],
+            "supports_model_override":true,
+        },
+        {
+            "agent":"pi",
+            "installed":installed_cli("pi"),
+            "run_supported":true,
+            "authenticated":null,
+            "api_ready":null,
+            "supported_think_modes":["auto","off","low","medium","high","xhigh"],
+            "supports_model_override":true,
+        }
+    ])
 }
 #[cfg(test)]
 mod tests {

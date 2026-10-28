@@ -200,8 +200,31 @@ test('unified runAgent defaults selectors, Bridge decides actual Agent',async()=
     agent:'codex',agentMode:'prefer'})
   assert.equal(output.selected_agent,'workbuddy')
   assert.deepEqual(requests[0],{api_version:2,client_key:'abc_123',prompt:'Synthetic only',
-    agent:'codex',model:'auto',think_mode:'auto',agent_mode:'prefer'})
+    agent:'codex',agent_mode:'prefer'})
   assert.equal(calls.filter(x=>x.action==='agent.run').length,0)
+})
+test('SDK leaves unprovided Agent options to local user preferences', async()=>{
+  const requests=[]
+  const {page}=browser(req=>({ok:true,result:req.action==='local.connect'?SESSION:{}}))
+  const bridge=createLocalBridgeClient({page,fetchImpl:async(url,options)=>{
+    if(url.endsWith('/v2/capabilities'))return jsonResponse(capabilities())
+    if(url.endsWith('/v2/agents/tasks')){
+      requests.push(JSON.parse(options.body))
+      return jsonResponse({task_id:TASK,status:'accepted',selected_agent:'pi'},202)
+    }
+    throw Error('unexpected request')
+  }})
+  await bridge.connect()
+  await bridge.runAgent({clientKey:'prefs-1',prompt:'Read-only synthetic'})
+  assert.deepEqual(requests[0],{
+    api_version:2,client_key:'prefs-1',prompt:'Read-only synthetic'
+  })
+  await bridge.runAgent({clientKey:'prefs-2',prompt:'Read-only synthetic',agent:'auto',
+    model:'auto',thinkMode:'auto',agentMode:'prefer'})
+  assert.equal(requests[1].agent,'auto')
+  assert.equal(requests[1].model,'auto')
+  assert.equal(requests[1].think_mode,'auto')
+  assert.equal(requests[1].agent_mode,'prefer')
 })
 test('unified Agent options never silently downgrade a rejected model or thinkMode',async()=>{
   const {page,calls}=browser(req=>({ok:true,
@@ -245,8 +268,8 @@ test('unified Agent fallback preserves exact options and clientKey',async()=>{
   assert.equal(fallback.params.api_version,2)
   assert.equal(fallback.params.client_key,'idempotent-1')
   assert.equal(fallback.params.agent,'pi')
-  assert.equal(fallback.params.model,'auto')
-  assert.equal(fallback.params.think_mode,'auto')
+  assert.equal(fallback.params.model,undefined)
+  assert.equal(fallback.params.think_mode,undefined)
   assert.equal(fallback.params.agent_mode,'prefer')
   assert.equal(bridge.mode,'native-fallback')
 })
