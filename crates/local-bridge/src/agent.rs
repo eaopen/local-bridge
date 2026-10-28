@@ -61,18 +61,31 @@ fn parse_codex_events(output: &str) -> Result<String> {
 // Homebrew Codex CLI (and its /usr/bin/env node interpreter) can otherwise be
 // invisible. Only add conventional local tool directories to *this child*.
 // Never run a shell or change global/user PATH settings.
-fn codex_command(program: &str) -> Command {
+fn codex_command(program: &str, model: &str, think_mode: &str) -> Result<Command> {
+    if model != "auto" && !pi_id(model, true) {
+        bail!("invalid Codex model");
+    }
+    if think_mode != "auto" && !["low", "medium", "high", "xhigh"].contains(&think_mode) {
+        bail!("unsupported Codex think mode");
+    }
     let mut command = Command::new(program);
+    command.args([
+        "exec",
+        "--ephemeral",
+        "--sandbox",
+        "read-only",
+        "--skip-git-repo-check",
+        "--json",
+    ]);
+    if model != "auto" {
+        command.args(["--model", model]);
+    }
+    if think_mode != "auto" {
+        command.args(["-c", &format!("model_reasoning_effort={think_mode}")]);
+    }
+    // No Web-supplied arguments, shell, write approvals or working directory.
+    command.arg("-");
     command
-        .args([
-            "exec",
-            "--ephemeral",
-            "--sandbox",
-            "read-only",
-            "--skip-git-repo-check",
-            "--json",
-            "-",
-        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -91,10 +104,10 @@ fn codex_command(program: &str) -> Command {
             command.env("PATH", paths);
         }
     }
-    command
+    Ok(command)
 }
 
-fn spawn_codex() -> Result<std::process::Child> {
+fn spawn_codex(model: &str, think_mode: &str) -> Result<std::process::Child> {
     // Prefer the user's PATH, and on macOS fall back to existing Homebrew
     // launchers for Chrome's GUI environment. No installation is performed.
     #[cfg(target_os = "macos")]
@@ -103,7 +116,7 @@ fn spawn_codex() -> Result<std::process::Child> {
     let candidates = ["codex"];
 
     for candidate in candidates {
-        match codex_command(candidate).spawn() {
+        match codex_command(candidate, model, think_mode)?.spawn() {
             Ok(child) => return Ok(child),
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
             Err(err) => return Err(err).context("Codex CLI could not start"),
@@ -116,11 +129,17 @@ fn spawn_codex() -> Result<std::process::Child> {
 /// non-interactive, ephemeral, read-only mode. No arbitrary executable or
 /// arguments can arrive from a Profile, browser page, MCP, or model text.
 pub fn run_codex(prompt: &str) -> Result<Value> {
+    run_codex_web(prompt, "auto", "auto")
+}
+
+/// The same bounded, read-only Codex CLI task, with documented V2 options.
+/// Returning a spawn receipt is not proof of a completed turn.
+pub fn run_codex_web(prompt: &str, model: &str, think_mode: &str) -> Result<Value> {
     if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
         bail!("agent prompt must contain 1..65536 bytes of text");
     }
 
-    let mut child = spawn_codex()?;
+    let mut child = spawn_codex(model, think_mode)?;
 
     let stdout = child.stdout.take().context("Codex stdout unavailable")?;
     let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
@@ -257,6 +276,66 @@ pub fn run_pi(provider: &str, model: &str, prompt: &str) -> Result<Value> {
     run_pi_command(pi_command(provider, model)?, provider, model, prompt)
 }
 
+/// One browser-approved, text-only Pi run using the user's own installed
+/// model credentials. Unlike the legacy fixed CLI shortcut, user-installed
+/// model *extensions* remain discoverable (e.g. a configured model proxy), but
+/// all Pi tool calls, MCP, project context and session persistence are disabled.
+fn pi_web_command(model: &str, think_mode: &str) -> Result<Command> {
+    if model != "auto" && !pi_id(model, true) {
+        bail!("invalid Pi model");
+    }
+    if think_mode != "auto" && !["off", "low", "medium", "high", "xhigh"].contains(&think_mode) {
+        bail!("unsupported Pi think mode");
+    }
+    // Finder-launched Chrome Hosts may not inherit Homebrew's PATH.
+    // Prefer a known installed executable; user profile/extensions stay Pi-owned.
+    #[cfg(target_os = "macos")]
+    let program = ["/opt/homebrew/bin/pi", "/usr/local/bin/pi"]
+        .into_iter()
+        .find(|p| std::path::Path::new(p).is_file())
+        .unwrap_or("pi");
+    #[cfg(not(target_os = "macos"))]
+    let program = "pi";
+    let mut command = Command::new(program);
+    #[cfg(target_os = "macos")]
+    {
+        use std::path::PathBuf;
+        let raw = std::env::var_os("PATH").unwrap_or_default();
+        let mut dirs: Vec<PathBuf> = std::env::split_paths(&raw).collect();
+        for name in ["/opt/homebrew/bin", "/usr/local/bin"] {
+            let dir = PathBuf::from(name);
+            if dir.is_dir() && !dirs.contains(&dir) {
+                dirs.push(dir);
+            }
+        }
+        if let Ok(paths) = std::env::join_paths(dirs) {
+            command.env("PATH", paths);
+        }
+    }
+    command.args([
+        "--print",
+        "--no-session",
+        "--no-tools",
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-context-files",
+    ]);
+    if model != "auto" {
+        command.args(["--model", model]);
+    }
+    if think_mode != "auto" {
+        command.args(["--thinking", think_mode]);
+    }
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    Ok(command)
+}
+pub fn run_pi_web(prompt: &str, model: &str, think_mode: &str) -> Result<Value> {
+    run_pi_command(pi_web_command(model, think_mode)?, "pi", model, prompt)
+}
+
 /// Enterprise app provides one already-authenticated compatible model session.
 /// No per-user Pi model/account setup, global Pi changes or Bridge model router.
 pub fn run_pi_enterprise(prompt: &str) -> Result<Value> {
@@ -379,7 +458,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_gui_codex_child_path_can_find_homebrew_node() {
-        let command = codex_command("/opt/homebrew/bin/codex");
+        let command = codex_command("/opt/homebrew/bin/codex", "auto", "auto").unwrap();
         let child_path = command
             .get_envs()
             .find_map(|(name, value)| (name == "PATH").then_some(value).flatten())
@@ -413,6 +492,29 @@ mod tests {
         assert!(pi_command("deepseek", "--dangerous").is_err());
         assert!(pi_command("deepseek", "../secret").is_err());
         assert!(pi_command("deepseek", "deepseek-v4-pro").is_ok());
+    }
+
+    #[test]
+    fn web_cli_options_keep_existing_tools_bounded() {
+        let codex = codex_command("codex", "gpt-6", "high").unwrap();
+        let args: Vec<_> = codex
+            .get_args()
+            .map(|v| v.to_string_lossy().to_string())
+            .collect();
+        assert!(args.windows(2).any(|s| s == ["--model", "gpt-6"]));
+        assert!(args
+            .windows(2)
+            .any(|s| s == ["-c", "model_reasoning_effort=high"]));
+        assert!(codex_command("codex", "auto", "off").is_err());
+        let pi = pi_web_command("9router/m3cn/MiniMax-M2.7", "medium").unwrap();
+        let args: Vec<_> = pi
+            .get_args()
+            .map(|v| v.to_string_lossy().to_string())
+            .collect();
+        assert!(args.iter().any(|s| s == "--no-tools"));
+        assert!(!args.iter().any(|s| s == "--no-extensions"));
+        assert!(args.windows(2).any(|s| s == ["--thinking", "medium"]));
+        assert!(pi_web_command("auto", "max").is_err());
     }
 
     #[test]

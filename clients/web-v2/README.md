@@ -40,11 +40,13 @@ if (connection.available) {
 }
 ```
 
-**Only WorkBuddy is currently a validated runnable Web V2 adapter** and its
-default model/thinkMode cannot yet be overridden. Explicit unsupported model
-or reasoning mode is rejected *before* execution. Codex/Pi are known Agent
-IDs, not falsely advertised as Web-ready adapters. Provider selection and
-ready checks belong to Bridge, not enterprise Web code. Web SDK V2 has no
+**Three code-level Web V2 adapters now exist:** WorkBuddy macOS ACP text,
+Codex CLI read-only text and Pi CLI no-tools text. All share the same
+`runAgent/readAgent` contract; none has completed the full enterprise
+browser/login/model end-to-end validation. Capability discovery distinguishes
+`eligible` (can attempt) from `ready` (unknown), never treats installed as
+authenticated. Unsupported model/thinkMode is rejected before starting a task.
+Web SDK V2 has no
 `startWorkbuddy`/`readWorkbuddy`/`pollWorkbuddy` methods.
 
 **Important:** `message.final` marks one assistant message, not the completion of an Agent task. Only a task terminal event/state confirms completion or failure. The stable `clientKey` is reused across uncertain direct HTTP → Native fallback submissions, so a transport failure must not start the Agent again.
@@ -63,7 +65,7 @@ Source: `clients/web-v2/client.js` and `client.d.ts`. No external runtime depend
 
 **No duplicate protocol:** the SDK exports `chromeRequest`, `directJson` and `directStream` for compatibility, and `createLocalBridgeClient()` for the recommended high-level API. Do not implement a competing Origin/token/SSE parser in Etech.
 
-**Deferred:** generic Agent Provider discovery/routing and WorkBuddy production Adapter, Windows/Mac installed-client E2E, WebSocket for interactive tool approval, desktop wrapper UI, CloudFile V1 migration. HTTP/SSE handles current one-way multi-message outputs.
+**Deferred:** verified Agent login/model readiness, enterprise Profile policy activation, Windows/macOS browser E2E, WebSocket tool approval, desktop wrapper UI and CloudFile V1 migration. HTTP/SSE handles current one-way multi-message outputs.
 
 
 ## Unified Agent API (preview.3, `api_version=2`)
@@ -89,7 +91,7 @@ Semantics:
 - Missing agent uses the ApplicationProfile policy order and only currently available/authorized/compatible local adapters. Specifying an agent with agentMode=prefer raises its priority, but Bridge may select another ready adapter **before submission**. agentMode=require fails if the chosen provider is unavailable. The application does not maintain vendor-specific routing.
 - Missing model/thinkMode asks the selected Provider to use its existing defaults. An explicitly selected model is an **exact constraint**, not a suggestion to silently switch models; an explicit reasoning level must be verifiably applied or be rejected. The actual model and think mode, if known, should appear in the returned applied fields; null means unverified provider defaults.
 - clientKey is required and remains unchanged across HTTP errors and the Chrome Native fallback. Once accepted, fail/unknown never triggers automatic cross-provider retry. The same task_id/cursor is used to read multiple replies and independent task completion.
-- **Current executable capability (2026-10-28)**: the merged Web worker supports WorkBuddy text-only with its own default model/think mode; Codex/Pi web run, explicit model selection and explicit think mode switching are NOT yet verified. The new generic request validates all three fields and rejects unsupported overrides before running. This is an intentionally honest API foundation, not a claim of 3 fully working adapters.
+- **Current code capability (2026-10-28)**: WorkBuddy is the existing macOS text-only worker; Codex uses the existing read-only JSONL CLI; Pi uses its configured CLI model with tools disabled. All three now share OS-user per-Origin grants, idempotency, start and task cursor reads. Model/thinkMode CLI switches are forwarded only to compatible adapters; `applied_model/applied_think_mode=null` until reality can be verified. **No browser/login/model end-to-end validation has been performed.** See [Web V2 Agent status and run contract](../../docs/WEB_V2_AGENT.md).
 - The **unshipped** vendor-specific Web V2 SDK methods and V2 HTTP/Native task routes are removed. `runAgent/readAgent` is the only new public Web V2 Agent API. Existing CloudFile V1 and original YuanShu entry stay unchanged.
 
 

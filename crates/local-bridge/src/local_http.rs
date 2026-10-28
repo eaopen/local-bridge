@@ -4,7 +4,7 @@
 //! A short-lived token is created only by the trusted Native Host after an
 //! explicit local OS-user site grant. No Profile, web page, or CORS preflight
 //! can mint authorization. This service never binds to a LAN interface.
-use crate::{agent_options, inbox, web_v2, workbuddy_web};
+use crate::{agent_grants, agent_options, inbox, web_v2, workbuddy_web};
 use anyhow::{bail, Context, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
@@ -90,9 +90,7 @@ fn token_file(token: &str) -> Result<PathBuf> {
 
 /// Invoked by Chrome's trusted Native Host once per page; never by HTTP.
 pub fn issue_session(origin: &str) -> Result<Value> {
-    if !valid_origin(origin)
-        || !(workbuddy_web::allowed(origin)? || web_v2::has_status_grant(origin)?)
-    {
+    if !valid_origin(origin) || !(agent_grants::any(origin)? || web_v2::has_status_grant(origin)?) {
         bail!("OS user has not permitted this site to use local capabilities");
     }
     let endpoint = advertised_endpoint()?;
@@ -152,7 +150,7 @@ pub fn issue_session(origin: &str) -> Result<Value> {
     bail!("could not allocate a unique local session")
 }
 fn verify_session(origin: &str, token: &str) -> Result<()> {
-    if !(workbuddy_web::allowed(origin)? || web_v2::has_status_grant(origin)?) {
+    if !(agent_grants::any(origin)? || web_v2::has_status_grant(origin)?) {
         bail!("site grant revoked");
     }
     let file = token_file(token)?;
@@ -408,7 +406,7 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
     }
     // MCP-only sites are valid local clients too. Individual routes still
     // recheck exact WorkBuddy or MCP tool permissions before execution.
-    let allowed = workbuddy_web::allowed(&req.origin).unwrap_or(false)
+    let allowed = agent_grants::any(&req.origin).unwrap_or(false)
         || web_v2::has_status_grant(&req.origin).unwrap_or(false);
     if !allowed {
         reply(&mut stream, 403, None, &json!({"error":"site_not_granted"}))?;
@@ -432,6 +430,7 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
         ("GET", "/v2/capabilities") => {
             let value = json!({"protocol":"local-bridge-http-sse-v2",
                 "workbuddy":workbuddy_web::capability(&req.origin)?,
+                "agents":agent_options::capabilities(&req.origin)?,
                 "mcp":web_v2::capabilities(&req.origin)?,
                 "events":"sse+cursor", "local_bridge":true});
             reply(&mut stream, 200, Some(&req.origin), &value)?;
@@ -493,29 +492,15 @@ fn serve_client(mut stream: TcpStream) -> Result<()> {
                     .ok()
                     .and_then(|v| agent_options::from_value(&v).ok())
                 {
-                    Some(options) => {
-                        if options.model != "auto" || options.think_mode != "auto" {
-                            // The only currently executable Web adapter cannot
-                            // override model or reasoning config yet. Fail
-                            // explicitly instead of quietly ignoring it.
-                            reply(
-                                &mut stream,
-                                422,
-                                Some(&req.origin),
-                                &json!({"error":"agent_option_not_supported"}),
-                            )?;
-                        } else {
-                            match agent_options::run(&req.origin, options) {
-                                Ok(task) => reply(&mut stream, 202, Some(&req.origin), &task)?,
-                                Err(_) => reply(
-                                    &mut stream,
-                                    503,
-                                    Some(&req.origin),
-                                    &json!({"error":"no_authorized_compatible_agent"}),
-                                )?,
-                            }
-                        }
-                    }
+                    Some(options) => match agent_options::run(&req.origin, options) {
+                        Ok(task) => reply(&mut stream, 202, Some(&req.origin), &task)?,
+                        Err(_) => reply(
+                            &mut stream,
+                            503,
+                            Some(&req.origin),
+                            &json!({"error":"no_authorized_compatible_agent"}),
+                        )?,
+                    },
                     None => reply(
                         &mut stream,
                         400,

@@ -1,9 +1,13 @@
-//! Generic V2 Agent request: Bridge chooses a real local adapter before work.
-//! A Web hint is not proof an Agent is available. No cross-provider retries.
-use crate::workbuddy_web;
-use anyhow::{bail, Result};
+//! One Web V2 Agent status, selection, run and read contract for WorkBuddy,
+//! Codex and Pi. Unknown login/API readiness is NEVER reported as verified.
+//! Selection is before execution only; failed/unknown tasks never switch Agent.
+use crate::{agent_grants, agent_task, inbox, workbuddy_web};
+use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::time::Duration;
 
 fn default_auto() -> String {
     "auto".into()
@@ -11,7 +15,6 @@ fn default_auto() -> String {
 fn default_prefer() -> String {
     "prefer".into()
 }
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RunAgentRequest {
@@ -27,11 +30,11 @@ pub struct RunAgentRequest {
     #[serde(default = "default_prefer")]
     pub agent_mode: String,
 }
-
-fn valid_id(s: &str, max: usize) -> bool {
-    !s.is_empty()
-        && s.len() <= max
-        && s.bytes()
+fn valid_id(value: &str, max: usize) -> bool {
+    !value.is_empty()
+        && value.len() <= max
+        && value
+            .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.' | b':' | b'/'))
 }
 impl RunAgentRequest {
@@ -47,6 +50,7 @@ impl RunAgentRequest {
             || !valid_id(&self.model, 128)
             || self.model.contains("://")
             || self.model.starts_with('/')
+            || self.model.contains("..")
             || !["auto", "off", "low", "medium", "high", "xhigh", "max"]
                 .contains(&self.think_mode.as_str())
             || !["prefer", "require"].contains(&self.agent_mode.as_str())
@@ -57,14 +61,120 @@ impl RunAgentRequest {
         Ok(())
     }
 }
-
+fn installed_cli(name: &str) -> bool {
+    let binary = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_owned()
+    };
+    let paths = std::env::var_os("PATH").unwrap_or_default();
+    #[cfg(target_os = "macos")]
+    let dirs: Vec<_> = std::env::split_paths(&paths)
+        .chain(
+            ["/opt/homebrew/bin", "/usr/local/bin"]
+                .into_iter()
+                .map(std::path::PathBuf::from),
+        )
+        .collect();
+    #[cfg(not(target_os = "macos"))]
+    let dirs: Vec<_> = std::env::split_paths(&paths).collect();
+    dirs.iter().any(|dir| {
+        let path = dir.join(&binary);
+        if !path.is_file() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            path.metadata()
+                .is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0)
+        }
+        #[cfg(not(unix))]
+        {
+            true
+        }
+    })
+}
+fn options_supported(agent: &str, model: &str, think: &str) -> bool {
+    match agent {
+        "workbuddy" => model == "auto" && think == "auto",
+        "codex" => {
+            (model == "auto" || valid_id(model, 128))
+                && ["auto", "low", "medium", "high", "xhigh"].contains(&think)
+        }
+        "pi" => {
+            (model == "auto" || valid_id(model, 128))
+                && ["auto", "off", "low", "medium", "high", "xhigh"].contains(&think)
+        }
+        _ => false,
+    }
+}
+fn agent_state(origin: &str, name: &str) -> Result<Value> {
+    let authorized = agent_grants::allowed(origin, name)?;
+    let (installed, run_supported, modes) = match name {
+        "workbuddy" => {
+            let wb = workbuddy_web::capability(origin)?;
+            (
+                wb["installed"] == true,
+                wb["run_supported"] == true,
+                vec!["auto"],
+            )
+        }
+        "codex" => (
+            installed_cli("codex"),
+            true,
+            vec!["auto", "low", "medium", "high", "xhigh"],
+        ),
+        "pi" => (
+            installed_cli("pi"),
+            true,
+            vec!["auto", "off", "low", "medium", "high", "xhigh"],
+        ),
+        _ => bail!("unknown Agent provider"),
+    };
+    let eligible = installed && authorized && run_supported;
+    // An installed CLI or WBIPC application is NOT proof of usable login,
+    // a valid model, quota or successful completion. Real work resolves that.
+    let state = if !installed {
+        "not_installed"
+    } else if !run_supported {
+        "unsupported_platform"
+    } else if !authorized {
+        "not_granted"
+    } else {
+        "unverified"
+    };
+    Ok(json!({
+        "agent":name,
+        "installed":installed,
+        "local_grant":authorized,
+        "run_supported":run_supported,
+        "eligible":eligible,
+        "state":state,
+        "authenticated":null,
+        "api_ready":null,
+        "ready":null,
+        "task_mode":if name == "codex" { "read_only_sandbox" } else { "text_only_no_tools" },
+        "supported_think_modes":modes,
+        "supports_model_override":name != "workbuddy"
+    }))
+}
+/// Fresh, uniform status read used by native, local HTTP, CLI and the Web SDK.
+/// No login probes or model calls occur during capability discovery.
+pub fn capabilities(origin: &str) -> Result<Value> {
+    let agents: Vec<Value> = ["workbuddy", "codex", "pi"]
+        .iter()
+        .map(|name| agent_state(origin, name))
+        .collect::<Result<_>>()?;
+    Ok(json!(agents))
+}
 fn pick_agent<'a>(requested: &str, mode: &str, candidates: &'a [&'a str]) -> Result<&'a str> {
     if mode == "require" {
         return candidates
             .iter()
             .copied()
             .find(|c| *c == requested)
-            .ok_or_else(|| anyhow::anyhow!("required agent unavailable"));
+            .ok_or_else(|| anyhow::anyhow!("required Agent unavailable or incompatible"));
     }
     if requested != "auto" {
         if let Some(selected) = candidates.iter().copied().find(|c| *c == requested) {
@@ -74,85 +184,158 @@ fn pick_agent<'a>(requested: &str, mode: &str, candidates: &'a [&'a str]) -> Res
     candidates
         .first()
         .copied()
-        .ok_or_else(|| anyhow::anyhow!("no available local agent adapter"))
+        .ok_or_else(|| anyhow::anyhow!("no authorized compatible local Agent"))
 }
 
-/// One task uses one selected adapter. WorkBuddy-only execution at this
-/// stage is reported accurately; unverified model/think mode is not applied.
+/// Serialize task starts across both native Host and HTTP server processes.
+/// Never hold the lock while a running Agent or its worker performs a task.
+struct StartLock(std::path::PathBuf);
+impl StartLock {
+    fn acquire() -> Result<Self> {
+        let dir = inbox::data_root()?;
+        fs::create_dir_all(&dir)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
+        }
+        let path = dir.join("agent-v2-start.lock");
+        let mut opts = OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        match opts.open(&path) {
+            Ok(mut file) => {
+                let lock = Self(path);
+                file.write_all(b"agent-v2-start\n")?;
+                file.sync_all()?;
+                Ok(lock)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                let meta = fs::symlink_metadata(&path)?;
+                if !meta.file_type().is_file() {
+                    bail!("invalid Agent start lock");
+                }
+                if meta.modified()?.elapsed().unwrap_or_default() > Duration::from_secs(60) {
+                    let _ = fs::remove_file(&path);
+                    bail!("stale Agent start lock cleared; retry with same clientKey");
+                }
+                bail!("Agent task submission already in progress; preserve clientKey");
+            }
+            Err(error) => Err(error).context("cannot lock Agent task submission"),
+        }
+    }
+}
+impl Drop for StartLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+fn accepted(id: &str, chosen: &str, request: &RunAgentRequest, reused: bool) -> Value {
+    json!({
+        "api_version":2,
+        "task_id":id,"status":"accepted","reused":reused,
+        "selected_agent":chosen,"requested_agent":request.agent,
+        "selection":if reused { "existing_task" } else if request.agent == chosen {
+            "preferred"
+        } else if request.agent == "auto" {
+            "automatic"
+        } else {
+            "fallback_before_execution"
+        },
+        "requested_model":request.model,"requested_think_mode":request.think_mode,
+        "applied_model":null,"applied_think_mode":null
+    })
+}
 pub fn run(origin: &str, request: RunAgentRequest) -> Result<Value> {
     request.check()?;
-    let wb = workbuddy_web::capability(origin)?;
-    let available =
-        if wb["installed"] == true && wb["local_grant"] == true && wb["run_supported"] == true {
-            vec!["workbuddy"]
-        } else {
-            Vec::new()
-        };
-    let chosen = pick_agent(&request.agent, &request.agent_mode, &available)?;
-    if request.model != "auto" {
-        bail!("explicit model not supported by selected adapter");
+    let _lock = StartLock::acquire()?;
+    // Resolve an existing client key BEFORE selecting another Agent. In a
+    // transport failure the same logical task must not be started twice.
+    if let Some(id) = workbuddy_web::find(origin, &request.client_key)? {
+        if !agent_grants::allowed(origin, "workbuddy")? {
+            bail!("existing WorkBuddy task grant revoked");
+        }
+        return Ok(accepted(&id, "workbuddy", &request, true));
     }
-    if request.think_mode != "auto" {
-        bail!("explicit think mode not supported by selected adapter");
+    if let Some((id, provider)) = agent_task::find(origin, &request.client_key)? {
+        if !agent_grants::allowed(origin, &provider)? {
+            bail!("existing Agent task grant revoked");
+        }
+        return Ok(accepted(&id, &provider, &request, true));
     }
-    let mut task = match chosen {
+    let candidates: Vec<&str> = ["workbuddy", "codex", "pi"]
+        .into_iter()
+        .filter(|name| {
+            options_supported(name, &request.model, &request.think_mode)
+                && agent_state(origin, name).is_ok_and(|state| state["eligible"] == true)
+        })
+        .collect();
+    let chosen = pick_agent(&request.agent, &request.agent_mode, &candidates)?;
+    let output = match chosen {
         "workbuddy" => workbuddy_web::start(origin, &request.client_key, &request.prompt)?,
-        _ => bail!("agent adapter unavailable"),
+        "codex" | "pi" => agent_task::start(
+            origin,
+            &request.client_key,
+            chosen,
+            &request.prompt,
+            &request.model,
+            &request.think_mode,
+        )?,
+        _ => bail!("unsupported Agent adapter"),
     };
-    task["api_version"] = json!(2);
-    task["selected_agent"] = json!(chosen);
-    task["requested_agent"] = json!(request.agent);
-    task["selection"] = json!(if request.agent == chosen {
-        "preferred"
-    } else if request.agent == "auto" {
-        "automatic"
-    } else {
-        "fallback_before_execution"
-    });
-    task["applied_model"] = Value::Null;
-    task["applied_think_mode"] = Value::Null;
-    Ok(task)
+    let id = output["task_id"]
+        .as_str()
+        .context("missing Agent task ID")?;
+    Ok(accepted(id, chosen, &request, output["reused"] == true))
 }
-
-/// The current only runnable Web V2 worker is WorkBuddy. Preserve the generic
-/// client-facing task contract while other Agent adapters are verified.
 pub fn poll(origin: &str, id: &str, cursor: u64) -> Result<Value> {
-    if !id.starts_with("wb-") {
-        bail!("agent task adapter not available for this ID");
-    }
-    let mut event_page = workbuddy_web::poll(origin, id, cursor)?;
-    event_page["api_version"] = json!(2);
-    Ok(event_page)
+    let mut page = if id.starts_with("wb-") {
+        workbuddy_web::poll(origin, id, cursor)?
+    } else if id.starts_with("codex-") || id.starts_with("pi-") {
+        agent_task::poll(origin, id, cursor)?
+    } else {
+        bail!("unsupported Agent task ID");
+    };
+    page["api_version"] = json!(2);
+    Ok(page)
 }
-
 pub fn from_value(value: &Value) -> Result<RunAgentRequest> {
     let parsed: RunAgentRequest = serde_json::from_value(value.clone())?;
     parsed.check()?;
     Ok(parsed)
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn agent_selection_respects_preferences_and_strictness() {
+    fn selection_and_strictness_are_shared_by_all_adapters() {
         assert_eq!(
-            pick_agent("auto", "prefer", &["workbuddy", "codex"]).unwrap(),
-            "workbuddy"
-        );
-        assert_eq!(
-            pick_agent("codex", "prefer", &["workbuddy", "codex"]).unwrap(),
+            pick_agent("auto", "prefer", &["codex", "pi"]).unwrap(),
             "codex"
         );
+        assert_eq!(pick_agent("pi", "require", &["codex", "pi"]).unwrap(), "pi");
         assert_eq!(
-            pick_agent("pi", "prefer", &["workbuddy"]).unwrap(),
-            "workbuddy"
+            pick_agent("workbuddy", "prefer", &["codex", "pi"]).unwrap(),
+            "codex"
         );
-        assert!(pick_agent("pi", "require", &["workbuddy"]).is_err());
+        assert!(pick_agent("workbuddy", "require", &["codex", "pi"]).is_err());
         assert!(pick_agent("auto", "prefer", &[]).is_err());
     }
     #[test]
-    fn invalid_options_fail_before_any_task_executes() {
+    fn provider_options_must_be_supported_before_submitting_any_task() {
+        assert!(options_supported("workbuddy", "auto", "auto"));
+        assert!(!options_supported("workbuddy", "gpt-6", "auto"));
+        assert!(options_supported("codex", "gpt-6", "high"));
+        assert!(!options_supported("codex", "auto", "off"));
+        assert!(options_supported("pi", "9router/m3cn/model", "medium"));
+        assert!(!options_supported("pi", "auto", "max"));
+    }
+    #[test]
+    fn invalid_options_fail_before_start() {
         let base = json!({"api_version":2,"client_key":"task-123","prompt":"synthetic task"});
         assert!(from_value(&base).is_ok());
         assert!(from_value(&json!({"client_key":"task-123","prompt":"synthetic"})).is_err());
@@ -160,34 +343,13 @@ mod tests {
             from_value(&json!({"api_version":1,"client_key":"task-123","prompt":"synthetic"}))
                 .is_err()
         );
-        assert!(
-            from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"synthetic"}))
-                .is_ok()
-        );
         assert!(from_value(
-            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "agent":"workbuddy","model":"auto","think_mode":"high",
-           "agent_mode":"prefer"})
-        )
-        .is_ok());
-        assert!(from_value(
-            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "agent":"auto","agent_mode":"require"})
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test","shell":"rm"})
         )
         .is_err());
+        assert!(from_value(&json!({"api_version":2,"client_key":"task-123","prompt":"test","agent":"auto","agent_mode":"require"})).is_err());
         assert!(from_value(
-            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "model":"https://secret.example/path?token=abc"})
-        )
-        .is_err());
-        assert!(from_value(
-            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "think_mode":"unlimited"})
-        )
-        .is_err());
-        assert!(from_value(
-            &json!({"api_version":2,"client_key":"task-123","prompt":"test",
-           "shell":"rm -rf"})
+            &json!({"api_version":2,"client_key":"task-123","prompt":"test","model":"../secret"})
         )
         .is_err());
     }

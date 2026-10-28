@@ -268,6 +268,32 @@ fn node_path() -> Result<String> {
     }
     bail!("Node 24+ unavailable")
 }
+/// Existing WorkBuddy tasks participate in the common V2 client_key
+/// idempotency check before Bridge chooses another Agent.
+pub fn find(origin: &str, client_key: &str) -> Result<Option<String>> {
+    let base = root()?;
+    if !base.exists() {
+        return Ok(None);
+    }
+    let current = timestamp()?;
+    for item in fs::read_dir(base)? {
+        let item = item?;
+        if !item.file_type()?.is_dir() {
+            continue;
+        }
+        let Ok(meta) = metadata(&item.path()) else {
+            continue;
+        };
+        if meta.origin == origin
+            && meta.client_key == client_key
+            && current.saturating_sub(meta.created) <= TTL
+        {
+            return Ok(Some(meta.id));
+        }
+    }
+    Ok(None)
+}
+
 pub fn start(origin: &str, client_key: &str, prompt: &str) -> Result<Value> {
     if !allowed(origin)? {
         bail!("WorkBuddy not allowed on this origin");

@@ -135,7 +135,8 @@ pub fn capabilities(origin: &str) -> Result<Value> {
         .collect();
     Ok(json!({"origin":origin,"mcp_status_grants":grants,
         "workbuddy":workbuddy_web::capability(origin)?,
-        "agent_web_run_supported":cfg!(target_os="macos"),"profile_trusted":false}))
+        "agents":agent_options::capabilities(origin)?,
+        "agent_web_run_supported":true,"profile_trusted":false}))
 }
 /// Presence of a local OS-user grant; execution still rechecks an exact tool.
 pub fn has_status_grant(origin: &str) -> Result<bool> {
@@ -198,12 +199,7 @@ pub fn handle_native(request: &Value) -> Value {
             let mut options = p.clone();
             options.as_object_mut().unwrap().remove("origin");
             match agent_options::from_value(&options) {
-                Ok(request) => {
-                    if request.model != "auto" || request.think_mode != "auto" {
-                        return fail("agent_option_not_supported");
-                    }
-                    agent_options::run(origin, request)
-                }
+                Ok(request) => agent_options::run(origin, request),
                 Err(_) => return fail("invalid_agent_options"),
             }
         }
@@ -242,7 +238,9 @@ mod tests {
                 "think_mode":"high","agent_mode":"prefer"}
         }));
         assert_eq!(reply["ok"], false);
-        assert_eq!(reply["error"], "agent_option_not_supported");
+        // A preferred WorkBuddy may fall back before submission if another
+        // authorized adapter supports high. In CI no Origin grant exists.
+        assert_eq!(reply["error"], "not_granted_or_provider_unavailable");
         let invalid = handle_native(&json!({
             "protocol_version":2,"request_id":"agent-run-2",
             "action":"web.v2.agent.run",
