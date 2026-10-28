@@ -108,17 +108,26 @@ fn native_host_status_and_explicit_inbox_handoff() {
         }),
         &root,
     );
-    assert_eq!(relay["ok"],true);
-    assert_eq!(relay["result"]["status"],"received");
+    assert_eq!(relay["ok"], true);
+    assert_eq!(relay["result"]["status"], "received");
     let returned_id = relay["result"]["task_id"].as_str().unwrap();
-    let returned = command(&root, &["inbox","read",returned_id]);
-    assert_eq!(returned["source"],"web-ai-relay");
-    assert_eq!(returned["relay"]["task_ref"],id);
-    assert_eq!(returned["context"]["selection"],"Suggested changes, not executed.");
-    assert_eq!(command(&root, &["inbox","delete",returned_id])["deleted"],true);
-    let prepared=command(&root,&["relay","prepare",id]);
-    assert_eq!(prepared["task_ref"],id);
-    assert!(prepared["prompt"].as_str().unwrap().contains("User-selected example text"));
+    let returned = command(&root, &["inbox", "read", returned_id]);
+    assert_eq!(returned["source"], "web-ai-relay");
+    assert_eq!(returned["relay"]["task_ref"], id);
+    assert_eq!(
+        returned["context"]["selection"],
+        "Suggested changes, not executed."
+    );
+    assert_eq!(
+        command(&root, &["inbox", "delete", returned_id])["deleted"],
+        true
+    );
+    let prepared = command(&root, &["relay", "prepare", id]);
+    assert_eq!(prepared["task_ref"], id);
+    assert!(prepared["prompt"]
+        .as_str()
+        .unwrap()
+        .contains("User-selected example text"));
     assert_eq!(command(&root, &["inbox", "delete", id])["deleted"], true);
     assert!(command(&root, &["inbox", "list"])["items"]
         .as_array()

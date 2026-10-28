@@ -95,12 +95,18 @@ fn validate_relay(value: &Value) -> Result<(Value, Value)> {
     }
     if raw.web_ai.is_empty()
         || raw.web_ai.len() > 32
-        || !raw.web_ai.bytes().all(|b| b.is_ascii_lowercase() || b == b'-')
+        || !raw
+            .web_ai
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b == b'-')
     {
         bail!("invalid_provider_name");
     }
     if raw.task_ref.len() > 96
-        || !raw.task_ref.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b':' | b'.' | b'-' | b'_'))
+        || !raw
+            .task_ref
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b':' | b'.' | b'-' | b'_'))
     {
         bail!("invalid_task_ref");
     }
@@ -202,7 +208,7 @@ fn handle_with_summary(request: &Value, runner: impl FnOnce(&str) -> Result<Valu
                         "note":"Web AI reply stored for human review; no local tool was executed."
                     }
                 }),
-                Err(_) => failure("local_inbox_unavailable")
+                Err(_) => failure("local_inbox_unavailable"),
             }
         }
         Some("context.summarize") => {

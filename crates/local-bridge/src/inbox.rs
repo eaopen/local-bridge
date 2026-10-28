@@ -250,7 +250,10 @@ mod tests {
         let dir = env::temp_dir().join(format!(
             "local-bridge-relay-{}-{}",
             std::process::id(),
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let id = save_record_to(
             &dir,
@@ -258,9 +261,8 @@ mod tests {
             "web-ai-relay",
             Some(json!({"relay_id":"rel-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","task_ref":"ctx-123456789abc","web_ai":"chatgpt"})),
         ).unwrap();
-        let stored: Value = serde_json::from_slice(
-            &fs::read(dir.join(format!("{id}.json"))).unwrap()
-        ).unwrap();
+        let stored: Value =
+            serde_json::from_slice(&fs::read(dir.join(format!("{id}.json"))).unwrap()).unwrap();
         assert_eq!(stored["source"], "web-ai-relay");
         assert_eq!(stored["relay"]["task_ref"], "ctx-123456789abc");
         assert_eq!(stored["context"]["selection"], "patch suggestion");
