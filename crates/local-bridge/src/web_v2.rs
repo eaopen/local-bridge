@@ -2,13 +2,12 @@
 //! Chrome must validate the real sender origin and a separate website permission.
 //! The local user grants an exact (origin, installed provider, status tool) tuple.
 //! This is not a remote-profile permission, nor generic provider.call.
-use crate::{agent_options, inbox, local_http, mcp_provider, workbuddy_web};
-use anyhow::{bail, Context, Result};
+use crate::{agent_options, inbox, local_http, mcp_provider, state_file, workbuddy_web};
+use anyhow::{bail, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 const MAX_GRANTS_BYTES: u64 = 64 * 1024;
@@ -63,30 +62,7 @@ fn load() -> Result<Vec<Grant>> {
     Ok(grants)
 }
 fn save(grants: &[Grant]) -> Result<()> {
-    let path = path()?;
-    // Directory is private to the OS user (same location as the Bridge inbox).
-    let tmp = path.with_extension("json.tmp");
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options.open(&tmp).context("cannot stage Web grant file")?;
-    let result = (|| -> Result<()> {
-        serde_json::to_writer(&mut file, grants)?;
-        file.write_all(b"\n")?;
-        file.sync_all()?;
-        // Windows may reject replacing an existing destination; do not lose
-        // old grants or relax execution when this update fails.
-        fs::rename(&tmp, &path)?;
-        Ok(())
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(tmp);
-    }
-    result
+    state_file::write_json(&path()?, grants)
 }
 
 /// Only executable from a local CLI with the user's existing MCP registration.
@@ -100,25 +76,30 @@ pub fn grant_status(origin: &str, provider: &str, tool: &str) -> Result<Value> {
     {
         bail!("installed MCP provider does not advertise the status tool");
     }
-    let mut grants = load()?;
-    if !grants
-        .iter()
-        .any(|g| g.origin == origin && g.provider == provider && g.tool == tool)
-    {
-        if grants.len() >= MAX_GRANTS {
-            bail!("too many Web grants");
+    state_file::with_lock(&path()?, || {
+        let mut grants = load()?;
+        if !grants
+            .iter()
+            .any(|g| g.origin == origin && g.provider == provider && g.tool == tool)
+        {
+            if grants.len() >= MAX_GRANTS {
+                bail!("too many Web grants");
+            }
+            grants.push(grant);
+            save(&grants)?;
         }
-        grants.push(grant);
-        save(&grants)?;
-    }
+        Ok(())
+    })?;
     Ok(json!({"origin":origin,"provider":provider,"tool":tool,
         "granted":true,"scope":"status_only_no_args"}))
 }
 pub fn revoke_status(origin: &str, provider: &str, tool: &str) -> Result<Value> {
     checked(origin, provider, tool)?;
-    let mut grants = load()?;
-    grants.retain(|g| !(g.origin == origin && g.provider == provider && g.tool == tool));
-    save(&grants)?;
+    state_file::with_lock(&path()?, || {
+        let mut grants = load()?;
+        grants.retain(|g| !(g.origin == origin && g.provider == provider && g.tool == tool));
+        save(&grants)
+    })?;
     Ok(json!({"origin":origin,"provider":provider,"tool":tool,"revoked":true}))
 }
 pub fn capabilities(origin: &str) -> Result<Value> {

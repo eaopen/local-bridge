@@ -1,12 +1,11 @@
 //! Per-origin Agent authorization for Web V2. Existing WorkBuddy site grants
 //! remain valid; Codex/Pi receive the same explicit OS-user grant semantics.
-use crate::{inbox, workbuddy_web};
+use crate::{inbox, state_file, workbuddy_web};
 use anyhow::{bail, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,33 +38,9 @@ fn load() -> Result<Vec<Grant>> {
     Ok(grants)
 }
 fn save(grants: &[Grant]) -> Result<()> {
-    let p = path()?;
-    let dir = p
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("invalid grant directory"))?;
-    fs::create_dir_all(dir)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
-    }
-    let tmp = p.with_extension("json.tmp");
-    let mut opts = OpenOptions::new();
-    opts.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(0o600);
-    }
-    let mut f = opts.open(&tmp)?;
-    f.write_all(&serde_json::to_vec(grants)?)?;
-    f.sync_all()?;
-    if let Err(err) = fs::rename(&tmp, &p) {
-        let _ = fs::remove_file(tmp);
-        return Err(err.into());
-    }
-    Ok(())
+    state_file::write_json(&path()?, grants)
 }
+
 pub fn allowed(origin: &str, agent: &str) -> Result<bool> {
     check(origin, agent)?;
     // Do not break users who previously approved WorkBuddy with grant-workbuddy.
@@ -90,20 +65,23 @@ pub fn grant(origin: &str, agent: &str) -> Result<Value> {
         // Existing WorkBuddy task permission and data stay authoritative.
         return workbuddy_web::grant(origin);
     }
-    let mut grants = load()?;
-    if !grants
-        .iter()
-        .any(|g| g.origin == origin && g.agent == agent)
-    {
-        if grants.len() >= 96 {
-            bail!("too many Agent grants");
+    state_file::with_lock(&path()?, || {
+        let mut grants = load()?;
+        if !grants
+            .iter()
+            .any(|g| g.origin == origin && g.agent == agent)
+        {
+            if grants.len() >= 96 {
+                bail!("too many Agent grants");
+            }
+            grants.push(Grant {
+                origin: origin.into(),
+                agent: agent.into(),
+            });
+            save(&grants)?;
         }
-        grants.push(Grant {
-            origin: origin.into(),
-            agent: agent.into(),
-        });
-        save(&grants)?;
-    }
+        Ok(())
+    })?;
     let mode = if agent == "codex" {
         "read_only_sandbox"
     } else {
@@ -116,9 +94,11 @@ pub fn revoke(origin: &str, agent: &str) -> Result<Value> {
     if agent == "workbuddy" {
         return workbuddy_web::revoke(origin);
     }
-    let mut grants = load()?;
-    grants.retain(|g| !(g.origin == origin && g.agent == agent));
-    save(&grants)?;
+    state_file::with_lock(&path()?, || {
+        let mut grants = load()?;
+        grants.retain(|g| !(g.origin == origin && g.agent == agent));
+        save(&grants)
+    })?;
     Ok(json!({"origin":origin,"agent":agent,"revoked":true}))
 }
 

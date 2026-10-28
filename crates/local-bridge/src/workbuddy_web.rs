@@ -1,11 +1,16 @@
 //! WorkBuddy Web V2: one macOS native-account text-only job, cursor-based replies.
 //! Browser AND OS-user grants are required. No tool calls, shell or auto retry.
-use crate::inbox;
-use anyhow::{bail, Context, Result};
+use crate::{inbox, state_file};
+#[cfg(target_os = "macos")]
+use anyhow::Context;
+use anyhow::{bail, Result};
 use local_bridge_core::valid_origin;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs::{self, OpenOptions};
+use std::fs;
+#[cfg(target_os = "macos")]
+use std::fs::OpenOptions;
+#[cfg(target_os = "macos")]
 use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
@@ -51,6 +56,7 @@ fn private_dir(p: &Path) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(target_os = "macos")]
 fn private_write(p: &Path, b: &[u8]) -> Result<()> {
     let mut o = OpenOptions::new();
     o.create_new(true).write(true);
@@ -79,48 +85,36 @@ fn read_grants() -> Result<Vec<String>> {
     }
     Ok(ids)
 }
-fn private_grant_root() -> Result<()> {
-    let dir = inbox::data_root()?;
-    fs::create_dir_all(&dir)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
-    }
-    Ok(())
-}
 fn save_grants(ids: &[String]) -> Result<()> {
-    private_grant_root()?;
-    let p = grant_file()?;
-    let tmp = p.with_extension("json.tmp");
-    private_write(&tmp, &serde_json::to_vec(ids)?)?;
-    if let Err(e) = fs::rename(&tmp, &p) {
-        let _ = fs::remove_file(tmp);
-        return Err(e).context("grant update failed");
-    }
-    Ok(())
+    state_file::write_json(&grant_file()?, ids)
 }
+
 pub fn grant(origin: &str) -> Result<Value> {
     if !valid_origin(origin) {
         bail!("invalid agent origin");
     }
-    let mut ids = read_grants()?;
-    if !ids.iter().any(|x| x == origin) {
-        if ids.len() >= 32 {
-            bail!("too many grants");
+    state_file::with_lock(&grant_file()?, || {
+        let mut ids = read_grants()?;
+        if !ids.iter().any(|x| x == origin) {
+            if ids.len() >= 32 {
+                bail!("too many grants");
+            }
+            ids.push(origin.into());
+            save_grants(&ids)?;
         }
-        ids.push(origin.into());
-        save_grants(&ids)?;
-    }
+        Ok(())
+    })?;
     Ok(json!({"origin":origin,"provider":"workbuddy","granted":true,"mode":"text_only_no_tools"}))
 }
 pub fn revoke(origin: &str) -> Result<Value> {
     if !valid_origin(origin) {
         bail!("invalid agent origin");
     }
-    let mut ids = read_grants()?;
-    ids.retain(|x| x != origin);
-    save_grants(&ids)?;
+    state_file::with_lock(&grant_file()?, || {
+        let mut ids = read_grants()?;
+        ids.retain(|x| x != origin);
+        save_grants(&ids)
+    })?;
     Ok(json!({"origin":origin,"provider":"workbuddy","revoked":true}))
 }
 pub fn allowed(origin: &str) -> Result<bool> {

@@ -11,6 +11,10 @@
 - **保持体积与依赖**：不新增常驻桌面进程、第二套 CloudFile 工作副本、Journal/Guard、Tauri/WebView2，也不因第一批增加数据库、自动更新服务或新业务参数。
 - 下一批才考虑：Bridge 本地持久化原子写入与统一任务状态投影；真正有常驻运行/用户安装需求后，再移植轻量自启、签名更新与回退机制。详见[小步迁移计划](LOCAL_FOUNDATION_MIGRATION.md)。
 
+## M0.2 — Bridge Web 授权原子存储（第二批）
+
+从 Agent2 的原子写入/短事务原则提取极小的通用状态函数，解决固定 `.json.tmp` 残留和跨进程授权互相覆盖。仅修复 Bridge 自身 status/Agent/WorkBuddy 三组 Web 授权；存储路径/JSON schema 不变，不需要新依赖，也不涉及 CloudFile Journal、Guard 或工作副本。详细范围见[通用能力迁移计划](LOCAL_FOUNDATION_MIGRATION.md)。
+
 ## M0 — 当前已实现的基线
 
 Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 MCP Client、离线 Profile 结构校验、可选 Chrome Native Host/Inbox、Web AI 手动接力，以及用户主动调用既有 Codex CLI 的临时只读任务均已在代码中实现。**Codex/Pi 与 WorkBuddy 均已有独立本机实验记录；统一 Web V2 Agent 状态和 run/read 已有源码，但三者的 Chrome/HTTP 真实端到端尚未验收。已实现代码不等于已验证模型/登录/企业联动。**可信在线 Profile、PersonalProfile Runtime、跨 Provider 任务聚合、完整通信 Adapter、CloudFile 文件 IPC 均未交付。CloudFile 编辑仍走现有 Agent2/Hub/Server。详见 [Agent 实测矩阵](AGENT_PROVIDER_VALIDATION.md)。

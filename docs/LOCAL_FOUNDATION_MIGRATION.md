@@ -31,6 +31,14 @@
 - **CI**：Windows/macOS/Linux Rustfmt、Clippy、test/build 全绿；不宣称真实 Chrome GUI/企业登录验收完成。
 - 未把整套 Agent2 `storage/update/hostreg` 文件直接复制；只有实际需要的通用行为落入 Bridge。原 CloudFile Agent2 `dev`、原 Chrome 扩展、Agent2 Provider Draft PR #26 均不变。
 
+## 第 2 批：现有 Web 授权持久化（小范围落地）
+
+- 只针对 **Bridge 自己** 的三份 Web 授权：`web-v2-status-grants.json`、`web-v2-agent-grants.json`、`workbuddy-web-v2-grants.json`。原文件名、JSON 字段、Origin 范围及 WorkBuddy 旧授权兼容语义保持不变。
+- 采用 Agent2 的可靠私有写入思路：私有父目录、唯一暂存文件、`fsync` 后重命名、Windows 短暂占用时有界重试。不会清理/迁移用户旧授权，也不因历史 `.json.tmp` 残留阻塞更新。
+- 授权的“读→改→写”使用 Rust 1.90 标准库 OS 文件锁（锁进程退出自动释放），避免两次并发 CLI 互相覆盖。不是新数据库、后台任务或身份系统。
+- 只要原文件损坏或权限不可用，继续 **fail closed**：不默默重建全部授权或替网页登录放权。现有 Agent任务文件、MCP Provider 注册和 CloudFile 专业文件 Journal **不在这一批迁移范围**。
+- 最小 CI：重复覆盖文件、旧固定 temp 残留、并发写锁和现有 Web 授权测试；没有真实 AI/Chrome/CloudFile 写入。
+
 ## 下一步严格优先级
 
 1. 先使用现有用户日志/故障验证 Host 安装、回退行为，若有 Windows Manifest/Registry 争用再做小范围修正。
