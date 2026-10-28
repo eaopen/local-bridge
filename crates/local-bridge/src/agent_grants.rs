@@ -104,7 +104,11 @@ pub fn grant(origin: &str, agent: &str) -> Result<Value> {
         });
         save(&grants)?;
     }
-    let mode = if agent == "codex" { "read_only_sandbox" } else { "text_only_no_tools" };
+    let mode = if agent == "codex" {
+        "read_only_sandbox"
+    } else {
+        "text_only_no_tools"
+    };
     Ok(json!({"origin":origin,"agent":agent,"granted":true,"mode":mode}))
 }
 pub fn revoke(origin: &str, agent: &str) -> Result<Value> {
