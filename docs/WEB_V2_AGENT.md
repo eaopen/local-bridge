@@ -1,6 +1,6 @@
 # Web V2 Agent：统一状态、选择、执行与读取（2026-10-28）
 
-> **实现状态：代码已接线，尚未做真实登录、模型、Chrome、Windows/macOS 端到端验收。** 以下是当前 `dev` 候选代码合同，不把源码存在或 CI 通过当作实际 Agent 可用。
+> **实现状态（2026-10-29）：代码已在 `dev`。macOS 独立 Chrome for Testing + 现有真实 Codex 登录，已通过 Web V2 `agent.run/read` → `task.completed`、同一 `clientKey` 重用原任务；详细见 [实机验收](validation/chrome-macos-20261029.md)。尚未验收 Windows、正式 Chrome 权限弹窗、HTTP/SSE→Native 断线续读、WorkBuddy/Pi 的相同 E2E 和企业真实 SSO。** CI 或 `accepted` 均不等于任务完成。
 
 ## 公共合同
 
