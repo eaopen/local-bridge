@@ -154,7 +154,7 @@ fn agent_state(origin: &str, name: &str) -> Result<Value> {
         "authenticated":null,
         "api_ready":null,
         "ready":null,
-        "task_mode":"text_only_no_tools",
+        "task_mode":if name == "codex" { "read_only_sandbox" } else { "text_only_no_tools" },
         "supported_think_modes":modes,
         "supports_model_override":name != "workbuddy"
     }))
