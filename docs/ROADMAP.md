@@ -1,5 +1,7 @@
 # Roadmap — 优先交付用户可用的跨系统协作
 
+**双产品栈长期独立（2026-10-29）：** CloudFile Agent2 + 原 CloudFile Chrome 是第一套；Local Bridge + 新 Chrome + 可选独立 CloudFile Provider 是第二套。两套的 Chrome/Host/通用配置和发行保持独立，但**CloudFile 文件目录、Journal/Guard 和文件任务只有 Agent2 一份**，只有明确批准并验收的升级合并才能切换。见[双轨边界](CLOUDFILE_TO_BRIDGE_MIGRATION.md)。
+
 **产品定位（2026-10-27）：** 面向个人和企业的轻量级本地能力连接与任务协作平台。**默认混合、按需隔离**。每个开发任务都要证明减少用户操作，而不是增加一个平台。
 
 ## M0 — 当前已实现的基线
@@ -23,7 +25,7 @@ Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 
 
 - 先提供显式用户触发的 `agent codex <prompt|->` 只读 CLI 接线（完成条件与超时不可误报，需真实本机验收），再扩展到 AgentAdapter/浏览器受控调用；
 - **Codex 与 WorkBuddy 两者都列入 P0 验证（不是运行时必装）：** Codex 继续复用实测 CLI，再以 App Server stdio 做会话/状态最小 Adapter；WorkBuddy 先在真实安装机验证本地 Connector → Bridge MCP，获得官方第三方应用 OAuth/Scope 后才验证 Bridge → WorkBuddy Local Assistant Open API。两方向不得混算；Pi 是可选备选。见 [验收标准](AGENT_PROVIDER_VALIDATION.md)。
-- CloudFile Agent2 既有任务摘要旁路接入 BridgeTask，文件本身继续由现役引擎处理。
+- Agent2 `cloudfile-native-host --bridge-provider` 的只读摘要逐步接入 BridgeTask，展示**同一个 Agent2 文件数据根**的现有任务；不在 Bridge 新建 Journal/工作副本或并行上传引擎。
 - 同一台公司电脑同时运行企业文件任务和个人聊天助手任务；不切换 Profile、不增加跨 Profile 审批，统一展示真实结果。
 
 ## 已实现的本机 Provider 连接基线（仍待真实微信实机验收）
@@ -39,9 +41,9 @@ Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 
 
 ## M4 — 验证后才考虑统一桌面入口
 
-- CloudFile 查看、普通编辑、独占编辑通过最小 IPC 适配逐项真实验收；旧 Host、Guard、Journal 和活动文件任务不迁移。
+- 为**第二套 Chrome/Bridge 入口**逐项验证查看、普通编辑、独占编辑，经 Provider 调用原 Agent2 唯一文件执行器；两入口共用文件任务、Journal/Guard/工作副本，不独立复制。
 - Windows 普通用户优先，Mac/Linux 同合同逐步覆盖；Chrome/Agent 升级与回退须保持已有生产使用习惯。
-- 完整桌面壳、更多扩展、复杂任务 UI 在实测价值明确后建设，不强制 WebView/Pi/特权后台。
+- 第二套可以按实际价值添加 Bridge 可选的通用桌面任务壳；第一套原 Tauri 长期保留。统一安装、旧插件退役属于未来单独批准的升级合并，不是本里程碑自动结果。
 
 **判断标准：**解决了什么痛点、减少哪些步骤、复用了什么、有没有新障碍。拒绝重复 SSO、企业 DLP、重写文件引擎、大型通用 RPA、重复任务数据库和过度审批。
 
