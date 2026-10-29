@@ -48,17 +48,42 @@ fn private_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 fn strong_token() -> Result<String> {
+    // 256 bits of OS-provided randomness on both desktop platforms.
+    // No timestamp, PID, browser-generated token or persisted shared secret.
+    let mut raw = [0u8; 32];
     #[cfg(unix)]
+    File::open("/dev/urandom")?.read_exact(&mut raw)?;
+    #[cfg(windows)]
     {
-        // CSPRNG; no user-supplied entropy, timestamp, PID or pseudo-random token.
-        let mut raw = [0u8; 32];
-        File::open("/dev/urandom")?.read_exact(&mut raw)?;
-        Ok(raw.iter().map(|b| format!("{b:02x}")).collect())
+        // BCryptGenRandom with a null algorithm handle uses Windows' system CSPRNG.
+        // No new dependency or OS credential store is needed.
+        #[link(name = "bcrypt")]
+        unsafe extern "system" {
+            fn BCryptGenRandom(
+                algorithm: *mut std::ffi::c_void,
+                buffer: *mut u8,
+                buffer_size: u32,
+                flags: u32,
+            ) -> i32;
+        }
+        const BCRYPT_USE_SYSTEM_PREFERRED_RNG: u32 = 0x0000_0002;
+        // SAFETY: raw is a valid writable 32-byte buffer; the null handle is
+        // permitted with BCRYPT_USE_SYSTEM_PREFERRED_RNG.
+        let status = unsafe {
+            BCryptGenRandom(
+                std::ptr::null_mut(),
+                raw.as_mut_ptr(),
+                raw.len() as u32,
+                BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+            )
+        };
+        if status < 0 {
+            bail!("Windows system random generator unavailable");
+        }
     }
-    #[cfg(not(unix))]
-    {
-        bail!("loopback session bootstrap not yet enabled on this OS")
-    }
+    #[cfg(not(any(unix, windows)))]
+    bail!("unsupported local session random generator");
+    Ok(raw.iter().map(|b| format!("{b:02x}")).collect())
 }
 /// Plain 127.0.0.1 HTTP is the default. TLS is *not* required for a
 /// same-machine Bridge, and Chrome LNA permission is distinct from TLS trust.
@@ -585,13 +610,10 @@ mod tests {
 
     #[test]
     fn session_token_is_cryptographically_random_and_strict() {
-        #[cfg(unix)]
-        {
-            let a = strong_token().unwrap();
-            let b = strong_token().unwrap();
-            assert!(token_id(&a));
-            assert_ne!(a, b);
-        }
+        let a = strong_token().unwrap();
+        let b = strong_token().unwrap();
+        assert!(token_id(&a));
+        assert_ne!(a, b);
         assert!(!token_id("test"));
         assert!(!token_id("../etc/passwd"));
     }
