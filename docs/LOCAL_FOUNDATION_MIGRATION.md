@@ -29,7 +29,7 @@
 - **单元**：同配置重复安装、不同配置拒绝覆盖、显式备份替换、回退、卸载与外部 Host 拒绝删除。
 - **跨进程**：在隔离用户目录运行真正 `local-bridge` 和 `local-bridge-native-host`，校验 Host 缺失仍可正常自检、原 Native Messaging/InBox 仍可用。
 - **CI**：Windows/macOS/Linux Rustfmt、Clippy、test/build 全绿；不宣称真实 Chrome GUI/企业登录验收完成。
-- 未把整套 Agent2 `storage/update/hostreg` 文件直接复制；只有实际需要的通用行为落入 Bridge。原 CloudFile Agent2 `dev`、原 Chrome 扩展、Agent2 Provider Draft PR #26 均不变。
+- 未把整套 Agent2 `storage/update/hostreg` 文件直接复制；只有实际需要的通用行为落入 Bridge。原 CloudFile Agent2 `dev`、原 Chrome 扩展、Agent2 Provider PR #26（已合入 Agent2 dev） 均不变。
 
 ## 第 2 批：现有 Web 授权持久化（小范围落地）
 
