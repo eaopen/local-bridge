@@ -6,8 +6,6 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::time::Duration;
 
 fn default_auto() -> String {
     "auto".into()
@@ -189,7 +187,12 @@ fn pick_agent<'a>(requested: &str, mode: &str, candidates: &'a [&'a str]) -> Res
 
 /// Serialize task starts across both native Host and HTTP server processes.
 /// Never hold the lock while a running Agent or its worker performs a task.
-struct StartLock(std::path::PathBuf);
+// Keep one OS file lock across process boundaries while resolving a clientKey
+// and recording its task. Unlike create_new + delete, this releases on crash
+// and cannot delete another process's live lock after an arbitrary 60s cutoff.
+struct StartLock {
+    _file: fs::File,
+}
 impl StartLock {
     fn acquire() -> Result<Self> {
         let dir = inbox::data_root()?;
@@ -199,39 +202,28 @@ impl StartLock {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
         }
-        let path = dir.join("agent-v2-start.lock");
+        Self::acquire_at(&dir.join("agent-v2-start.lock"))
+    }
+
+    fn acquire_at(path: &std::path::Path) -> Result<Self> {
+        if fs::symlink_metadata(path).is_ok_and(|m| !m.file_type().is_file()) {
+            bail!("invalid Agent start lock");
+        }
         let mut opts = OpenOptions::new();
-        opts.write(true).create_new(true);
+        opts.read(true).write(true).create(true).truncate(false);
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
             opts.mode(0o600);
         }
-        match opts.open(&path) {
-            Ok(mut file) => {
-                let lock = Self(path);
-                file.write_all(b"agent-v2-start\n")?;
-                file.sync_all()?;
-                Ok(lock)
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                let meta = fs::symlink_metadata(&path)?;
-                if !meta.file_type().is_file() {
-                    bail!("invalid Agent start lock");
-                }
-                if meta.modified()?.elapsed().unwrap_or_default() > Duration::from_secs(60) {
-                    let _ = fs::remove_file(&path);
-                    bail!("stale Agent start lock cleared; retry with same clientKey");
-                }
-                bail!("Agent task submission already in progress; preserve clientKey");
+        let file = opts.open(path).context("cannot open Agent start lock")?;
+        match file.try_lock().map_err(std::io::Error::from) {
+            Ok(()) => Ok(Self { _file: file }),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                bail!("Agent task submission already in progress; preserve clientKey")
             }
             Err(error) => Err(error).context("cannot lock Agent task submission"),
         }
-    }
-}
-impl Drop for StartLock {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.0);
     }
 }
 fn accepted(id: &str, chosen: &str, request: &RunAgentRequest, reused: bool) -> Value {
@@ -351,6 +343,23 @@ pub fn local_inventory() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn agent_start_lock_excludes_concurrent_starts_and_recovers_without_deleting_file() {
+        let path = std::env::temp_dir().join(format!(
+            "bridge-agent-lock-{}-{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        let _ = fs::remove_file(&path);
+        let first = StartLock::acquire_at(&path).unwrap();
+        assert!(StartLock::acquire_at(&path).is_err());
+        drop(first);
+        assert!(path.is_file(), "stable OS lock file must not be unlinked");
+        let second = StartLock::acquire_at(&path).unwrap();
+        drop(second);
+        fs::remove_file(path).unwrap();
+    }
+
     #[test]
     fn selection_and_strictness_are_shared_by_all_adapters() {
         assert_eq!(
