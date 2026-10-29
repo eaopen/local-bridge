@@ -107,7 +107,11 @@ fn codex_command(program: &str, model: &str, think_mode: &str) -> Result<Command
     Ok(command)
 }
 
-fn spawn_codex(model: &str, think_mode: &str) -> Result<std::process::Child> {
+fn spawn_codex(
+    model: &str,
+    think_mode: &str,
+    cwd: Option<&std::path::Path>,
+) -> Result<std::process::Child> {
     // Prefer the user's PATH, and on macOS fall back to existing Homebrew
     // launchers for Chrome's GUI environment. No installation is performed.
     #[cfg(target_os = "macos")]
@@ -116,7 +120,11 @@ fn spawn_codex(model: &str, think_mode: &str) -> Result<std::process::Child> {
     let candidates = ["codex"];
 
     for candidate in candidates {
-        match codex_command(candidate, model, think_mode)?.spawn() {
+        let mut command = codex_command(candidate, model, think_mode)?;
+        if let Some(cwd) = cwd {
+            command.current_dir(cwd);
+        }
+        match command.spawn() {
             Ok(child) => return Ok(child),
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
             Err(err) => return Err(err).context("Codex CLI could not start"),
@@ -135,11 +143,20 @@ pub fn run_codex(prompt: &str) -> Result<Value> {
 /// The same bounded, read-only Codex CLI task, with documented V2 options.
 /// Returning a spawn receipt is not proof of a completed turn.
 pub fn run_codex_web(prompt: &str, model: &str, think_mode: &str) -> Result<Value> {
+    run_codex_in(prompt, model, think_mode, None)
+}
+
+pub(crate) fn run_codex_in(
+    prompt: &str,
+    model: &str,
+    think_mode: &str,
+    cwd: Option<&std::path::Path>,
+) -> Result<Value> {
     if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
         bail!("agent prompt must contain 1..65536 bytes of text");
     }
 
-    let mut child = spawn_codex(model, think_mode)?;
+    let mut child = spawn_codex(model, think_mode, cwd)?;
 
     let stdout = child.stdout.take().context("Codex stdout unavailable")?;
     let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
@@ -334,6 +351,17 @@ fn pi_web_command(model: &str, think_mode: &str) -> Result<Command> {
 }
 pub fn run_pi_web(prompt: &str, model: &str, think_mode: &str) -> Result<Value> {
     run_pi_command(pi_web_command(model, think_mode)?, "pi", model, prompt)
+}
+
+pub(crate) fn run_pi_check(
+    prompt: &str,
+    model: &str,
+    think_mode: &str,
+    cwd: &std::path::Path,
+) -> Result<Value> {
+    let mut command = pi_web_command(model, think_mode)?;
+    command.current_dir(cwd).arg("--no-mcp").arg("--no-approve");
+    run_pi_command(command, "pi", model, prompt)
 }
 
 /// Enterprise app provides one already-authenticated compatible model session.

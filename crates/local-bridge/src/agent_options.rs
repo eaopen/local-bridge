@@ -95,7 +95,7 @@ fn installed_cli(name: &str) -> bool {
         }
     })
 }
-fn options_supported(agent: &str, model: &str, think: &str) -> bool {
+pub(crate) fn options_supported(agent: &str, model: &str, think: &str) -> bool {
     match agent {
         "workbuddy" => model == "auto" && think == "auto",
         "codex" => {

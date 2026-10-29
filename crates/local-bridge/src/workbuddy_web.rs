@@ -246,7 +246,7 @@ impl Drop for StartLock {
 }
 
 #[cfg(target_os = "macos")]
-fn assets(dir: &Path) -> Result<()> {
+pub(crate) fn assets(dir: &Path) -> Result<()> {
     private_write(
         &dir.join("worker.mjs"),
         include_str!("../../../scripts/workbuddy-web-v2/worker.mjs").as_bytes(),
@@ -262,7 +262,7 @@ fn assets(dir: &Path) -> Result<()> {
     Ok(())
 }
 #[cfg(target_os = "macos")]
-fn node_path() -> Result<String> {
+pub(crate) fn node_path() -> Result<String> {
     for s in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "node"] {
         if !s.starts_with('/') || Path::new(s).is_file() {
             return Ok(s.to_owned());

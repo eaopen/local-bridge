@@ -171,3 +171,35 @@ fn native_host_status_and_explicit_inbox_handoff() {
 
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn explicit_bridge_data_directory_keeps_user_home_separate() {
+    let root = std::env::temp_dir().join(format!(
+        "local-bridge-data-dir-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let home = root.join("original-agent-home");
+    let bridge = root.join("bridge-dev-state");
+    std::fs::create_dir_all(&home).unwrap();
+    let output = for_user(env!("CARGO_BIN_EXE_local-bridge"), &home)
+        .env("LOCAL_BRIDGE_DATA_DIR", &bridge)
+        .args(["self-test"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let status: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(status["ok"], true);
+    assert!(bridge.is_dir());
+    assert_eq!(std::fs::read_dir(&home).unwrap().count(), 0);
+    let bad = for_user(env!("CARGO_BIN_EXE_local-bridge"), &home)
+        .env("LOCAL_BRIDGE_DATA_DIR", "relative-state")
+        .args(["agent-preferences", "get"])
+        .output()
+        .unwrap();
+    assert!(!bad.status.success());
+    std::fs::remove_dir_all(root).unwrap();
+}

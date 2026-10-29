@@ -42,6 +42,9 @@ fn run() -> Result<()> {
             }
         }
         [x] if x == "mcp" => mcp::serve()?,
+        [command, action, provider] if command == "agent" && action == "check" => {
+            println!("{}", local_bridge::agent_health::check(provider)?);
+        }
         [x, action] if x == "agent-preferences" && action == "get" => {
             println!("{}", agent_preferences::get_value()?);
         }
@@ -287,7 +290,7 @@ fn run() -> Result<()> {
         }
         [] | [_] if args.first().is_none_or(|s| s == "--help" || s == "-h") => {
             println!(
-                "Local Bridge {}\nCommands: status | mcp | agent-preferences get|set <json|-> | tasks list [--cloudfile] | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host status|uninstall|rollback | native-host install <extension-id> [--replace] | self-test | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 serve | web-v2 grant-agent <origin> <workbuddy|codex|pi> | web-v2 revoke-agent <origin> <workbuddy|codex|pi> | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
+                "Local Bridge {}\nCommands: status | mcp | agent check <codex|workbuddy|pi> | agent-preferences get|set <json|-> | tasks list [--cloudfile] | provider add <id> <absolute-executable> [fixed-args...] | provider list | provider tools <id> | provider call <id> <tool> <json|-> | provider remove <id> | relay prepare <inbox-id> | agent codex <prompt|-> | agent pi enterprise <prompt|-> | agent pi <provider> <model> <prompt|-> | agent workbuddy status|send <prompt|->|messages <message-id> | inbox list|read <id>|delete <id>|summarize codex <id> | native-host status|uninstall|rollback | native-host install <extension-id> [--replace] | self-test | validate-channel <file> | validate-profile <file> | validate-profile-v2 <file> | profile-v2 inspect <file> | web-v2 grant-status <origin> <provider> <tool> | web-v2 revoke-status <origin> <provider> <tool> | web-v2 capabilities <origin> | web-v2 serve | web-v2 grant-agent <origin> <workbuddy|codex|pi> | web-v2 revoke-agent <origin> <workbuddy|codex|pi> | web-v2 grant-workbuddy <origin> | web-v2 revoke-workbuddy <origin> | --version",
                 env!("CARGO_PKG_VERSION")
             );
         }

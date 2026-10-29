@@ -106,6 +106,9 @@ Requires Rust **1.90+**. No Node.js, Python, Docker or model runtime required at
 ```bash
 cargo test --workspace
 cargo run -p local-bridge -- status
+cargo run -p local-bridge -- agent check codex
+# Explicit fixed-text availability checks also support: workbuddy / pi.
+# These checks use the Agent's current configuration and may consume model quota.
 cargo run -p local-bridge -- mcp
 # Optional user-registered independent stdio MCP provider:
 # cargo run -p local-bridge -- provider add wechat /absolute/path/to/wechat-provider serve

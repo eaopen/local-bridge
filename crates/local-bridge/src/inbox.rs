@@ -9,6 +9,13 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn data_root() -> Result<PathBuf> {
+    if let Some(path) = env::var_os("LOCAL_BRIDGE_DATA_DIR") {
+        let path = PathBuf::from(path);
+        if !path.is_absolute() {
+            bail!("LOCAL_BRIDGE_DATA_DIR must be an absolute local directory");
+        }
+        return Ok(path);
+    }
     #[cfg(target_os = "windows")]
     {
         env::var_os("LOCALAPPDATA")

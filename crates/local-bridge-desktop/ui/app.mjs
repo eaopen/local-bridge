@@ -1,10 +1,11 @@
 import {AGENTS,AGENT_LABELS,THINK_OPTIONS,defaults,shiftPriority,normalizePreferenceDraft} from './preferences.mjs'
 import {SETTINGS,generalPreferences,connectionState} from './settings.mjs'
+import {agentHealthView,createAgentCheckQueue} from './agent-health.mjs'
 
 const invoke=globalThis.__TAURI__?.core?.invoke
 const el=id=>document.getElementById(id)
 const pageLabels={overview:'概览',tasks:'任务中心',settings:'设置'}
-const state={prefs:defaults(),tasks:null,settings:null,setting:'general',probes:{},providerPaths:{},busy:new Set()}
+const state={prefs:defaults(),tasks:null,settings:null,setting:'general',probes:{},providerPaths:{},busy:new Set(),agents:[],agentChecks:{},checkingAgent:null,queuedAgents:[]}
 const generalKey='local-bridge-desktop-general-v1'
 let general=generalPreferences(null)
 try{general=generalPreferences(JSON.parse(localStorage.getItem(generalKey)))}catch{}
@@ -60,20 +61,15 @@ async function loadOverview(){
     el('version-label').textContent='Desktop '+(data.version||'预览版')
     const checks=data.diagnostics?.checks||[]
     const agents=data.agents||[]
+    state.agents=agents
     const providers=data.mcp_providers?.providers||[]
     el('overview-stats').replaceChildren(
       metric('本机基础诊断',data.diagnostics?.ok===true?'正常':'需检查',
         String(checks.filter(x=>x.ok===false).length)+' 项异常'),
-      metric('已发现 Agent',String(agents.filter(x=>x.installed).length)+' / 3',
-        '已安装不代表已登录'),
+      agentMetric(),
       metric('MCP Provider',String(providers.length),'已注册不代表授权通过')
     )
-    const list=el('overview-agents');list.replaceChildren()
-    for(const agent of agents){
-      list.append(line(AGENT_LABELS[agent.agent]||agent.agent,
-        (agent.run_supported?'支持当前平台':'当前平台未支持')+' · 登录/API 尚未核验',
-        agent.installed?'unverified':'not_installed'))
-    }
+    renderAgentChecks()
     const components=el('overview-components');components.replaceChildren()
     const host=data.host||{}
     components.append(line('Bridge Chrome Native Host','仅 com.eaopen.browser_bridge',
@@ -89,6 +85,59 @@ async function loadOverview(){
   }catch(error){notice('读取概览失败：'+error)}
   finally{button.disabled=false}
 }
+function agentMetric(){
+  const ready=state.agents.filter(agent=>agentHealthView(agent,state.agentChecks[agent.agent],false).label==='可用').length
+  return metric('已验证可用 Agent',ready+' / '+state.agents.length,
+    state.agents.filter(agent=>agent.installed).length+' 个已安装 · 未检查不计入可用')
+}
+function renderAgentChecks(){
+  for(const target of ['overview-agents','settings-agents']){
+    const list=el(target);list.replaceChildren()
+    for(const agent of state.agents){
+      const check=state.agentChecks[agent.agent]
+      const queued=state.queuedAgents.includes(agent.agent)
+      const view=agentHealthView(agent,check,state.checkingAgent===agent.agent,Date.now(),queued)
+      const row=node('div',null,'agent-check-row')
+      const body=node('div',null,'agent-check-body'),heading=node('div',null,'agent-check-heading')
+      heading.append(node('strong',AGENT_LABELS[agent.agent]||agent.agent),node('span',view.label,'pill '+view.kind))
+      body.append(heading,node('p',view.detail,'item-sub'))
+      if(check){
+        const auth=check.authenticated===true?'已确认':check.authenticated===false?'未通过':'未确认'
+        const api=check.api_ready===true?'已响应':check.api_ready===false?'未通过':'未确认'
+        body.append(node('p','认证：'+auth+' · 调用：'+api+' · 短任务：'+(check.run_completed?'已完成':'未完成'),'item-sub'),
+          node('p','检查时间：'+new Date(check.checked_at_unix_ms).toLocaleTimeString('zh-CN')+' · 模型：'+(check.model||'默认'),'item-sub'))
+      }
+      const button=node('button',state.checkingAgent===agent.agent?'正在检查…':queued?'等待检查…':check||!agent.installed?'重新检查':'检查可用性','button secondary')
+      button.type='button';button.disabled=state.checkingAgent===agent.agent||queued
+      button.addEventListener('click',()=>void checkAgent(agent.agent))
+      row.append(body,button);list.append(row)
+    }
+    if(!state.agents.length)list.append(node('p','正在读取本机 Agent…','item-sub'))
+  }
+  const stats=el('overview-stats')
+  if(stats.children.length===3)stats.children[1].replaceWith(agentMetric())
+}
+const agentCheckQueue=createAgentCheckQueue(async agent=>{
+  delete state.agentChecks[agent]
+  try{
+    // Re-discover after a user installs/logs into an Agent outside this window.
+    const inventory=await call('desktop_overview')
+    state.agents=inventory.agents||[];renderAgentChecks()
+    state.agentChecks[agent]=await call('desktop_agent_check',{agent})
+  }catch(error){
+    state.agentChecks[agent]={agent,ready:false,checked_at_unix_ms:Date.now(),
+      reason:'检查未完成，请重新检查。'}
+    notice('Agent 检查失败：'+error)
+  }
+},snapshot=>{
+  state.checkingAgent=snapshot.active;state.queuedAgents=snapshot.pending
+  renderAgentChecks()
+})
+function checkAgent(agent){
+  return agentCheckQueue.enqueue(agent)
+}
+// Results are intentionally not persisted as permanent account readiness.
+setInterval(renderAgentChecks,30000)
 function when(time){
   if(typeof time!=='number'||!Number.isFinite(time)||time<=0)return '—'
   return new Date(time).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',
@@ -197,6 +246,7 @@ async function savePreferences(event){
       priority:state.prefs.priority
     })
     putPreferences(await call('desktop_preferences_save',{preferences:draft}))
+    state.agentChecks={};renderAgentChecks()
     notice('已保存到本机。仅对未明确指定参数的新任务生效。',true)
   }catch(error){notice('保存失败：'+error)}
   finally{button.disabled=false}
@@ -214,7 +264,12 @@ function setPage(page){
   notice('')
   if(page==='overview')void loadOverview()
   if(page==='tasks')void loadTasks()
-  if(page==='settings'){void loadSettings();if(state.setting==='agent')void loadPreferences()}
+  if(page==='settings'){void loadSettings();if(!state.agents.length)void loadAgentInventory();if(state.setting==='agent')void loadPreferences()}
+}
+
+async function loadAgentInventory(){
+  try{const data=await call('desktop_overview');state.agents=data.agents||[];renderAgentChecks()}
+  catch(error){notice('Agent 状态读取失败：'+error)}
 }
 
 const providerDetails={
@@ -353,3 +408,5 @@ el('reset-preferences').addEventListener('click',()=>{
   notice('已恢复表单默认值。点击“保存到本机”后才会生效。')
 })
 setPage(general.startPage)
+// Run once per desktop startup; page changes and refreshes never enqueue again.
+void Promise.all(AGENTS.map(checkAgent))

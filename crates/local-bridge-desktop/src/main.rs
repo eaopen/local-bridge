@@ -1,8 +1,8 @@
 //! Optional OS-user-only Tauri management window. No HTTP admin endpoint,
 //! second task database, Web Agent grants, CloudFile file writes or tray daemon.
 use local_bridge::{
-    agent_options, agent_preferences, diagnostics, mcp_provider, native_host_registration,
-    task_center,
+    agent_health, agent_options, agent_preferences, diagnostics, mcp_provider,
+    native_host_registration, task_center,
 };
 use serde_json::{json, Value};
 
@@ -23,6 +23,15 @@ fn desktop_overview() -> Value {
         "agent_login_verified":false,
         "cloudfile_write_capability":false
     })
+}
+
+#[tauri::command]
+async fn desktop_agent_check(agent: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        agent_health::check(&agent).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|_| "Agent 检查失败".to_string())?
 }
 
 #[tauri::command]
@@ -93,6 +102,7 @@ fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             desktop_overview,
+            desktop_agent_check,
             desktop_tasks,
             desktop_preferences_get,
             desktop_preferences_save,

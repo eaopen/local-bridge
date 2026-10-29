@@ -149,12 +149,14 @@ async function task(){
   throw Error(denied?'permission_not_available':'acp_not_completed');
  emit('task.completed',{stop_reason:'end_turn'});
 }
+let taskTimer;
 try{
- await Promise.race([task(),new Promise((_,reject)=>setTimeout(()=>reject(Error('task_timeout')),170000))]);
+ await Promise.race([task(),new Promise((_,reject)=>{taskTimer=setTimeout(()=>reject(Error('task_timeout')),170000);})]);
 }catch(e){
  try{closeMessage();emit('task.failed',{code:String(e.message||'unavailable').slice(0,64)});}catch{}
  process.exitCode=1;
 }finally{
+ clearTimeout(taskTimer);
  for(const p of pending.values())clearTimeout(p.timer);pending.clear();
  try{proc?.kill('SIGTERM');}catch{}
  try{broker?.dispose();}catch{}

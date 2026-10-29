@@ -33,7 +33,7 @@
           <button type="button" class="button secondary" id="refresh-overview">刷新状态</button></div>
         <div class="stat-grid" id="overview-stats"></div>
         <div class="two-col">
-          <article class="panel"><div class="panel-title"><h3>本机 Agent</h3><small>认证与模型 API 状态需实测</small></div><div id="overview-agents" class="stack"></div></article>
+          <article class="panel"><div class="panel-title"><h3>本机 Agent</h3><small>启动时自动检查 · 支持重新检查</small></div><div id="overview-agents" class="stack"></div><p class="footnote">启动时依次运行固定文本短任务，可能消耗少量模型额度。不可用时可重新检查；结果仅代表检查时的当前配置。</p></article>
           <article class="panel"><div class="panel-title"><h3>连接组件</h3><small>当前 OS 用户注册情况</small></div><div id="overview-components" class="stack"></div></article>
         </div>
         <p class="footnote">CloudFile 的下载、编辑、Guard 与 Journal 由原 Agent2 独立负责；本界面没有文件写入权限。</p>
@@ -77,6 +77,7 @@
           </article>
         </section>
         <section id="settings-agent" hidden>
+        <article class="panel auxiliary"><h3>Agent 可用性</h3><p>启动时自动检查，复用原有登录与已保存的参数。修复登录或配置后可重新检查。</p><div id="settings-agents" class="stack"></div></article>
         <div class="section-heading"><div><h2>Agent 默认设置</h2><p>只为未明确指定参数的新任务提供默认值；不会改变网站授权。</p></div></div>
         <form id="preferences-form" class="panel settings-panel">
           <div class="settings-grid">
