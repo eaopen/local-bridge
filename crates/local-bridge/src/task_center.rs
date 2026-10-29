@@ -59,10 +59,14 @@ fn cloudfile_rows(response: &Value) -> Result<(Vec<Value>, bool)> {
     let total = value["total"]
         .as_u64()
         .ok_or_else(|| anyhow::anyhow!("CloudFile task count missing"))?;
+    let returned = value["returned"]
+        .as_u64()
+        .ok_or_else(|| anyhow::anyhow!("CloudFile returned task count missing"))?;
     let truncated = value["truncated"]
         .as_bool()
         .ok_or_else(|| anyhow::anyhow!("CloudFile truncation state missing"))?;
     if items.len() > MAX_CLOUDFILE
+        || returned != items.len() as u64
         || total < items.len() as u64
         || (truncated && total <= items.len() as u64)
         || (!truncated && total != items.len() as u64)
@@ -215,7 +219,7 @@ mod tests {
         let file = json!({
             "schema_version":1,"provider_id":"cloudfile",
             "storage_scope":"agent2_shared","data_owner":"cloudfile-agent2",
-            "read_only":true,"total":1,"truncated":false,
+            "read_only":true,"total":1,"returned":1,"truncated":false,
             "items":[{
                 "task_id":id,"mode":"exclusive-edit","status":"unknown",
                 "stage":"original_publish_unconfirmed",
@@ -247,7 +251,7 @@ mod tests {
         let file = json!({
             "schema_version":1,"provider_id":"cloudfile",
             "storage_scope":"unexpected","data_owner":"cloudfile-agent2",
-            "read_only":true,"total":0,"truncated":false,"items":[]
+            "read_only":true,"total":0,"returned":0,"truncated":false,"items":[]
         });
         assert!(cloudfile_rows(&json!({
             "ok":true,"result":{"isError":false,
