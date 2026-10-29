@@ -20,7 +20,7 @@
 | Chrome Web V2 / Agent | 独立 Chrome MV3 + Web SDK、AgentPreferences；**macOS 实机已通过只读 MCP 及真实 Codex `runAgent/readAgent`、同 clientKey 去重、Origin 撤权** | Windows、正式权限弹窗、HTTP/SSE → Native 断连续读、企业 Web 登录；其他 Agent 的 ready 不等于已验证 |
 | Agent | Codex/Pi 文本 CLI Worker、WorkBuddy 独立真实实验回执、重复 clientKey 保护 | 通用 WorkBuddy 原桌面账号 Adapter、实际模型/ThinkMode 生效核验、多平台失败恢复 |
 | 任务中心 | 本机 CLI 和独立 Tauri 预览的只读 AI/WorkBuddy/Inbox 任务聚合 | 通用 Web 任务 API、事件订阅、跨模块动作转发；来源错误要保留不完整状态 |
-| CloudFile 文件 | Agent2 独立文件 Owner 保留；[Provider Draft #26](https://github.com/eaopen/cloudfile-local-agent2/pull/26) 有共用原 Agent2 数据根的只读脱敏代码 | Provider 未合并 Agent2 `dev`；无 Bridge 三模式真实文件动作，不能建第二 Writer |
+| CloudFile 文件 | Agent2 独立文件 Owner 保留；[Provider PR #26（已合入 Agent2 dev）](https://github.com/eaopen/cloudfile-local-agent2/pull/26) 有共用原 Agent2 数据根的只读脱敏代码 | Provider 已合并 Agent2 `dev`，未自动启用或注册；无 Bridge 三模式真实文件动作，不能建第二 Writer |
 | 企业 V2 / Profile | ApplicationProfile V2 **离线结构解析/校验**、企业 Pi 临时推理适配代码 | 可信在线 Profile/SSO/企业 AI API 的真实 Web 联动 |
 | 通讯 Provider | Bridge MCP Client 注册/调用独立 Provider，微信状态/搜索有协议/CI 测试 | 真实微信 GUI、用户授权和消息读/发的实机验收 |
 
