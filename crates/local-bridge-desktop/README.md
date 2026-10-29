@@ -8,9 +8,10 @@ One OS-user-local window with **Overview / Tasks / Settings**:
 - Overview reads existing diagnostics, Bridge Native Host/MCP Provider registration, and Agent install hints; installed is not authenticated.
 - Tasks render the existing task center for Codex/Pi/WorkBuddy/Inbox. Only an explicit user click includes redacted CloudFile file summaries via an installed Agent2 Provider. No file name/path/ticket, upload, checkin or background polling.
 - Settings reuse the exact same AgentPreferences Rust get/save functions as the CLI for agent/model/think_mode/agent_mode/priority. No duplicate Tauri Store, model credentials, or enterprise AI billing.
+- Settings have four always-visible categories: General, Agent, CloudFile and WeChat. General stores only appearance/start-page preferences in the desktop WebView. CloudFile/WeChat can register or remove their local connection with fixed provider arguments and explicitly discover tools. Registration, successful MCP discovery, and app login remain separate states. Missing providers show setup instructions; provider-owned configuration remains in the original application until it offers a settings interface.
 - UI uses bundled static HTML/CSS/ES modules with a restrictive CSP, without a CDN or JS framework.
 
-Four local Tauri commands: desktop_overview, desktop_tasks, desktop_preferences_get, desktop_preferences_save. No HTTP management endpoint and no generic Web/MCP task-list permission.
+Local Tauri commands cover overview, tasks, Agent preferences, settings context and fixed CloudFile/WeChat provider registration/removal/tool discovery. Tool discovery runs outside the UI thread and never calls a chat/file tool. No HTTP management endpoint and no generic Web/MCP task-list permission.
 
 ## Explicit development build
 
@@ -19,7 +20,7 @@ Isolated nested Cargo workspace: normal root CLI CI never compiles Tauri, WebVie
 ```sh
 cargo check --manifest-path crates/local-bridge-desktop/Cargo.toml
 cargo run --manifest-path crates/local-bridge-desktop/Cargo.toml
-node --test crates/local-bridge-desktop/ui/preferences.test.mjs
+node --test crates/local-bridge-desktop/ui/*.test.mjs
 ```
 
 This is a **development MVP**, not a signed installer: bundle.active=false, no tray/autostart, and optional desktop Cargo.lock/release signing are not finalized. A later release task must pin/update its dependency tree and use a separate Local Bridge Desktop channel.

@@ -1,0 +1,4 @@
+/target/
+/gen/
+# The optional desktop dependency lock is not finalized for release yet.
+/Cargo.lock

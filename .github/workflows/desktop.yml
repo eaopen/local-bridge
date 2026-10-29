@@ -15,7 +15,7 @@ jobs:
       - name: Validate static desktop JavaScript
         run: |
           node --check crates/local-bridge-desktop/ui/app.mjs
-          node --test crates/local-bridge-desktop/ui/preferences.test.mjs
+          node --test crates/local-bridge-desktop/ui/*.test.mjs
   desktop-check:
     strategy:
       fail-fast: false
@@ -29,3 +29,5 @@ jobs:
           toolchain: '1.90.0'
       - name: Check isolated Tauri desktop
         run: cargo check --manifest-path crates/local-bridge-desktop/Cargo.toml
+      - name: Test desktop connection restrictions
+        run: cargo test --manifest-path crates/local-bridge-desktop/Cargo.toml
