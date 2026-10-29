@@ -348,7 +348,10 @@ mod tests {
         let path = std::env::temp_dir().join(format!(
             "bridge-agent-lock-{}-{}",
             std::process::id(),
-            std::thread::current().name().unwrap_or("test")
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let _ = fs::remove_file(&path);
         let first = StartLock::acquire_at(&path).unwrap();
