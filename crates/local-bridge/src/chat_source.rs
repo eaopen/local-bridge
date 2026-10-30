@@ -175,6 +175,7 @@ mod tests {
         assert!(normalize(
             json!({"chat_id":"other","source":"desktop_ui","messages":[]}),
             "test",
+            "local_index",
             10
         )
         .is_err());
