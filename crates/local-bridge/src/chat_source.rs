@@ -90,14 +90,18 @@ fn normalize(data: Value, chat_id: &str, requested: &str, limit: u32) -> Result<
     let structured = requested == "structured_db";
     if structured
         && (data["id_kind"] != "stable_conversation_id"
-            || !data["source_identity"].as_str().is_some_and(|id| !id.is_empty() && id.len() <= 512))
+            || !data["source_identity"]
+                .as_str()
+                .is_some_and(|id| !id.is_empty() && id.len() <= 512))
     {
         bail!("Provider 缺少结构化来源身份，未采用片段");
     }
     if returned == "desktop_ui" && data["live_read"] != true {
         bail!("Provider 未确认此次实时读取，未采用片段");
     }
-    let rows = data["messages"].as_array().context("Provider 未返回消息列表")?;
+    let rows = data["messages"]
+        .as_array()
+        .context("Provider 未返回消息列表")?;
     if rows.len() > limit as usize {
         bail!("Provider 返回超出所选范围");
     }
