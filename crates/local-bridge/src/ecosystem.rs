@@ -41,7 +41,7 @@ fn executable(name: &str) -> Option<PathBuf> {
                 use std::os::unix::fs::PermissionsExt;
                 if path
                     .metadata()
-                    .is_err_or(|m| m.permissions().mode() & 0o111 == 0)
+                    .map_or(true, |m| m.permissions().mode() & 0o111 == 0)
                 {
                     continue;
                 }
