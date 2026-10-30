@@ -5,6 +5,18 @@ use serde_json::{json, Value};
 
 fn payload(envelope: Value) -> Result<Value> {
     if envelope["ok"] != true || envelope["result"]["isError"] == true {
+        if envelope["result"]["content"]
+            .as_array()
+            .is_some_and(|blocks| {
+                blocks.iter().any(|b| {
+                    b["text"]
+                        .as_str()
+                        .is_some_and(|t| t.contains("source_access_denied"))
+                })
+            })
+        {
+            bail!("macOS 拒绝读取微信数据。请在系统设置 → 隐私与安全性 → 完全磁盘访问权限中允许 Local Bridge Desktop Dev，重启本应用后重试。无需重新取钥或登录微信。");
+        }
         bail!("微信 Provider 调用失败；未自动重试");
     }
     let result = &envelope["result"];
@@ -43,6 +55,31 @@ pub fn status() -> Result<Value> {
         "live_read_verified":data["capabilities"]["live_read_verified"] == true,
         "platform":data["adapter"]["platform"],"blocked_reason":data["adapter"]["blocked_reason"],
         "send_enabled":false}))
+}
+pub fn conversations(source: &str, cursor: Option<String>) -> Result<Value> {
+    if !["local_index", "structured_db"].contains(&source)
+        || cursor.as_ref().is_some_and(|v| v.len() > 4096)
+    {
+        bail!("此来源暂不支持会话选择");
+    }
+    let data = invoke(
+        "wechat_list_chats",
+        json!({"source":source,"limit":100,"cursor":cursor}),
+    )?;
+    if data["source"] != source
+        || (source == "structured_db" && data["id_kind"] != "stable_conversation_id")
+    {
+        bail!("会话列表来源不匹配");
+    }
+    let rows = data["chats"].as_array().context("会话列表无效")?;
+    if rows.len() > 100 {
+        bail!("会话列表过长");
+    }
+    for row in rows {
+        let id = row["chat_id"].as_str().context("会话身份缺失")?;
+        validate_request(id, source, 10)?;
+    }
+    Ok(data)
 }
 fn validate_request(chat_id: &str, source: &str, limit: u32) -> Result<()> {
     if chat_id.trim().is_empty()
@@ -213,6 +250,11 @@ mod tests {
         changed = valid.clone();
         changed["messages"][0]["chat_id"] = json!("other");
         assert!(normalize(changed, "wxid_a", "structured_db", 2).is_err());
+    }
+    #[test]
+    fn permission_denial_has_actionable_message() {
+        let error = payload(json!({"ok":false,"result":{"content":[{"type":"text","text":"source_access_denied"}]}})).unwrap_err();
+        assert!(error.to_string().contains("完全磁盘访问权限"));
     }
     #[test]
     fn mcp_error_is_not_an_empty_chat() {

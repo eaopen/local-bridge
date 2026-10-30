@@ -7,12 +7,66 @@ export function selectedContext(data,indexes){
 }
 export function mountChatSource({document,call,onBusy,onUse}){
  const el=id=>document.getElementById(id)
- let pending=false,blocked=false,data=null
+ let pending=false,blocked=false,data=null,chats=[],cursor=null,searchTimer=null,loaded=false
  const note=text=>{el('chat-source-status').textContent=text}
- function controls(){el('chat-source-fields').disabled=pending||blocked;el('chat-source-apply').disabled=pending||blocked||!data}
+ function controls(){el('chat-source-read').disabled=pending||blocked||!el('chat-source-id').value.trim();el('chat-source-fields').disabled=pending||blocked;el('chat-source-apply').disabled=pending||blocked||!data}
  function reset(){data=null;el('chat-source-messages').replaceChildren();controls()}
+ function renderChats(){
+  const select=el('chat-source-conversation'),selected=el('chat-source-id').value
+  const search=el('chat-source-search').value.trim().toLocaleLowerCase()
+  select.replaceChildren()
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='请选择聊天';select.append(placeholder)
+  for(const chat of chats.filter(c=>(c.title||c.chat_id).toLocaleLowerCase().includes(search))){
+   const option=document.createElement('option');option.value=chat.chat_id
+   const title=chat.title||chat.chat_id
+   option.textContent=title+(chats.filter(c=>(c.title||c.chat_id)===title).length>1?' · '+chat.chat_id.slice(-12):'')
+   select.append(option)
+  }
+  select.value=selected
+  el('chat-source-more').hidden=!cursor
+ }
+ async function loadChats(more=false){
+  const source=el('chat-source-mode').value
+  if(source==='desktop_ui'){note('微信界面读取需在更多选项中指定会话。');return}
+  const result=await call('desktop_chat_source_conversations',{source,cursor:more?cursor:null})
+  if(!Array.isArray(result.chats))throw Error('invalid')
+  const combined=more?[...chats,...result.chats]:result.chats
+  chats=[...new Map(combined.map(c=>[c.chat_id,c])).values()];cursor=result.has_more?result.next_cursor:null
+  loaded=true;renderChats();note(chats.length?`已加载 ${chats.length} 个聊天，请选择后读取片段。${cursor?'未找到时可加载更多。':''}`:'此来源暂无聊天，可切换读取来源或手动粘贴。')
+ }
+ async function searchChats(){
+  if(pending||blocked)return
+  const term=el('chat-source-search').value.trim().toLocaleLowerCase()
+  if(!term){renderChats();return}
+  if(!loaded){await check();if(!loaded)return}
+  reset();el('chat-source-id').value='';pending=true;onBusy(true);controls()
+  try{
+   const seen=new Set();const deadline=Date.now()+120000
+   while(cursor&&Date.now()<deadline&&seen.size<50){
+    if(seen.has(cursor))throw Error('repeated cursor')
+    seen.add(cursor);note(`正在查找聊天…已检查 ${chats.length} 个`)
+    await loadChats(true)
+   }
+   renderChats()
+   const matches=chats.filter(c=>(c.title||c.chat_id).toLocaleLowerCase().includes(term))
+   if(!cursor&&matches.length===1){
+    el('chat-source-id').value=matches[0].chat_id;el('chat-source-conversation').value=matches[0].chat_id
+    note(`已找到“${matches[0].title||'聊天'}”，点击读取片段。`)
+   }else note(matches.length?`找到 ${matches.length} 个聊天，请从列表选择。${cursor?'仍有会话未检查，点击继续查找。':''}`:
+    cursor?'暂未找到，仍有会话未检查。点击继续查找。':'当前数据来源中未找到该聊天，请尝试名称中的几个字。')
+   el('chat-source-more').textContent=cursor?'继续查找':'加载更多聊天'
+  }catch{note('查找未完成，请点击“选择微信聊天”重试。')}
+  finally{pending=false;onBusy(false);controls()}
+ }
+ async function refresh(more=false){
+  if(pending||blocked)return
+  reset();pending=true;onBusy(true);controls();note('正在加载聊天…')
+  try{await loadChats(more)}catch{note('聊天列表加载失败，请重试；仍可手动粘贴。')}
+  finally{pending=false;onBusy(false);controls()}
+ }
  async function check(){
   if(pending||blocked)return
+  reset();chats=[];cursor=null;el('chat-source-id').value='';renderChats()
   pending=true;onBusy(true);controls()
   try{
    const state=await call('desktop_chat_source_status')
@@ -22,26 +76,23 @@ export function mountChatSource({document,call,onBusy,onUse}){
    el('chat-source-mode').querySelector('[value=structured_db]').disabled=!structured
    if((!live&&el('chat-source-mode').value==='desktop_ui')||
       (!structured&&el('chat-source-mode').value==='structured_db'))el('chat-source-mode').value='local_index'
-   note(!state.registered?'尚未注册 Provider，请到设置 → 微信，填写已安装的可执行文件路径。':
-    !state.read_contract_supported?'协议已响应；请升级 Provider，当前版本不支持明确区分读取来源。':
-    live?'Provider 已响应。实时读取可尝试，但尚未完成此设备的实机验收。':
-    structured?'Provider 已响应。已配置结构化数据库查询，但此设备尚未通过真实微信读取验收。':
-    state.blocked_reason==='macos_login_safety_hold'?'Provider 已响应；仅可读取已有索引。Mac 实时操作因登录保护暂停，不会触碰微信。':
-    'Provider 已响应；实时后端尚不可用，可读取已有索引或手动粘贴。')
-  }catch{note('Provider 连接检查失败。可继续手动粘贴；未尝试读取微信。')}
+   if(structured)el('chat-source-mode').value='structured_db'
+   if(state.read_contract_supported){await loadChats()}
+   else note(!state.registered?'请到设置 → 微信连接已安装的 Provider。':'请升级 Provider 后再选择聊天。')
+  }catch(error){note('聊天列表加载失败：'+String(error).slice(0,240))}
   finally{pending=false;onBusy(false);controls()}
  }
  async function read(){
   if(pending||blocked)return
-  const chatId=el('chat-source-id').value.trim();if(!chatId){note('请填写明确的会话名；结构化库需填写稳定会话 ID。');return}
+  const chatId=el('chat-source-id').value.trim();if(!chatId){note('请先从列表选择聊天。');return}
   reset();pending=true;onBusy(true);controls();note('正在读取指定会话片段…')
   try{
    data=await call('desktop_chat_source_read',{chatId,source:el('chat-source-mode').value,limit:10})
    if(!Array.isArray(data.messages))throw Error('invalid')
    const sourceLabel=data.source==='local_index'?'已有索引 · 非实时':
     data.source==='structured_db'?'本机结构化库 · 按需读取':'微信界面 · 可见范围'
-   const identityNote=data.id_kind==='stable_conversation_id'?'当前按稳定会话 ID 读取。':'显示名不是稳定身份，请核对内容。'
-   note(`${sourceLabel} · ${data.chat_id} · ${data.messages.length} 条 · 不完整${data.cached_fallback?'；实时读取失败，返回的是旧索引':''}${data.skipped_non_text?'；跳过非文本 '+data.skipped_non_text+' 条':''}。 ${identityNote}`)
+   const identityNote=data.id_kind==='stable_conversation_id'?'请核对片段后使用。':'显示名不是稳定身份，请核对内容。'
+   note(`${sourceLabel} · ${chats.find(c=>c.chat_id===data.chat_id)?.title||data.chat_id} · ${data.messages.length} 条 · 不完整${data.cached_fallback?'；实时读取失败，返回的是旧索引':''}${data.skipped_non_text?'；跳过非文本 '+data.skipped_non_text+' 条':''}。 ${identityNote}`)
    for(const [i,m] of data.messages.entries()){
     const label=document.createElement('label');label.className='chat-source-message'
     const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(i);checkbox.checked=true
@@ -62,7 +113,11 @@ export function mountChatSource({document,call,onBusy,onUse}){
    onUse(selectedContext(data,indexes));note('所选片段已放入本轮输入。核对后点击“生成建议”才会交给 Agent。')
   }catch(error){note(String(error))}
  })
- for(const id of ['chat-source-id','chat-source-mode'])el(id).addEventListener('input',()=>reset())
+ el('chat-source-search').addEventListener('input',()=>{reset();el('chat-source-id').value='';controls();renderChats();clearTimeout(searchTimer);searchTimer=setTimeout(()=>void searchChats(),400)})
+ el('chat-source-conversation').addEventListener('change',()=>{reset();el('chat-source-id').value=el('chat-source-conversation').value;controls()})
+ el('chat-source-more').addEventListener('click',()=>void (el('chat-source-search').value.trim()?searchChats():refresh(true)))
+ el('chat-source-id').addEventListener('input',()=>reset())
+ el('chat-source-mode').addEventListener('change',()=>{chats=[];cursor=null;el('chat-source-id').value='';renderChats();void refresh()})
  controls()
  return {setBlocked(value){blocked=value;controls()},reset(){reset();note('本轮读取片段已清除；未读取新消息。')}}
 }

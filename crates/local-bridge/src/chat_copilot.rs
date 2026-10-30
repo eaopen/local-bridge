@@ -46,7 +46,13 @@ impl Input {
         }
         let source = self.context_source.as_deref().unwrap_or("manual");
         let label = self.thread_label.as_deref().unwrap_or("");
-        if !["manual", "wechat_local_index", "wechat_desktop_ui"].contains(&source)
+        if ![
+            "manual",
+            "wechat_local_index",
+            "wechat_desktop_ui",
+            "wechat_structured_db",
+        ]
+        .contains(&source)
             || label.chars().count() > 200
             || label.contains('\0')
         {
@@ -184,6 +190,14 @@ mod tests {
         assert!(input("").prompt().is_err());
         assert!(input(&"字".repeat(3000)).prompt().is_err());
         assert!(input("bad\0text").prompt().is_err());
+    }
+    #[test]
+    fn structured_context_is_accepted_but_unknown_source_is_rejected() {
+        let mut request = input("synthetic");
+        request.context_source = Some("wechat_structured_db".into());
+        assert!(request.prompt().unwrap().contains("wechat_structured_db"));
+        request.context_source = Some("unsupported".into());
+        assert!(Session::default().run(request).is_err());
     }
     #[test]
     fn ephemeral_read_clear_and_busy_are_explicit() {

@@ -68,15 +68,20 @@
             <details class="chat-connector">
               <summary>微信片段 <span class="chat-muted">按需读取 · 不自动发送</span></summary>
               <fieldset id="chat-source-fields" class="chat-inputs">
-                <div class="actions chat-source-actions"><button type="button" id="chat-source-check" class="button secondary">检查连接</button></div>
-                <p id="chat-source-status" role="status">未检查连接。检查仅查询 Provider，不读取微信聊天。</p>
-                <label class="field">读取来源<select id="chat-source-mode"><option value="local_index">已有索引（非实时）</option><option value="structured_db" disabled>结构化数据库（需已配置）</option><option value="desktop_ui" disabled>微信界面（需实机验收）</option></select></label>
-                <label class="field">指定会话（索引用名称，结构化库用 ID）<input id="chat-source-id" maxlength="200" autocomplete="off" placeholder="联系人/群聊显示名，或结构化库稳定会话 ID"></label>
+                <div class="actions chat-source-actions"><button type="button" id="chat-source-check" class="button secondary">选择微信聊天</button></div>
+                <p id="chat-source-status" role="status">选择聊天后读取片段；不会自动发送或交给 AI。</p>
+                <label class="field">查找聊天<input id="chat-source-search" placeholder="输入好友或群名称" autocomplete="off"></label>
+                <label class="field">选择聊天<select id="chat-source-conversation"><option value="">先点击“选择微信聊天”</option></select></label>
+                <button type="button" id="chat-source-more" class="button secondary" hidden>加载更多聊天</button>
+                <details><summary>更多读取选项</summary>
+                <label class="field">读取来源<select id="chat-source-mode"><option value="local_index">已有索引（非实时）</option><option value="structured_db" disabled>本机微信记录</option><option value="desktop_ui" disabled>微信界面（需实机验收）</option></select></label>
+                <label class="field">手动指定会话（高级）<input id="chat-source-id" maxlength="200" autocomplete="off" placeholder="联系人/群聊显示名，或结构化库稳定会话 ID"></label>
+                </details>
                 <button type="button" id="chat-source-read" class="button secondary">读取最近 10 条片段</button>
                 <div id="chat-source-messages" aria-label="读取的片段，勾选后使用"></div>
                 <button type="button" id="chat-source-apply" class="button secondary" disabled>使用勾选片段</button>
               </fieldset>
-              <p class="chat-muted">索引仅包含此前读取或授权导入的数据。实时读取失败仍可手动粘贴。生成前请核对会话和内容。</p>
+              <p class="chat-muted">只读取你选择的聊天。勾选片段后用于本轮建议，不会自动发送。</p>
             </details>
             <fieldset id="chat-inputs" class="chat-inputs">
               <label class="field"><span>对话片段 <small>可标明我 / 对方</small></span>

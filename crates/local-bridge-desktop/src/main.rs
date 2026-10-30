@@ -15,7 +15,10 @@ fn desktop_chat_run(
     session: tauri::State<'_, local_bridge::chat_copilot::Session>,
     input: local_bridge::chat_copilot::Input,
 ) -> Result<Value, String> {
-    session.run(input).map_err(|e| e.to_string())
+    Ok(match session.run(input) {
+        Ok(receipt) => receipt,
+        Err(error) => json!({"status":"rejected","error":error.to_string()}),
+    })
 }
 #[tauri::command]
 fn desktop_chat_read(
@@ -145,6 +148,11 @@ async fn desktop_chat_source_status() -> Result<Value, String> {
         .await.map_err(|_| "连接检查未完成".to_string())?
 }
 #[tauri::command]
+async fn desktop_chat_source_conversations(source: String, cursor: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::conversations(&source, cursor).map_err(|e| e.to_string()))
+        .await.map_err(|_| "会话列表加载失败".to_string())?
+}
+#[tauri::command]
 async fn desktop_chat_source_read(chat_id: String, source: String, limit: u32) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::read(&chat_id, &source, limit).map_err(|e| e.to_string()))
         .await.map_err(|_| "读取未完成；未自动重试".to_string())?
@@ -171,6 +179,7 @@ fn main() {
             desktop_provider_tools,
             desktop_chat_source_status,
             desktop_chat_source_read,
+            desktop_chat_source_conversations,
         ])
         .run(tauri::generate_context!())
         .expect("unable to start Local Bridge Desktop");

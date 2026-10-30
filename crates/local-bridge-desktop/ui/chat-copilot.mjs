@@ -132,6 +132,9 @@ export function mountChat({call,document,clipboard}){
     try{
       const result=await call('desktop_chat_run',{input:{...selection,...sourceContext,client_key:taskId,mode:el('chat-mode').value,text:el('chat-text').value,
         intent:el('chat-intent').value,voice:el('chat-voice').value,constraints:el('chat-constraints').value,feedback}})
+      if(result.status==='rejected'){
+        taskId=null;say(result.error+'。本轮未提交，修改后可重新生成。');return
+      }
       taskId=result.task_id
     }catch(error){say(String(error)+'。可读取本轮结果，或清除后重试。');busy=false;controls();return}
     finally{busy=false;controls()}
