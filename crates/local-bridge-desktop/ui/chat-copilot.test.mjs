@@ -1,8 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {parseDraft,copyDraft,readUntilDone,FEEDBACK} from './chat-copilot.mjs'
+import {parseDraft,copyDraft,readUntilDone,FEEDBACK,relationshipHint,RELATIONSHIP_HINTS} from './chat-copilot.mjs'
 const draft={judgment:'原因未知',facts:['两天未回复'],hypotheses:['可能忙，未经证实'],unknowns:['原因'],
   candidates:[{label:'稳',text:'先不下结论'},{label:'留边界',text:'这次不回复'}],avoid:'不推断感情'}
+test('relationship labels guide context without automatic profiling',()=>{
+  assert.equal(Object.keys(RELATIONSHIP_HINTS).length,7)
+  assert.match(relationshipHint('work'),/避免擅自承诺/)
+  assert.match(relationshipHint('new_connection'),/低压力/)
+  assert.equal(relationshipHint('unknown'),relationshipHint('general'))
+})
 test('structured and fenced drafts keep facts and hypotheses separate',()=>{
   assert.deepEqual(parseDraft(JSON.stringify(draft)),draft)
   assert.deepEqual(parseDraft('```json\n'+JSON.stringify(draft)+'\n```'),draft)
