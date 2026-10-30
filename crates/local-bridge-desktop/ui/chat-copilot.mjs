@@ -1,6 +1,17 @@
 import {mountChatSource} from './chat-source.mjs'
 // No storage, telemetry, HTML interpolation or connector calls in this module.
 export const FEEDBACK=['自然','太油','太冷','不像我','越界']
+// User-selected context, not a diagnosis of the other person's feelings or intentions.
+export const RELATIONSHIP_HINTS=Object.freeze({
+  general:'仅根据聊天判断，不假设双方关系。',
+  friends:'朋友或同学：自然接话，有共同梗才用幽默，不硬加暧昧。',
+  work:'同事或客户：专业清晰，避免擅自承诺时间、交付或立场。',
+  family:'家人与亲友：先理解感受，避免说教或替对方决定。',
+  new_connection:'新认识或互相了解：低压力、不把礼貌当明确好感。',
+  partner:'伴侣或亲密关系：优先真诚、修复和双方边界，不操控情绪。',
+  group:'多人群聊：把观点与发言人分开，不推断群成员的心理。'
+})
+export function relationshipHint(value){return RELATIONSHIP_HINTS[value]||RELATIONSHIP_HINTS.general}
 const bounded=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max
 export function parseDraft(raw){
   if(typeof raw!=='string'||raw.length>32000)throw new Error('结果为空或超出显示限制')
@@ -40,6 +51,7 @@ export function mountChat({call,document,clipboard}){
   let selection=null,busy=false,sourceBusy=false,taskId=null,feedback='',sourceContext={}
   let sourceView
   const say=text=>{el('chat-status').textContent=text}
+  function refreshRelationshipHint(){el('chat-relationship-hint').textContent=relationshipHint(el('chat-relationship').value)}
   const node=(tag,text,cls='')=>{
     const element=document.createElement(tag);element.textContent=text; if(cls)element.className=cls;return element
   }
@@ -131,7 +143,8 @@ export function mountChat({call,document,clipboard}){
     busy=true;controls();el('chat-results').replaceChildren();say('正在提交本轮片段…')
     try{
       const result=await call('desktop_chat_run',{input:{...selection,...sourceContext,client_key:taskId,mode:el('chat-mode').value,text:el('chat-text').value,
-        intent:el('chat-intent').value,voice:el('chat-voice').value,constraints:el('chat-constraints').value,feedback}})
+        intent:el('chat-intent').value,voice:el('chat-voice').value,relationship:el('chat-relationship').value,
+        constraints:el('chat-constraints').value,feedback}})
       if(result.status==='rejected'){
         taskId=null;say(result.error+'。本轮未提交，修改后可重新生成。');return
       }
@@ -156,5 +169,7 @@ export function mountChat({call,document,clipboard}){
     say('已载入 '+context.thread_label+' 的所选片段；尚未发送给 Agent。')
   }})
   el('chat-text').addEventListener('input',()=>{sourceContext={};el('chat-context-source').textContent='手动编辑'})
+  el('chat-relationship').addEventListener('change',refreshRelationshipHint)
+  refreshRelationshipHint()
   return {refresh}
 }
