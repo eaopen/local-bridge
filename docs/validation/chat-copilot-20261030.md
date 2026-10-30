@@ -50,3 +50,12 @@ node --test crates/local-bridge-desktop/ui/*.test.mjs
 ```
 
 配置依据：[Codex 官方配置参考](https://learn.chatgpt.com/docs/config-file/config-reference) 及本机 `codex exec --help`。工具配置随 CLI 版本变化；实机记录仅适用于本次安装版本，不等于全版本认证。
+
+## 原生桌面追加验收（同日，本地更新）
+
+- 本地旧进程已替换为本分支构建，开发入口 `/tmp/Local Bridge Desktop Dev.app` 已启动，出现「帮我聊」和生态接入入口；原开发二进制已备份为 `.before-chat-p0`。
+- 通过 macOS 原生窗口点击，使用同一虚构朋友对话完成真实 Codex 生成，页面显示事实/推测/未知与三条候选；编辑第一条、点击复制、在第二条用系统粘贴，核对内容完全一致。
+- 原生点击「自然」反馈、「这次不回复」和「清除本轮」均显示相应回执；清除后输入与结果为空。当前本地默认 Agent 已保存为 Codex（model/think 均 auto），应用保持打开。
+- WorkBuddy 固定短任务检查成功，但本次真实聊天调用失败；页面如实显示未完成，未自动切换。具体失败原因未定位，不视为 WorkBuddy 聊天验收通过。Pi 固定短任务未通过。
+- PR 初次核心 CI 因 `items_after_test_module` 失败；调整两个文件的函数位置后，本地严格 Clippy、62 项核心单测通过，修正提交 `d2b295f` 的三系统核心 CI 均成功。
+- 此次补齐 macOS 原生窗口→真实 Codex→编辑→系统剪贴板闭环；Windows 实机和 WorkBuddy/Pi 聊天可用性仍待验收。微信未操作。
