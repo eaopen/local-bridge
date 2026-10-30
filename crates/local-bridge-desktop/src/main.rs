@@ -139,6 +139,17 @@ async fn desktop_provider_tools(id: String) -> Result<Value, String> {
     .map_err(|_| "连接检查失败".to_string())?
 }
 
+#[tauri::command]
+async fn desktop_chat_source_status() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(|| local_bridge::chat_source::status().map_err(|e| e.to_string()))
+        .await.map_err(|_| "连接检查未完成".to_string())?
+}
+#[tauri::command]
+async fn desktop_chat_source_read(chat_id: String, source: String, limit: u32) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::read(&chat_id, &source, limit).map_err(|e| e.to_string()))
+        .await.map_err(|_| "读取未完成；未自动重试".to_string())?
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(local_bridge::chat_copilot::Session::default())
@@ -158,6 +169,8 @@ fn main() {
             desktop_provider_add,
             desktop_provider_remove,
             desktop_provider_tools,
+            desktop_chat_source_status,
+            desktop_chat_source_read,
         ])
         .run(tauri::generate_context!())
         .expect("unable to start Local Bridge Desktop");

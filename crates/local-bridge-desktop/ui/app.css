@@ -55,3 +55,5 @@ body:has(#page-chat:not([hidden])) .topbar{margin-bottom:14px;padding-bottom:14p
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) #page-chat{--chat-line:#414c60;--chat-muted:#a3b1c5;--chat-soft:#242e3e;--chat-input:#283244}}
 
 #page-chat .field select{appearance:none;padding-right:26px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m2 2 4 4 4-4' fill='none' stroke='%238292aa' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center}
+
+.chat-source-actions{margin-top:8px!important;justify-content:flex-start}#chat-source-status{font-size:11px;line-height:1.6;overflow-wrap:anywhere}.chat-connector .field{margin:8px 0}.chat-source-message{display:flex;align-items:flex-start;gap:7px;margin:8px 0;padding:8px;background:var(--chat-input);border:1px solid var(--chat-line);border-radius:7px;overflow-wrap:anywhere}.chat-source-message small{display:block;color:var(--chat-muted);font-size:10px}.chat-source-message span{white-space:pre-wrap;min-width:0}#chat-source-messages{max-height:260px;overflow:auto;margin:10px 0}

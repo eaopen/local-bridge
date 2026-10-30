@@ -64,17 +64,19 @@
         </div>
         <div class="chat-workspace">
           <form id="chat-form" class="panel chat-context">
-            <div class="chat-card-heading"><h2>对话上下文</h2><span class="pill">手动粘贴</span></div>
+            <div class="chat-card-heading"><h2>对话上下文</h2><span class="pill" id="chat-context-source">手动粘贴</span></div>
             <details class="chat-connector">
-              <summary>微信接入预览 <span class="chat-muted">尚未接入</span></summary>
-              <div class="chat-connector-preview" aria-label="微信接入后的展示预留">
-                <p>接入后的展示位置 · 当前不读取微信</p>
-                <dl><div><dt>会话</dt><dd>待选择联系人或群聊</dd></div>
-                  <div><dt>消息范围</dt><dd>待授权读取选定片段</dd></div>
-                  <div><dt>读取状态</dt><dd>未读取 · 无聊天数据</dd></div></dl>
-                <div class="chat-message-placeholder">所选消息将显示在这里，核对后再生成建议。</div>
-                <small>读取不可用时仍可手动粘贴。发送能力需另行验证，当前只支持复制。</small>
-              </div>
+              <summary>微信片段 <span class="chat-muted">按需读取 · 不自动发送</span></summary>
+              <fieldset id="chat-source-fields" class="chat-inputs">
+                <div class="actions chat-source-actions"><button type="button" id="chat-source-check" class="button secondary">检查连接</button></div>
+                <p id="chat-source-status" role="status">未检查连接。检查仅查询 Provider，不读取微信聊天。</p>
+                <label class="field">读取来源<select id="chat-source-mode"><option value="local_index">已有索引（非实时）</option><option value="desktop_ui" disabled>微信界面（需实机验收）</option></select></label>
+                <label class="field">指定会话显示名<input id="chat-source-id" maxlength="200" autocomplete="off" placeholder="填写你要读取的联系人或群聊名称"></label>
+                <button type="button" id="chat-source-read" class="button secondary">读取最近 10 条片段</button>
+                <div id="chat-source-messages" aria-label="读取的片段，勾选后使用"></div>
+                <button type="button" id="chat-source-apply" class="button secondary" disabled>使用勾选片段</button>
+              </fieldset>
+              <p class="chat-muted">索引仅包含此前读取或授权导入的数据。实时读取失败仍可手动粘贴。生成前请核对会话和内容。</p>
             </details>
             <fieldset id="chat-inputs" class="chat-inputs">
               <label class="field"><span>对话片段 <small>可标明我 / 对方</small></span>
