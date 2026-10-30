@@ -38,6 +38,7 @@ pub fn status() -> Result<Value> {
     Ok(json!({"registered":true,"protocol_responding":true,
         "read_contract_supported":data["read_contract_version"] == 1,
         "local_index_read":data["capabilities"]["local_index_read"] == true,
+        "structured_db_read":data["capabilities"]["structured_db_read"] == true,
         "live_read_available":data["capabilities"]["live_read_available"] == true,
         "live_read_verified":data["capabilities"]["live_read_verified"] == true,
         "platform":data["adapter"]["platform"],"blocked_reason":data["adapter"]["blocked_reason"],
@@ -47,7 +48,7 @@ fn validate_request(chat_id: &str, source: &str, limit: u32) -> Result<()> {
     if chat_id.trim().is_empty()
         || chat_id.chars().count() > 200
         || chat_id.contains('\0')
-        || !["local_index", "desktop_ui"].contains(&source)
+        || !["local_index", "desktop_ui", "structured_db"].contains(&source)
         || !(1..=20).contains(&limit)
     {
         bail!("请填写明确的会话显示名并选择 1–20 条片段");
@@ -66,21 +67,35 @@ pub fn read(chat_id: &str, source: &str, limit: u32) -> Result<Value> {
     if source == "desktop_ui" && state["live_read_available"] != true {
         bail!("当前系统未开放实时读取；可改选已有索引或手动粘贴。未操作微信。");
     }
+    if source == "structured_db" && state["structured_db_read"] != true {
+        bail!("结构化读取未配置；需要由用户先安装并绑定只读数据来源。未操作微信。");
+    }
     let data = invoke(
         "wechat_get_messages",
         json!({"chat_id":chat_id.trim(),"limit":limit,"source":source}),
     )?;
-    normalize(data, chat_id.trim(), limit)
+    normalize(data, chat_id.trim(), source, limit)
 }
-fn normalize(data: Value, chat_id: &str, limit: u32) -> Result<Value> {
-    if data["chat_id"] != chat_id
-        || !["local_index", "desktop_ui"]
-            .iter()
-            .any(|s| data["source"] == *s)
-    {
-        bail!("Provider 返回的会话或来源不匹配，未采用片段");
+fn normalize(data: Value, chat_id: &str, requested: &str, limit: u32) -> Result<Value> {
+    if data["chat_id"] != chat_id {
+        bail!("Provider 返回的会话不匹配，未采用片段");
     }
-    if data["source"] == "desktop_ui" && data["live_read"] != true {
+    let returned = data["source"].as_str().context("Provider 未返回读取来源")?;
+    let cached_reported = returned == "local_index" && data["read_status"] == "cached_fallback";
+    let cached_fallback = requested == "desktop_ui" && cached_reported;
+    if returned != requested && !cached_fallback {
+        bail!("Provider 返回的来源与本轮选择不匹配");
+    }
+    let structured = requested == "structured_db";
+    if structured
+        && (data["id_kind"] != "stable_conversation_id"
+            || !data["source_identity"]
+                .as_str()
+                .is_some_and(|id| !id.is_empty() && id.len() <= 512))
+    {
+        bail!("Provider 缺少结构化来源身份，未采用片段");
+    }
+    if returned == "desktop_ui" && data["live_read"] != true {
         bail!("Provider 未确认此次实时读取，未采用片段");
     }
     let rows = data["messages"]
@@ -91,22 +106,43 @@ fn normalize(data: Value, chat_id: &str, limit: u32) -> Result<Value> {
     }
     let mut total = 0;
     let mut messages = Vec::new();
+    let mut skipped_non_text = 0;
     for row in rows {
-        let text = row["text"].as_str().context("Provider 消息格式不支持")?;
+        if structured && row["chat_id"] != chat_id {
+            bail!("Provider 消息包含其他会话");
+        }
+        let text = match row["text"].as_str() {
+            Some(text) => text,
+            None if structured && row["content_kind"] == "non_text" => {
+                skipped_non_text += 1;
+                continue;
+            }
+            None => bail!("Provider 消息格式不支持"),
+        };
         total += text.len();
         if total > 32_000 || text.contains('\0') {
             bail!("片段过长，请减少读取条数");
         }
-        messages.push(
-            json!({"text":text,"sender":row["sender"],"sent_at":row["sent_at"],
-            "source":row["source"],"imported_at":row["imported_at"]}),
-        );
+        messages.push(json!({
+            "text":text,"sender":row["sender"],"sent_at":row["sent_at"],
+            "source":row["source"],"imported_at":row["imported_at"],
+            "message_id":if structured {&row["message_id"]} else {&Value::Null}
+        }));
     }
-    Ok(
-        json!({"chat_id":chat_id,"source":data["source"],"messages":messages,
-        "complete":false,"id_kind":"display_name","live_read":data["source"] == "desktop_ui" && data["live_read"] == true,
-        "cached_fallback":data["read_status"] == "cached_fallback"}),
-    )
+    Ok(json!({
+        "chat_id":chat_id,
+        "source":returned,
+        "messages":messages,
+        "complete":false,
+        "id_kind":if structured {"stable_conversation_id"} else {"display_name"},
+        "source_identity":if structured {&data["source_identity"]} else {&Value::Null},
+        "coverage_complete":if structured {&data["coverage_complete"]} else {&Value::Null},
+        "has_more":if structured {&data["has_more"]} else {&Value::Null},
+        "next_cursor":if structured {&data["next_cursor"]} else {&Value::Null},
+        "skipped_non_text":skipped_non_text,
+        "live_read":returned == "desktop_ui" && data["live_read"] == true,
+        "cached_fallback":cached_reported
+    }))
 }
 #[cfg(test)]
 mod tests {
@@ -128,6 +164,7 @@ mod tests {
             json!({"chat_id":"test","source":"local_index","read_status":"cached_fallback",
             "messages":[{"text":"synthetic","source":"jsonl"}]}),
             "test",
+            "local_index",
             10,
         )
         .unwrap();
@@ -137,6 +174,7 @@ mod tests {
         assert!(normalize(
             json!({"chat_id":"other","source":"desktop_ui","messages":[]}),
             "test",
+            "local_index",
             10
         )
         .is_err());
@@ -147,9 +185,34 @@ mod tests {
             json!({"chat_id":"test","source":"local_index",
             "messages":[{"text":"one"},{"text":"two"}]}),
             "test",
+            "local_index",
             1
         )
         .is_err());
+    }
+    #[test]
+    fn structured_reader_rejects_wrong_source_or_identity() {
+        let valid = json!({
+            "chat_id":"wxid_a","source":"structured_db",
+            "id_kind":"stable_conversation_id","source_identity":"sha256:synthetic",
+            "coverage_complete":false,"messages":[
+                {"chat_id":"wxid_a","text":"hello","sender":"example",
+                 "source":"structured_db","message_id":"opaque-m1"},
+                {"chat_id":"wxid_a","text":null,"content_kind":"non_text"}
+            ]
+        });
+        let result = normalize(valid.clone(), "wxid_a", "structured_db", 2).unwrap();
+        assert_eq!(result["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(result["id_kind"], "stable_conversation_id");
+        assert_eq!(result["skipped_non_text"], 1);
+        assert_eq!(result["live_read"], false);
+        assert!(normalize(valid.clone(), "wxid_a", "local_index", 2).is_err());
+        let mut changed = valid.clone();
+        changed["source_identity"] = Value::Null;
+        assert!(normalize(changed, "wxid_a", "structured_db", 2).is_err());
+        changed = valid.clone();
+        changed["messages"][0]["chat_id"] = json!("other");
+        assert!(normalize(changed, "wxid_a", "structured_db", 2).is_err());
     }
     #[test]
     fn mcp_error_is_not_an_empty_chat() {

@@ -1,6 +1,6 @@
 // Explicit local-user reads only. No inference, sends, auto polling or persistence.
 export function selectedContext(data,indexes){
- if(!['local_index','desktop_ui'].includes(data?.source)||typeof data.chat_id!=='string'||!Array.isArray(data.messages))throw new Error('来源无效')
+ if(!['local_index','desktop_ui','structured_db'].includes(data?.source)||typeof data.chat_id!=='string'||!Array.isArray(data.messages))throw new Error('来源无效')
  const text=indexes.map(i=>{const m=data.messages[i];if(!m||typeof m.text!=='string')throw new Error('片段无效');return `${m.sender||'发言人未知'}：${m.text}`}).join('\n')
  if(!text.trim()||new TextEncoder().encode(text).length>7800)throw new Error('请选择少量片段，总长度需小于 7800 字节。')
  return {text,context_source:'wechat_'+data.source,thread_label:data.chat_id}
@@ -17,11 +17,15 @@ export function mountChatSource({document,call,onBusy,onUse}){
   try{
    const state=await call('desktop_chat_source_status')
    const live=state.read_contract_supported&&state.live_read_available
+   const structured=state.read_contract_supported&&state.structured_db_read
    el('chat-source-mode').querySelector('[value=desktop_ui]').disabled=!live
-   if(!live)el('chat-source-mode').value='local_index'
+   el('chat-source-mode').querySelector('[value=structured_db]').disabled=!structured
+   if((!live&&el('chat-source-mode').value==='desktop_ui')||
+      (!structured&&el('chat-source-mode').value==='structured_db'))el('chat-source-mode').value='local_index'
    note(!state.registered?'尚未注册 Provider，请到设置 → 微信，填写已安装的可执行文件路径。':
     !state.read_contract_supported?'协议已响应；请升级 Provider，当前版本不支持明确区分读取来源。':
     live?'Provider 已响应。实时读取可尝试，但尚未完成此设备的实机验收。':
+    structured?'Provider 已响应。已配置结构化数据库查询，但此设备尚未通过真实微信读取验收。':
     state.blocked_reason==='macos_login_safety_hold'?'Provider 已响应；仅可读取已有索引。Mac 实时操作因登录保护暂停，不会触碰微信。':
     'Provider 已响应；实时后端尚不可用，可读取已有索引或手动粘贴。')
   }catch{note('Provider 连接检查失败。可继续手动粘贴；未尝试读取微信。')}
@@ -29,12 +33,15 @@ export function mountChatSource({document,call,onBusy,onUse}){
  }
  async function read(){
   if(pending||blocked)return
-  const chatId=el('chat-source-id').value.trim();if(!chatId){note('请填写你要读取的会话显示名。');return}
+  const chatId=el('chat-source-id').value.trim();if(!chatId){note('请填写明确的会话名；结构化库需填写稳定会话 ID。');return}
   reset();pending=true;onBusy(true);controls();note('正在读取指定会话片段…')
   try{
    data=await call('desktop_chat_source_read',{chatId,source:el('chat-source-mode').value,limit:10})
    if(!Array.isArray(data.messages))throw Error('invalid')
-   note(`${data.source==='local_index'?'已有索引 · 非实时':'微信界面 · 可见范围'} · ${data.chat_id} · ${data.messages.length} 条 · 不完整${data.cached_fallback?'；实时读取失败，返回的是旧索引':''}。显示名不是稳定身份，请核对内容。`)
+   const sourceLabel=data.source==='local_index'?'已有索引 · 非实时':
+    data.source==='structured_db'?'本机结构化库 · 按需读取':'微信界面 · 可见范围'
+   const identityNote=data.id_kind==='stable_conversation_id'?'当前按稳定会话 ID 读取。':'显示名不是稳定身份，请核对内容。'
+   note(`${sourceLabel} · ${data.chat_id} · ${data.messages.length} 条 · 不完整${data.cached_fallback?'；实时读取失败，返回的是旧索引':''}${data.skipped_non_text?'；跳过非文本 '+data.skipped_non_text+' 条':''}。 ${identityNote}`)
    for(const [i,m] of data.messages.entries()){
     const label=document.createElement('label');label.className='chat-source-message'
     const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(i);checkbox.checked=true

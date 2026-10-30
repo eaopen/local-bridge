@@ -9,3 +9,7 @@ test('only selected messages enter AI input and retain non-live source',()=>{
  assert.throws(()=>selectedContext({...data,source:'unknown'},[0]))
  assert.throws(()=>selectedContext({...data,messages:[{text:'中'.repeat(3000)}]},[0]))
 })
+test('structured DB source must be explicit and preserves stable source',()=>{
+ const structured={source:'structured_db',chat_id:'wxid_synthetic',id_kind:'stable_conversation_id',source_identity:'sha256:synthetic',messages:[{text:'测试片段',sender:'甲'}]}
+ assert.deepEqual(selectedContext(structured,[0]),{text:'甲：测试片段',context_source:'wechat_structured_db',thread_label:'wxid_synthetic'})
+})
