@@ -42,3 +42,7 @@ No Agent2 Tauri source copy, CloudFile Journal/Guard/data clone, global Shell or
 沿用 Agent 设置；本次聊天失败不自动换 Agent。Codex 需要支持临时/忽略配置参数的版本，聊天调用不载入自定义 provider/profile；Pi 扩展模型不在当前受限模式支持范围。原 Web Agent 授权与任务行为不变。
 
 验收范围见 [Chat Copilot 本地报告](../../docs/validation/chat-copilot-20261030.md)。
+
+### WorkBuddy chat model selection
+
+WorkBuddy now accepts an explicit account model ID and reasoning effort in Agent settings. Both chat and availability checks pass these options to the bundled CLI; the worker validates them against the current account catalog before inference. `auto` remains the default and does not imply a fast model. On the tested Mac, `glm-5.3-flash` with `low` completed full chat requests in about 9–20 seconds, while `auto` hit the native broker's 50-second response deadline. Model availability varies by account. There is no automatic retry or provider/model substitution after submission. See [real validation](../../docs/validation/chat-copilot-20261030.md).

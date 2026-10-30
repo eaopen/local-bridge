@@ -28,6 +28,6 @@ jobs:
       - name: Web V2 SDK contract
         run: node --test clients/web-v2/client.test.mjs
       - name: WorkBuddy message stream regression
-        run: node --test scripts/workbuddy-web-v2/message-stream.test.mjs
+        run: node --test scripts/workbuddy-web-v2/message-stream.test.mjs scripts/workbuddy-web-v2/model-options.test.mjs
       - name: Build
         run: cargo build --workspace --locked

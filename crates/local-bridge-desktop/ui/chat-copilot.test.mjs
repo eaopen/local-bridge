@@ -32,3 +32,11 @@ test('polling reads the same invocation; failure and unknown never rerun an Agen
     await assert.rejects(readUntilDone(async()=>({status}),'one',{delay:async()=>{}}))
   await assert.rejects(readUntilDone(async()=>({status:'running'}),'one',{delay:async()=>{},limit:2}),/等待超时/)
 })
+
+test('WorkBuddy fenced JSON with a trailing explanation renders without discarding the explanation',()=>{
+  const fenced='```json\n'+JSON.stringify(draft)+'\n```'
+  assert.deepEqual(parseDraft(fenced+'\n\n也可以等待，不必回复。'),{...draft,commentary:'也可以等待，不必回复。'})
+  assert.throws(()=>parseDraft(fenced+'\n'+fenced))
+  assert.throws(()=>parseDraft(fenced+'\n'+'x'.repeat(2001)))
+  assert.throws(()=>parseDraft('```json\n{broken}\n```\n说明'))
+})

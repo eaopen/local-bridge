@@ -6,6 +6,7 @@ import http from 'node:http';
 import {spawn} from 'node:child_process';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
 import readline from 'node:readline';
+import {modelOptions} from './model-options.mjs';
 import {createMessageStream} from './message-stream.mjs';
 import {connectWorkbuddyBroker} from './workbuddyBroker.ts';
 import {loadWorkbuddyModelConfig} from './workbuddyModels.ts';
@@ -43,6 +44,7 @@ async function task(){
  broker=await connectWorkbuddyBroker(path.join(os.homedir(),'.workbuddy'));
  const models=await loadWorkbuddyModelConfig(broker,
   JSON.parse(fs.readFileSync(path.join(cli,'product.json'),'utf8')));
+ const selectedOptions=modelOptions(models,args.model,args.think_mode);
  const nonce=randomBytes(32).toString('hex');
  server=http.createServer(async(req,res)=>{
   try{
@@ -86,7 +88,7 @@ async function task(){
  proc=spawn(path.join(app,'MacOS/Electron'),
   [path.join(cli,'dist/codebuddy-lite-wb.mjs'),'--serve','--port','0','--host','127.0.0.1',
    '--acp','--acp-transport','stdio','--setting-sources','none','--strict-mcp-config',
-   '--mcp-config','{"mcpServers":{}}','--tools','','--no-session-persistence'],
+   '--mcp-config','{"mcpServers":{}}','--tools','','--no-session-persistence',...selectedOptions],
   {cwd:work,env,stdio:['pipe','pipe','pipe']});
  proc.stderr.resume();
  proc.on('close',()=>{

@@ -60,7 +60,7 @@ node --test crates/local-bridge-desktop/ui/*.test.mjs
 - PR 初次核心 CI 因 `items_after_test_module` 失败；调整两个文件的函数位置后，本地严格 Clippy、62 项核心单测通过，修正提交 `d2b295f` 的三系统核心 CI 均成功。
 - 此次补齐 macOS 原生窗口→真实 Codex→编辑→系统剪贴板闭环；Windows 实机和 WorkBuddy/Pi 聊天可用性仍待验收。微信未操作。
 
-## WorkBuddy 失败排查与局部修复
+## WorkBuddy 失败排查与局部修复（历史阶段，后续结果见末节）
 
 - 已修复可离线复现的 worker 缺陷：原先每个 token 小片段占一个事件，251 个片段就超限；现在合并至约 1024 字符，保持快照/消息边界与 Unicode 完整。新增四个 Node 回归，并接入三系统 CI。
 - 保留原事件与输出字节上限、不增加自动重试。私聊 worker 的 `task.failed` 现在可返回白名单安全提示，区分上游未接受、超时、输出超限；不回显原始错误或私聊。
@@ -68,3 +68,15 @@ node --test crates/local-bridge-desktop/ui/*.test.mjs
 - 一次较短的虚构结构化请求真实完成，但完整 Chat Copilot 样本仍未通过。低 effort、临时关闭额外思考及压缩提示/输出的试验仍约 52 秒失败，已撤回这些无效参数与提示改动；不能把短请求成功声称为聊天已修复。
 - 当前仍需 WorkBuddy 提供适合长响应的已授权接口，或在原客户端解决本次模型/网络延迟。Bridge 未改动 WorkBuddy 安装、代理超时或登录，不绕过其通道限制。
 - 严格 Clippy、63 项 Rust 单测、四项流式回归与桌面构建通过；本地默认 Agent 恢复 Codex。WorkBuddy 完整聊天验收仍未通过。
+
+
+## WorkBuddy 模型参数修复与真实验收
+
+- 原 `auto / auto` 的完整请求再次约 52 秒以 `E_UPSTREAM / 502` 结束。仅缩短系统提示词没有解决；账号实时目录显示 `auto` 配置为 high 推理。原通道仍是固定 50 秒、缓冲完整响应，不宣称已解除该限制。
+- 对照实验保留原 worker 提示词和授权链，仅用官方 CLI `--model glm-5.3-flash --effort low`，完整聊天正常完成；请求元数据确认实际传递了这两个参数。最终修复不包含实验性的提示词覆盖、禁用 reminder 或上游改写。
+- Desktop 偏好、统一 Agent API、本地聊天、Web worker 和短任务检查现在传递显式模型及思考强度。旧调用仍保持 auto 默认。worker 在发送聊天前用当前账号目录校验主 Agent 可用模型及该模型声明的思考强度；未知模型、不支持的强度明确失败，不静默替换、不自动重试、不改变账号凭据。
+- 通过 `chat_copilot_validation -- workbuddy glm-5.3-flash low` 完成四个虚构场景：friend 19.531 秒、work 19.245 秒、repair 18.226 秒、silence 8.603 秒。前三个返回可解析的 2–3 条草稿；silence 首次完成调用但返回空候选列表，前端如实降级原始草稿。随后明确三个 mode 均应返回 2–3 条可选草稿，单独复测 silence 13.909 秒完成并通过前端 `parseDraft`，返回三条草稿。提示词约束不保证模型永远遵循格式，原始草稿回退仍保留。
+- macOS 原生窗口已保存 WorkBuddy / glm-5.3-flash / low；真实点击生成，显示完成、事实/推测/未知与三档可编辑草稿。最终二进制已更新，重启后显示同样的模型及强度。未操作微信。
+- 检查：79 项 workspace Rust 测试、35 项 Web SDK、桌面与 WorkBuddy Node 测试、严格 Clippy、Desktop 构建均通过。此记录不代表所有账号/模型/输入在 50 秒内均可完成，也不代表 Windows/macOS 微信实机验收。
+
+- 最终构建的原生 understand 请求也确认完成，但模型在单个 JSON 代码块之后附加解释。补齐解析兼容：仅提取一个有界 JSON 块，尾随说明作为纯文本保留显示；多个区块、损坏 JSON、过长说明仍回退原文。新增针对这一真实返回形态的回归测试。

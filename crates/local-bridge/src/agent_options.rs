@@ -95,7 +95,11 @@ fn installed_cli(name: &str) -> bool {
 }
 pub(crate) fn options_supported(agent: &str, model: &str, think: &str) -> bool {
     match agent {
-        "workbuddy" => model == "auto" && think == "auto",
+        "workbuddy" => {
+            valid_id(model, 128)
+                && !model.contains('/')
+                && ["auto", "low", "medium", "high", "xhigh", "max"].contains(&think)
+        }
         "codex" => {
             (model == "auto" || valid_id(model, 128))
                 && ["auto", "low", "medium", "high", "xhigh"].contains(&think)
@@ -115,7 +119,7 @@ fn agent_state(origin: &str, name: &str) -> Result<Value> {
             (
                 wb["installed"] == true,
                 wb["run_supported"] == true,
-                vec!["auto"],
+                vec!["auto", "low", "medium", "high", "xhigh", "max"],
             )
         }
         "codex" => (
@@ -154,7 +158,7 @@ fn agent_state(origin: &str, name: &str) -> Result<Value> {
         "ready":null,
         "task_mode":if name == "codex" { "read_only_sandbox" } else { "text_only_no_tools" },
         "supported_think_modes":modes,
-        "supports_model_override":name != "workbuddy"
+        "supports_model_override":true
     }))
 }
 /// Fresh, uniform status read used by native, local HTTP, CLI and the Web SDK.
@@ -273,7 +277,13 @@ pub fn run(origin: &str, request: RunAgentRequest) -> Result<Value> {
         .collect();
     let chosen = pick_agent(&request.agent, &request.agent_mode, &candidates)?;
     let output = match chosen {
-        "workbuddy" => workbuddy_web::start(origin, &request.client_key, &request.prompt)?,
+        "workbuddy" => workbuddy_web::start_with_options(
+            origin,
+            &request.client_key,
+            &request.prompt,
+            &request.model,
+            &request.think_mode,
+        )?,
         "codex" | "pi" => agent_task::start(
             origin,
             &request.client_key,
@@ -317,8 +327,8 @@ pub fn local_inventory() -> Value {
             "run_supported":cfg!(target_os="macos"),
             "authenticated":null,
             "api_ready":null,
-            "supported_think_modes":["auto"],
-            "supports_model_override":false,
+            "supported_think_modes":["auto", "low", "medium", "high", "xhigh", "max"],
+            "supports_model_override":true,
         },
         {
             "agent":"codex",
@@ -388,7 +398,12 @@ pub(crate) fn run_local(request: RunAgentRequest) -> Result<Value> {
             &request.think_mode,
             &workspace.0,
         ),
-        "workbuddy" => workbuddy_web::run_text(&request.prompt, &workspace.0),
+        "workbuddy" => workbuddy_web::run_text(
+            &request.prompt,
+            &request.model,
+            &request.think_mode,
+            &workspace.0,
+        ),
         _ => bail!("unsupported Agent"),
     }
 }
@@ -433,7 +448,9 @@ mod tests {
     #[test]
     fn provider_options_must_be_supported_before_submitting_any_task() {
         assert!(options_supported("workbuddy", "auto", "auto"));
-        assert!(!options_supported("workbuddy", "gpt-6", "auto"));
+        assert!(options_supported("workbuddy", "glm-5.3-flash", "low"));
+        assert!(!options_supported("workbuddy", "auto", "off"));
+        assert!(!options_supported("workbuddy", "custom/model", "low"));
         assert!(options_supported("codex", "gpt-6", "high"));
         assert!(!options_supported("codex", "auto", "off"));
         assert!(options_supported("pi", "9router/m3cn/model", "medium"));

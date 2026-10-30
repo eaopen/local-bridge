@@ -98,7 +98,7 @@ fn confirmed(output: &Value) -> bool {
 }
 
 #[cfg(target_os = "macos")]
-fn workbuddy_check(root: &Path) -> Result<Value> {
+fn workbuddy_check(root: &Path, model: &str, think: &str) -> Result<Value> {
     use crate::workbuddy_web;
     use std::io::Write;
     workbuddy_web::assets(root)?;
@@ -115,7 +115,9 @@ fn workbuddy_check(root: &Path) -> Result<Value> {
         .stdin
         .take()
         .context("WorkBuddy input missing")?
-        .write_all(&serde_json::to_vec(&json!({"dir":root,"prompt":PROMPT}))?);
+        .write_all(&serde_json::to_vec(
+            &json!({"dir":root,"prompt":PROMPT,"model":model,"think_mode":think}),
+        )?);
     if sent.is_err() {
         let _ = child.kill();
         let _ = child.wait();
@@ -155,7 +157,7 @@ fn workbuddy_check(root: &Path) -> Result<Value> {
     Ok(json!({"status":"completed","result":answer}))
 }
 #[cfg(not(target_os = "macos"))]
-fn workbuddy_check(_root: &Path) -> Result<Value> {
+fn workbuddy_check(_root: &Path, _model: &str, _think: &str) -> Result<Value> {
     bail!("WorkBuddy adapter unsupported on this platform")
 }
 
@@ -212,7 +214,7 @@ pub fn check(name: &str) -> Result<Value> {
     let outcome = match name {
         "codex" => agent::run_codex_in(PROMPT, model, think, Some(&workspace.0)),
         "pi" => agent::run_pi_check(PROMPT, model, think, &workspace.0),
-        "workbuddy" => workbuddy_check(&workspace.0),
+        "workbuddy" => workbuddy_check(&workspace.0, model, think),
         _ => unreachable!(),
     };
     match outcome {

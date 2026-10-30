@@ -195,11 +195,10 @@ function fillThinkMode(){
     option.value=mode;select.append(option)
   }
   select.value=THINK_OPTIONS[name]?.includes(previous)?previous:'auto'
-  const isAuto=name==='auto',isWorkbuddy=name==='workbuddy'
+  const isAuto=name==='auto'
   el('setting-agent-mode').disabled=isAuto
   if(isAuto)el('setting-agent-mode').value='prefer'
-  el('setting-model').disabled=isWorkbuddy
-  if(isWorkbuddy)el('setting-model').value='auto'
+  el('setting-model').disabled=false
 }
 function renderPriority(){
   const list=el('priority-list');list.replaceChildren()

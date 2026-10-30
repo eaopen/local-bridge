@@ -3,7 +3,12 @@ export const FEEDBACK=['自然','太油','太冷','不像我','越界']
 const bounded=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max
 export function parseDraft(raw){
   if(typeof raw!=='string'||raw.length>32000)throw new Error('结果为空或超出显示限制')
-  const source=raw.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/,'$1')
+  let source=raw.trim(),commentary=''
+  const fenced=source.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```([\s\S]*)$/)
+  if(fenced){
+    source=fenced[1];commentary=fenced[2].trim()
+    if(commentary.length>2000||commentary.includes('```'))throw new Error('结果包含多个区块或过长说明，请检查原始草稿')
+  }
   let data
   try{data=JSON.parse(source)}catch{throw new Error('结果不是有效 JSON，请检查原始草稿')}
   if(!data||!bounded(data.judgment,2000)||!bounded(data.avoid,2000)||
@@ -11,7 +16,7 @@ export function parseDraft(raw){
     !Array.isArray(data.candidates)||data.candidates.length<2||data.candidates.length>3||
     !data.candidates.every(c=>c&&bounded(c.label,40)&&bounded(c.text,2000)))
     throw new Error('结果结构不完整，请检查原始草稿')
-  return data
+  return commentary?{...data,commentary}:data
 }
 export async function copyDraft(text,clipboard){
   if(!text.trim())throw new Error('草稿为空')
@@ -78,6 +83,7 @@ export function mountChat({call,document,clipboard}){
       card.append(label,copyButton(field));area.append(card)
     }
     area.append(node('p','注意：'+data.avoid,'muted-banner'))
+    if(data.commentary)area.append(node('p','补充：'+data.commentary,'muted-banner'))
     const buttons=node('div','','actions')
     for(const value of FEEDBACK){
       const button=node('button',value,'button secondary');button.type='button'

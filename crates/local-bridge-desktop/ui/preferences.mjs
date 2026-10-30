@@ -3,7 +3,7 @@ export const AGENTS = ['workbuddy','codex','pi']
 export const AGENT_LABELS = {workbuddy:'WorkBuddy',codex:'Codex',pi:'Pi'}
 export const THINK_OPTIONS = {
   auto:['auto','off','low','medium','high','xhigh'],
-  workbuddy:['auto'],
+  workbuddy:['auto','low','medium','high','xhigh','max'],
   codex:['auto','low','medium','high','xhigh'],
   pi:['auto','off','low','medium','high','xhigh']
 }
@@ -33,8 +33,8 @@ export function normalizePreferenceDraft(value){
     throw new Error('invalid_model')
   if(!THINK_OPTIONS[agent].includes(value.think_mode))
     throw new Error('unsupported_think_mode')
-  if(agent==='workbuddy'&&model!=='auto')
-    throw new Error('workbuddy_model_must_be_auto')
+  if(agent==='workbuddy'&&model.includes('/'))
+    throw new Error('invalid_workbuddy_model')
   const priority=value.priority
   if(!Array.isArray(priority)||priority.length!==AGENTS.length||
      AGENTS.some(v=>priority.filter(x=>x===v).length!==1))
