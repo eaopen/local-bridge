@@ -81,8 +81,7 @@ fn normalize(data: Value, chat_id: &str, requested: &str, limit: u32) -> Result<
         bail!("Provider 返回的会话不匹配，未采用片段");
     }
     let returned = data["source"].as_str().context("Provider 未返回读取来源")?;
-    let cached_reported = returned == "local_index"
-        && data["read_status"] == "cached_fallback";
+    let cached_reported = returned == "local_index" && data["read_status"] == "cached_fallback";
     let cached_fallback = requested == "desktop_ui" && cached_reported;
     if returned != requested && !cached_fallback {
         bail!("Provider 返回的来源与本轮选择不匹配");
