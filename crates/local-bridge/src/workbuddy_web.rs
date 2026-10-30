@@ -478,71 +478,6 @@ pub fn poll(origin: &str, task_id: &str, cursor: u64) -> Result<Value> {
         "has_more":last>next,"terminal":matches!(state,"completed"|"failed"|"unknown")}),
     )
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn concurrent_submission_is_rejected_until_original_start_releases_lock() {
-        let path = std::env::temp_dir().join(format!(
-            "local-bridge-workbuddy-lock-{}-{}",
-            std::process::id(),
-            timestamp().unwrap()
-        ));
-        private_dir(&path).unwrap();
-        let first = StartLock::acquire(&path).unwrap();
-        assert!(StartLock::acquire(&path).is_err());
-        drop(first);
-        let second = StartLock::acquire(&path).unwrap();
-        drop(second);
-        fs::remove_dir_all(&path).unwrap();
-    }
-
-    #[test]
-    fn read_only_summary_does_not_count_message_final_as_task_completion() {
-        let home = std::env::temp_dir().join(format!(
-            "local-bridge-wb-summary-{}-{}",
-            std::process::id(),
-            timestamp().unwrap()
-        ));
-        let id = "wb-1234-a-b";
-        let dir = home.join(id);
-        fs::create_dir_all(&dir).unwrap();
-        let meta = Meta {
-            id: id.into(),
-            origin: "https://private.example".into(),
-            client_key: "private-key".into(),
-            created: timestamp().unwrap(),
-        };
-        fs::write(dir.join("meta.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
-        fs::write(
-            dir.join("events.jsonl"),
-            b"{\"seq\":1,\"type\":\"task.started\"}\n{\"seq\":2,\"type\":\"message.final\",\"text\":\"private\"}\n"
-        ).unwrap();
-        let result = summaries_from(&home, meta.created + 20).unwrap();
-        assert_eq!(result[0]["status"], "running");
-        assert!(!result[0].to_string().contains("private"));
-        fs::remove_dir_all(home).unwrap();
-    }
-    #[test]
-    fn multiple_messages_are_not_completion() {
-        let mut items = vec![
-            json!({"seq":1,"type":"task.started"}),
-            json!({"seq":2,"type":"message.delta","text":"partial"}),
-            json!({"seq":3,"type":"message.final"}),
-        ];
-        assert_eq!(status(&items, 100), "running");
-        items.push(json!({"seq":4,"type":"task.completed"}));
-        assert_eq!(status(&items, 100), "completed");
-        assert_eq!(status(&items[..3], UNKNOWN_AFTER + 1), "unknown");
-    }
-    #[test]
-    fn origin_and_ids_reject_traversal() {
-        assert!(!safe_id("../run"));
-        assert!(!valid_origin("https://example.org/path"));
-    }
-}
-
 /// Existing ACP worker, but its private chat events travel over stdout only.
 /// No Bridge task directory, metadata or conversation transcript is created.
 #[cfg(target_os = "macos")]
@@ -623,4 +558,69 @@ pub(crate) fn run_text(prompt: &str, dir: &Path) -> Result<Value> {
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn run_text(_prompt: &str, _dir: &Path) -> Result<Value> {
     bail!("WorkBuddy adapter unsupported on this platform")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn concurrent_submission_is_rejected_until_original_start_releases_lock() {
+        let path = std::env::temp_dir().join(format!(
+            "local-bridge-workbuddy-lock-{}-{}",
+            std::process::id(),
+            timestamp().unwrap()
+        ));
+        private_dir(&path).unwrap();
+        let first = StartLock::acquire(&path).unwrap();
+        assert!(StartLock::acquire(&path).is_err());
+        drop(first);
+        let second = StartLock::acquire(&path).unwrap();
+        drop(second);
+        fs::remove_dir_all(&path).unwrap();
+    }
+
+    #[test]
+    fn read_only_summary_does_not_count_message_final_as_task_completion() {
+        let home = std::env::temp_dir().join(format!(
+            "local-bridge-wb-summary-{}-{}",
+            std::process::id(),
+            timestamp().unwrap()
+        ));
+        let id = "wb-1234-a-b";
+        let dir = home.join(id);
+        fs::create_dir_all(&dir).unwrap();
+        let meta = Meta {
+            id: id.into(),
+            origin: "https://private.example".into(),
+            client_key: "private-key".into(),
+            created: timestamp().unwrap(),
+        };
+        fs::write(dir.join("meta.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
+        fs::write(
+            dir.join("events.jsonl"),
+            b"{\"seq\":1,\"type\":\"task.started\"}\n{\"seq\":2,\"type\":\"message.final\",\"text\":\"private\"}\n"
+        ).unwrap();
+        let result = summaries_from(&home, meta.created + 20).unwrap();
+        assert_eq!(result[0]["status"], "running");
+        assert!(!result[0].to_string().contains("private"));
+        fs::remove_dir_all(home).unwrap();
+    }
+    #[test]
+    fn multiple_messages_are_not_completion() {
+        let mut items = vec![
+            json!({"seq":1,"type":"task.started"}),
+            json!({"seq":2,"type":"message.delta","text":"partial"}),
+            json!({"seq":3,"type":"message.final"}),
+        ];
+        assert_eq!(status(&items, 100), "running");
+        items.push(json!({"seq":4,"type":"task.completed"}));
+        assert_eq!(status(&items, 100), "completed");
+        assert_eq!(status(&items[..3], UNKNOWN_AFTER + 1), "unknown");
+    }
+    #[test]
+    fn origin_and_ids_reject_traversal() {
+        assert!(!safe_id("../run"));
+        assert!(!valid_origin("https://example.org/path"));
+    }
 }
