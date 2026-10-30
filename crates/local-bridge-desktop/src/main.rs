@@ -7,6 +7,31 @@ use local_bridge::{
 use serde_json::{json, Value};
 
 #[tauri::command]
+fn desktop_chat_selection() -> Result<Value, String> {
+    agent_options::local_selection().map_err(|_| "没有兼容的已安装 Agent，请检查 Agent 设置".into())
+}
+#[tauri::command]
+fn desktop_chat_run(
+    session: tauri::State<'_, local_bridge::chat_copilot::Session>,
+    input: local_bridge::chat_copilot::Input,
+) -> Result<Value, String> {
+    session.run(input).map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn desktop_chat_read(
+    session: tauri::State<'_, local_bridge::chat_copilot::Session>,
+    id: String,
+) -> Result<Value, String> {
+    session.read(&id).map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn desktop_chat_clear(
+    session: tauri::State<'_, local_bridge::chat_copilot::Session>,
+) -> Result<(), String> {
+    session.clear().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn desktop_overview() -> Value {
     let providers =
         mcp_provider::list().unwrap_or_else(|_| json!({"providers":[],"state":"unavailable"}));
@@ -58,7 +83,6 @@ fn desktop_preferences_save(preferences: Value) -> Result<Value, String> {
     // Same schema, private atomic file, OS lock, and validation as CLI.
     agent_preferences::save_value(preferences).map_err(|error| error.to_string())
 }
-
 
 #[tauri::command]
 fn desktop_ecosystem_discover() -> Value {
@@ -117,7 +141,12 @@ async fn desktop_provider_tools(id: String) -> Result<Value, String> {
 
 fn main() {
     tauri::Builder::default()
+        .manage(local_bridge::chat_copilot::Session::default())
         .invoke_handler(tauri::generate_handler![
+            desktop_chat_selection,
+            desktop_chat_run,
+            desktop_chat_read,
+            desktop_chat_clear,
             desktop_overview,
             desktop_agent_check,
             desktop_tasks,

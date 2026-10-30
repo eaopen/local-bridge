@@ -252,6 +252,14 @@ pub(crate) fn assets(dir: &Path) -> Result<()> {
         include_str!("../../../scripts/workbuddy-web-v2/worker.mjs").as_bytes(),
     )?;
     private_write(
+        &dir.join("model-options.mjs"),
+        include_str!("../../../scripts/workbuddy-web-v2/model-options.mjs").as_bytes(),
+    )?;
+    private_write(
+        &dir.join("message-stream.mjs"),
+        include_str!("../../../scripts/workbuddy-web-v2/message-stream.mjs").as_bytes(),
+    )?;
+    private_write(
         &dir.join("workbuddyBroker.ts"),
         include_str!("../../../scripts/workbuddy-native-validation/workbuddyBroker.ts").as_bytes(),
     )?;
@@ -352,6 +360,18 @@ pub fn find(origin: &str, client_key: &str) -> Result<Option<String>> {
 }
 
 pub fn start(origin: &str, client_key: &str, prompt: &str) -> Result<Value> {
+    start_with_options(origin, client_key, prompt, "auto", "auto")
+}
+pub fn start_with_options(
+    origin: &str,
+    client_key: &str,
+    prompt: &str,
+    model: &str,
+    think: &str,
+) -> Result<Value> {
+    if !crate::agent_options::options_supported("workbuddy", model, think) {
+        bail!("invalid WorkBuddy model options");
+    }
     if !allowed(origin)? {
         bail!("WorkBuddy not allowed on this origin");
     }
@@ -364,7 +384,7 @@ pub fn start(origin: &str, client_key: &str, prompt: &str) -> Result<Value> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (client_key, prompt);
+        let _ = (client_key, prompt, model, think);
         bail!("WorkBuddy desktop worker only validated on macOS");
     }
     #[cfg(target_os = "macos")]
@@ -429,7 +449,9 @@ pub fn start(origin: &str, client_key: &str, prompt: &str) -> Result<Value> {
             .stderr(Stdio::null())
             .spawn()
             .context("cannot start WorkBuddy worker")?;
-        let body = serde_json::to_vec(&json!({"dir":dir,"prompt":prompt}))?;
+        let body = serde_json::to_vec(
+            &json!({"dir":dir,"prompt":prompt,"model":model,"think_mode":think}),
+        )?;
         if child
             .stdin
             .take()
@@ -478,9 +500,131 @@ pub fn poll(origin: &str, task_id: &str, cursor: u64) -> Result<Value> {
         "has_more":last>next,"terminal":matches!(state,"completed"|"failed"|"unknown")}),
     )
 }
+#[derive(Debug)]
+pub(crate) struct TextRunFailure(pub &'static str);
+impl std::fmt::Display for TextRunFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+impl std::error::Error for TextRunFailure {}
+#[cfg(any(target_os = "macos", test))]
+fn text_failure(code: &str) -> TextRunFailure {
+    TextRunFailure(match code {
+        "upstream_refusal" => "WorkBuddy 上游未接受本次请求；原账号短检查成功不保证本次聊天完成。",
+        "model_unavailable" => {
+            "WorkBuddy 原账号当前未开放所选模型，请在设置中选择可用模型；未发送聊天内容。"
+        }
+        "effort_unavailable" => {
+            "WorkBuddy 所选模型不支持此思考强度，请改为自动或受支持的强度；未发送聊天内容。"
+        }
+        "event_limit" => "WorkBuddy 回复超过本轮输出限制，请缩短片段后再试。",
+        "acp_timeout" | "task_timeout" => "WorkBuddy 本次调用超时；未自动重试。",
+        "permission_not_available" => "WorkBuddy 请求了未开放的工具权限；聊天模式未授予该权限。",
+        _ => "WorkBuddy 本次调用未完成，请在原客户端检查账号、模型与网络。",
+    })
+}
+
+/// Existing ACP worker, but its private chat events travel over stdout only.
+/// No Bridge task directory, metadata or conversation transcript is created.
+#[cfg(target_os = "macos")]
+pub(crate) fn run_text(prompt: &str, model: &str, think: &str, dir: &Path) -> Result<Value> {
+    use std::io::Read;
+    use std::time::{Duration, Instant};
+    assets(dir)?;
+    let mut child = Command::new(node_path()?)
+        .arg("--experimental-strip-types")
+        .arg(dir.join("worker.mjs"))
+        .current_dir(dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .context("WorkBuddy worker unavailable")?;
+    let stdout = child.stdout.take().context("missing WorkBuddy output")?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.take(512_001).read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let sent = child
+        .stdin
+        .take()
+        .context("missing WorkBuddy input")?
+        .write_all(&serde_json::to_vec(
+            &json!({"dir":dir,"prompt":prompt,"output":"stdout","model":model,"think_mode":think}),
+        )?);
+    let deadline = Instant::now() + Duration::from_secs(180);
+    let success = loop {
+        if sent.is_err() || Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            break false;
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status.success(),
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break false;
+            }
+        }
+    };
+    let bytes = reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("WorkBuddy reader failed"))??;
+    if bytes.len() > 512_000 {
+        bail!("WorkBuddy did not complete");
+    }
+    let rows: Vec<Value> = std::str::from_utf8(&bytes)?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<std::result::Result<_, _>>()?;
+    if let Some(row) = rows.iter().rev().find(|row| row["type"] == "task.failed") {
+        return Err(text_failure(row["code"].as_str().unwrap_or("")).into());
+    }
+    if !success {
+        return Err(text_failure("").into());
+    }
+    if !rows
+        .last()
+        .is_some_and(|row| row["type"] == "task.completed")
+    {
+        bail!("WorkBuddy did not confirm completion");
+    }
+    let mut answer = String::new();
+    let mut last_id = Value::Null;
+    for row in rows.iter().filter(|row| row["type"] == "message.delta") {
+        if row["message_id"] != last_id {
+            answer.clear();
+            last_id = row["message_id"].clone();
+        }
+        if let Some(text) = row["text"].as_str() {
+            answer.push_str(text);
+        }
+    }
+    if answer.trim().is_empty() {
+        bail!("WorkBuddy returned no text");
+    }
+    Ok(json!({"status":"completed","result":answer,"persisted_by_bridge":false}))
+}
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn run_text(_prompt: &str, _model: &str, _think: &str, _dir: &Path) -> Result<Value> {
+    bail!("WorkBuddy adapter unsupported on this platform")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn private_failure_hints_never_echo_external_error_text() {
+        assert!(text_failure("upstream_refusal").0.contains("上游"));
+        assert!(text_failure("event_limit").0.contains("输出限制"));
+        assert!(!text_failure("private message / token / URL")
+            .0
+            .contains("token"));
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn concurrent_submission_is_rejected_until_original_start_releases_lock() {

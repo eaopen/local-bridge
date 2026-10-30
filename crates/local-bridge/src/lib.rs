@@ -6,6 +6,7 @@ pub mod agent_health;
 pub mod agent_options;
 pub mod agent_preferences;
 pub mod agent_task;
+pub mod chat_copilot;
 pub mod diagnostics;
 pub mod ecosystem;
 pub mod inbox;

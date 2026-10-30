@@ -57,6 +57,25 @@ fn parse_codex_events(output: &str) -> Result<String> {
     Ok(answer)
 }
 
+// CLI diagnostics can be item.error even when the turn succeeds. They are not
+// tool activity; never mistake command/MCP/file-change receipts for chat text.
+fn parse_private_codex_events(transcript: &str) -> Result<String> {
+    for line in transcript.lines().filter(|line| !line.is_empty()) {
+        let event: Value = serde_json::from_str(line)?;
+        if event["type"]
+            .as_str()
+            .is_some_and(|kind| kind.starts_with("item."))
+        {
+            if let Some(kind) = event["item"]["type"].as_str() {
+                if !["agent_message", "reasoning", "error"].contains(&kind) {
+                    bail!("Codex attempted a tool action; private text result rejected");
+                }
+            }
+        }
+    }
+    parse_codex_events(transcript)
+}
+
 // macOS Chrome launched from Finder has a minimal PATH; a user's existing
 // Homebrew Codex CLI (and its /usr/bin/env node interpreter) can otherwise be
 // invisible. Only add conventional local tool directories to *this child*.
@@ -111,6 +130,7 @@ fn spawn_codex(
     model: &str,
     think_mode: &str,
     cwd: Option<&std::path::Path>,
+    private_text: bool,
 ) -> Result<std::process::Child> {
     // Prefer the user's PATH, and on macOS fall back to existing Homebrew
     // launchers for Chrome's GUI environment. No installation is performed.
@@ -121,6 +141,9 @@ fn spawn_codex(
 
     for candidate in candidates {
         let mut command = codex_command(candidate, model, think_mode)?;
+        if private_text {
+            restrict_codex_text(&mut command);
+        }
         if let Some(cwd) = cwd {
             command.current_dir(cwd);
         }
@@ -152,11 +175,65 @@ pub(crate) fn run_codex_in(
     think_mode: &str,
     cwd: Option<&std::path::Path>,
 ) -> Result<Value> {
+    run_codex_impl(prompt, model, think_mode, cwd, false)
+}
+
+// Private chat disables command execution, integrations and project context.
+// Codex read-only sandbox remains the final file-write boundary.
+// Unsupported CLI options fail closed. Authentication stays in Codex's own home.
+fn restrict_codex_text(command: &mut Command) {
+    command.args(["--ignore-user-config", "--ignore-rules", "--strict-config"]);
+    for setting in [
+        "mcp_servers={}",
+        "approval_policy=\"never\"",
+        "web_search=\"disabled\"",
+        "project_doc_max_bytes=0",
+        "features.shell_tool=false",
+        "features.unified_exec=false",
+        "features.apply_patch_freeform=false",
+        "features.view_image=false",
+        "features.apps=false",
+        "features.plugins=false",
+        "features.hooks=false",
+        "features.js_repl=false",
+        "features.multi_agent=false",
+        "features.memories=false",
+        "features.tool_suggest=false",
+        "features.browser_use=false",
+        "features.computer_use=false",
+        "features.in_app_browser=false",
+        "features.workspace_dependencies=false",
+        "features.search_tool=false",
+        "features.request_permissions_tool=false",
+        "features.skip_host_skill_discovery=true",
+        "memories.use_memories=false",
+        "memories.generate_memories=false",
+        "history.persistence=\"none\"",
+        "analytics.enabled=false",
+    ] {
+        command.args(["-c", setting]);
+    }
+}
+
+pub(crate) fn run_codex_text(
+    prompt: &str,
+    model: &str,
+    think: &str,
+    cwd: &std::path::Path,
+) -> Result<Value> {
+    run_codex_impl(prompt, model, think, Some(cwd), true)
+}
+fn run_codex_impl(
+    prompt: &str,
+    model: &str,
+    think_mode: &str,
+    cwd: Option<&std::path::Path>,
+    private_text: bool,
+) -> Result<Value> {
     if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT {
         bail!("agent prompt must contain 1..65536 bytes of text");
     }
-
-    let mut child = spawn_codex(model, think_mode, cwd)?;
+    let mut child = spawn_codex(model, think_mode, cwd, private_text)?;
 
     let stdout = child.stdout.take().context("Codex stdout unavailable")?;
     let reader = thread::spawn(move || -> io::Result<Option<Vec<u8>>> {
@@ -217,7 +294,11 @@ pub(crate) fn run_codex_in(
         bail!("Codex did not complete; check its local login and CLI configuration");
     }
     let transcript = std::str::from_utf8(&bytes).context("Codex JSONL not UTF-8")?;
-    let answer = parse_codex_events(transcript)?;
+    let answer = if private_text {
+        parse_private_codex_events(transcript)?
+    } else {
+        parse_codex_events(transcript)?
+    };
 
     Ok(json!({
         "source": "local-cli",
@@ -351,6 +432,19 @@ fn pi_web_command(model: &str, think_mode: &str) -> Result<Command> {
 }
 pub fn run_pi_web(prompt: &str, model: &str, think_mode: &str) -> Result<Value> {
     run_pi_command(pi_web_command(model, think_mode)?, "pi", model, prompt)
+}
+
+pub(crate) fn run_pi_text(
+    prompt: &str,
+    model: &str,
+    think: &str,
+    cwd: &std::path::Path,
+) -> Result<Value> {
+    let mut command = pi_web_command(model, think)?;
+    command
+        .current_dir(cwd)
+        .args(["--no-extensions", "--no-mcp", "--no-approve"]);
+    run_pi_command(command, "pi", model, prompt)
 }
 
 pub(crate) fn run_pi_check(
@@ -543,6 +637,50 @@ mod tests {
         assert!(!args.iter().any(|s| s == "--no-extensions"));
         assert!(args.windows(2).any(|s| s == ["--thinking", "medium"]));
         assert!(pi_web_command("auto", "max").is_err());
+    }
+
+    #[test]
+    fn private_codex_command_disables_integrations_and_retains_read_only_boundary() {
+        let mut command = codex_command("codex", "auto", "auto").unwrap();
+        restrict_codex_text(&mut command);
+        let args: Vec<_> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        for required in [
+            "--ephemeral",
+            "--ignore-user-config",
+            "--ignore-rules",
+            "--strict-config",
+            "mcp_servers={}",
+            "features.shell_tool=false",
+            "features.plugins=false",
+            "features.hooks=false",
+            "memories.generate_memories=false",
+        ] {
+            assert!(args.iter().any(|a| a == required), "missing {required}");
+        }
+        assert!(args.windows(2).any(|a| a == ["--sandbox", "read-only"]));
+        assert!(!args.iter().any(|a| a.contains("bypass")));
+    }
+
+    #[test]
+    fn private_chat_allows_cli_diagnostics_but_rejects_tool_results() {
+        let answer = "{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"draft\"}}\n{\"type\":\"turn.completed\"}";
+        let diagnostic = "{\"type\":\"item.completed\",\"item\":{\"type\":\"error\",\"message\":\"CLI warning\"}}";
+        assert_eq!(
+            parse_private_codex_events(&format!("{diagnostic}\n{answer}")).unwrap(),
+            "draft"
+        );
+        for kind in [
+            "command_execution",
+            "mcp_tool_call",
+            "file_change",
+            "web_search",
+        ] {
+            let tool = json!({"type":"item.completed","item":{"type":kind}});
+            assert!(parse_private_codex_events(&format!("{tool}\n{answer}")).is_err());
+        }
     }
 
     #[test]

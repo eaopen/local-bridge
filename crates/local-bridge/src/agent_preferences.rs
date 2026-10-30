@@ -78,7 +78,12 @@ impl AgentPreferences {
                     .count()
                     != 1
             })
-            || (self.agent == "workbuddy" && (self.model != "auto" || self.think_mode != "auto"))
+            || (self.agent == "workbuddy"
+                && !crate::agent_options::options_supported(
+                    "workbuddy",
+                    &self.model,
+                    &self.think_mode,
+                ))
         {
             bail!("invalid Agent preferences");
         }
@@ -199,7 +204,7 @@ mod tests {
         assert!(p.validate().is_err());
         p = AgentPreferences::default();
         p.agent = "workbuddy".into();
-        p.think_mode = "high".into();
+        p.think_mode = "off".into();
         assert!(p.validate().is_err());
         p = AgentPreferences::default();
         p.model = "../private".into();
