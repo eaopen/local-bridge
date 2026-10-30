@@ -15,6 +15,6 @@ Bridge 调用独立 Provider 的六工具契约，不增加微信 SDK 依赖。�
 
 ## 未验收
 
-真实微信读取及发送均未验收。当前无在线 Windows 交互设备；Mac 4.1.15 既往缺失 AX 控件并发生重登录，继续遵守 Provider 的登录保护约束。候选源码评审位于 wechat-provider/docs/MAC_CANDIDATES_2026-10-30.md；优先验证指定窗口被动截图 + 本机 OCR，不直接引入自动回复/发送工程。
+真实微信读取及发送均未验收。当前无在线 Windows 交互设备；Mac 4.1.15 既往缺失 AX 控件并发生重登录，继续遵守 Provider 的登录保护约束。候选源码评审位于 wechat-provider/docs/MAC_CANDIDATES_2026-10-30.md；以结构化 SQLite / SQLCipher / WCDB 读取为主线，先验证授权导出与增量导入；Vision OCR 仅辅助少量可见文字、标题和发送核验，不作为主读取模块。GreenBubbles 尚无 Provider 适配器，Chat Copilot 保留人工输入。
 
 构建使用 cargo +1.90.0（系统默认 stable 当前仍是 1.88，低于项目要求）。本地已注册不代表新安装自动注册；Provider 仍是可选依赖。

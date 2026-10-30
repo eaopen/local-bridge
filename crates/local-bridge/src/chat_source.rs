@@ -70,9 +70,9 @@ pub fn read(chat_id: &str, source: &str, limit: u32) -> Result<Value> {
         "wechat_get_messages",
         json!({"chat_id":chat_id.trim(),"limit":limit,"source":source}),
     )?;
-    normalize(data, chat_id.trim())
+    normalize(data, chat_id.trim(), limit)
 }
-fn normalize(data: Value, chat_id: &str) -> Result<Value> {
+fn normalize(data: Value, chat_id: &str, limit: u32) -> Result<Value> {
     if data["chat_id"] != chat_id
         || !["local_index", "desktop_ui"]
             .iter()
@@ -86,7 +86,7 @@ fn normalize(data: Value, chat_id: &str) -> Result<Value> {
     let rows = data["messages"]
         .as_array()
         .context("Provider 未返回消息列表")?;
-    if rows.len() > 20 {
+    if rows.len() > limit as usize {
         bail!("Provider 返回超出所选范围");
     }
     let mut total = 0;
@@ -104,7 +104,7 @@ fn normalize(data: Value, chat_id: &str) -> Result<Value> {
     }
     Ok(
         json!({"chat_id":chat_id,"source":data["source"],"messages":messages,
-        "complete":false,"id_kind":"display_name","live_read":data["live_read"] == true,
+        "complete":false,"id_kind":"display_name","live_read":data["source"] == "desktop_ui" && data["live_read"] == true,
         "cached_fallback":data["read_status"] == "cached_fallback"}),
     )
 }
@@ -128,6 +128,7 @@ mod tests {
             json!({"chat_id":"test","source":"local_index","read_status":"cached_fallback",
             "messages":[{"text":"synthetic","source":"jsonl"}]}),
             "test",
+            10,
         )
         .unwrap();
         assert_eq!(result["live_read"], false);
@@ -135,7 +136,18 @@ mod tests {
         assert_eq!(result["messages"][0]["source"], "jsonl");
         assert!(normalize(
             json!({"chat_id":"other","source":"desktop_ui","messages":[]}),
-            "test"
+            "test",
+            10
+        )
+        .is_err());
+    }
+    #[test]
+    fn provider_cannot_exceed_requested_count() {
+        assert!(normalize(
+            json!({"chat_id":"test","source":"local_index",
+            "messages":[{"text":"one"},{"text":"two"}]}),
+            "test",
+            1
         )
         .is_err());
     }
