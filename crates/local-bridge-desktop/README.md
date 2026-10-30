@@ -34,3 +34,11 @@ This is a **development MVP**, not a signed installer: bundle.active=false, no t
 ## Not in MVP
 
 No Agent2 Tauri source copy, CloudFile Journal/Guard/data clone, global Shell or file tools, external navigation, task cancel/retry/commit, enterprise Web app shell, model API keys, automatic updater or system-wide resident daemon. The original CloudFile Chrome and Bridge Chrome keep separate Native Host IDs; the only CloudFile file owner stays Agent2.
+
+## 帮我聊（P0-A）
+
+左侧「帮我聊」粘贴短对话，选择理解、回应或理清自己，查看 Agent 提示后点击生成。候选可修改并复制，或选择不回复；反馈只在本页面内用于下一次生成。点击「清除本轮」移除页面内容与内存结果。无需微信或 Provider。
+
+沿用 Agent 设置；本次聊天失败不自动换 Agent。Codex 需要支持临时/忽略配置参数的版本，聊天调用不载入自定义 provider/profile；Pi 扩展模型不在当前受限模式支持范围。原 Web Agent 授权与任务行为不变。
+
+验收范围见 [Chat Copilot 本地报告](../../docs/validation/chat-copilot-20261030.md)。

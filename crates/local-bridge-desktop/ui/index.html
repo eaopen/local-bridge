@@ -16,6 +16,7 @@
       <p class="nav-label">工作空间</p>
       <nav aria-label="主导航">
         <button type="button" class="nav-item selected" data-page="overview" aria-current="page"><span aria-hidden="true">◫</span> 概览</button>
+        <button type="button" class="nav-item" data-page="chat"><span aria-hidden="true">✎</span> 帮我聊</button>
         <button type="button" class="nav-item" data-page="tasks"><span aria-hidden="true">☷</span> 任务中心</button>
         <button type="button" class="nav-item" data-page="settings"><span aria-hidden="true">⚙</span> 设置</button>
       </nav>
@@ -54,6 +55,30 @@
           </table>
         </div>
         <p class="footnote">这是只读视图。CloudFile 任务查询由本机用户主动启用，待确认提交不会自动重试或显示为成功。</p>
+      </section>
+
+      <section class="page" id="page-chat" hidden>
+        <div class="section-heading"><div><h2>帮我聊</h2><p>粘贴你选定的一小段对话，保留自己的表达。</p></div>
+          <button type="button" class="button secondary" id="chat-refresh-agent">刷新 Agent 选择</button></div>
+        <form id="chat-form" class="panel">
+          <fieldset id="chat-inputs" class="chat-inputs">
+          <label class="field"><span>对话片段（可标明“我 / 对方”；不完整也可以）</span>
+            <textarea id="chat-text" rows="7" required maxlength="8000" placeholder="朋友：明天又要出差，有点累。" autocomplete="off"></textarea></label>
+          <div class="settings-grid">
+            <label class="field"><span>这次需要</span><select id="chat-mode"><option value="reply">帮我回应</option><option value="understand">帮我理解</option><option value="reflect">帮我理清自己</option></select></label>
+            <label class="field"><span>沟通意图</span><select id="chat-intent"><option>自然回应</option><option>安慰</option><option>澄清</option><option>礼貌拒绝</option><option>关系修复</option><option>降温 / 留边界</option></select></label>
+            <label class="field"><span>表达风格</span><select id="chat-voice"><option>自然、简短、不油腻</option><option>温和、真诚</option><option>轻松、克制</option><option>直接、礼貌</option></select></label>
+            <label class="field"><span>补充目标或边界（可选）</span><input id="chat-constraints" maxlength="160" autocomplete="off" placeholder="例如：不用约见，不承诺加班"></label>
+          </div></fieldset>
+          <p id="chat-disclosure" class="muted-banner">正在读取现有 Agent 偏好…</p>
+          <div class="actions"><button type="submit" class="button primary" id="chat-generate" disabled>生成建议</button>
+            <button type="button" class="button secondary" id="chat-read" hidden>读取本轮结果</button>
+            <button type="button" class="button secondary" id="chat-no-reply">这次不回复</button>
+            <button type="button" class="button secondary" id="chat-clear">清除本轮</button></div>
+        </form>
+        <p id="chat-status" role="status" aria-live="polite"></p>
+        <div id="chat-results" class="panel" aria-label="本轮聊天建议"></div>
+        <p class="footnote">无需安装微信或 Provider。反馈只用于当前页面的下一次生成，不保存长期关系记忆。</p>
       </section>
 
       <section class="page" id="page-settings" hidden>

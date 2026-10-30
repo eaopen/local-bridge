@@ -406,3 +406,56 @@ mod tests {
         .is_err());
     }
 }
+
+/// Native desktop selection shares Web V2 preferences, option validation and
+/// selection rules, but never manufactures a Web origin grant. This is not
+/// exposed by HTTP, Native Messaging or MCP.
+pub fn local_selection() -> Result<Value> {
+    let prefs = agent_preferences::load()?;
+    let inventory = local_inventory();
+    let candidates: Vec<&str> = prefs
+        .priority
+        .iter()
+        .map(String::as_str)
+        .filter(|name| {
+            options_supported(name, &prefs.model, &prefs.think_mode)
+                && inventory.as_array().is_some_and(|items| {
+                    items.iter().any(|item| {
+                        item["agent"] == *name
+                            && item["installed"] == true
+                            && item["run_supported"] == true
+                    })
+                })
+        })
+        .collect();
+    let chosen = pick_agent(&prefs.agent, &prefs.agent_mode, &candidates)?;
+    Ok(json!({"agent":chosen,"model":prefs.model,"think_mode":prefs.think_mode}))
+}
+
+/// Terminal, non-persisting mode of the same Agent adapter dispatch. Selection
+/// is pinned to what the native UI displayed; there is no post-start fallback.
+pub(crate) fn run_local(request: RunAgentRequest) -> Result<Value> {
+    request.check()?;
+    if request.agent_mode != "require"
+        || !options_supported(&request.agent, &request.model, &request.think_mode)
+    {
+        bail!("private text run requires one explicit compatible Agent");
+    }
+    let workspace = crate::agent_health::Workspace::new()?;
+    match request.agent.as_str() {
+        "codex" => crate::agent::run_codex_text(
+            &request.prompt,
+            &request.model,
+            &request.think_mode,
+            &workspace.0,
+        ),
+        "pi" => crate::agent::run_pi_text(
+            &request.prompt,
+            &request.model,
+            &request.think_mode,
+            &workspace.0,
+        ),
+        "workbuddy" => workbuddy_web::run_text(&request.prompt, &workspace.0),
+        _ => bail!("unsupported Agent"),
+    }
+}

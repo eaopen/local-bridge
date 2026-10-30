@@ -16,9 +16,9 @@ static CHECK_LOCK: Mutex<()> = Mutex::new(());
 const MARKER: &str = "LOCAL_BRIDGE_AGENT_READY";
 const PROMPT: &str = "Availability check. Do not use tools or read files. Reply with exactly LOCAL_BRIDGE_AGENT_READY and nothing else.";
 
-struct Workspace(PathBuf);
+pub(crate) struct Workspace(pub(crate) PathBuf);
 impl Workspace {
-    fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         let root = std::env::temp_dir().join(format!(
             "local-bridge-agent-check-{}-{}",
             std::process::id(),

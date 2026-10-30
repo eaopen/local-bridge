@@ -1,0 +1,134 @@
+// No storage, telemetry, HTML interpolation or connector calls in this module.
+export const FEEDBACK=['自然','太油','太冷','不像我','越界']
+const bounded=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max
+export function parseDraft(raw){
+  if(typeof raw!=='string'||raw.length>32000)throw new Error('结果为空或超出显示限制')
+  const source=raw.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/,'$1')
+  let data
+  try{data=JSON.parse(source)}catch{throw new Error('结果不是有效 JSON，请检查原始草稿')}
+  if(!data||!bounded(data.judgment,2000)||!bounded(data.avoid,2000)||
+    !['facts','hypotheses','unknowns'].every(k=>Array.isArray(data[k])&&data[k].length<=12&&data[k].every(v=>bounded(v,2000)))||
+    !Array.isArray(data.candidates)||data.candidates.length<2||data.candidates.length>3||
+    !data.candidates.every(c=>c&&bounded(c.label,40)&&bounded(c.text,2000)))
+    throw new Error('结果结构不完整，请检查原始草稿')
+  return data
+}
+export async function copyDraft(text,clipboard){
+  if(!text.trim())throw new Error('草稿为空')
+  if(!clipboard?.writeText)throw new Error('剪贴板不可用，请选中文字手动复制')
+  await clipboard.writeText(text)
+}
+export async function readUntilDone(call,id,{delay=()=>new Promise(r=>setTimeout(r,800)),limit=240}={}){
+  for(let n=0;n<limit;n++){
+    const result=await call('desktop_chat_read',{id})
+    if(result.status==='completed')return result
+    if(result.status==='failed')throw new Error(result.error||'Agent 未完成')
+    if(result.status!=='running')throw new Error('Agent 状态未知；未自动重试')
+    await delay()
+  }
+  throw new Error('等待超时；未自动重试。可点击“读取本轮结果”继续查询')
+}
+
+export function mountChat({call,document,clipboard}){
+  const el=id=>document.getElementById(id)
+  let selection=null,busy=false,taskId=null,feedback=''
+  const say=text=>{el('chat-status').textContent=text}
+  const node=(tag,text,cls='')=>{
+    const element=document.createElement(tag);element.textContent=text; if(cls)element.className=cls;return element
+  }
+  function controls(){
+    el('chat-generate').disabled=busy||!selection||taskId!==null
+    el('chat-clear').disabled=busy
+    el('chat-read').hidden=taskId===null
+    el('chat-read').disabled=busy
+    el('chat-refresh-agent').disabled=busy||taskId!==null
+    el('chat-inputs').disabled=busy||taskId!==null
+  }
+  async function refresh(){
+    if(busy||taskId!==null)return
+    selection=null;controls()
+    try{
+      selection=await call('desktop_chat_selection')
+      const compatibility=selection.agent==='codex'?'此入口暂不支持 Codex 自定义服务配置。':selection.agent==='pi'?'此入口暂不支持 Pi 扩展模型。':''
+      el('chat-disclosure').textContent=`${compatibility}本次使用 ${selection.agent} · 模型 ${selection.model} · 思考 ${selection.think_mode}。点击生成会将选定片段、意图、风格与本轮反馈交给该 Agent，可能发送至其远端模型。Bridge 不保存聊天原文；Agent 服务的数据处理遵循其自身规则。`
+    }catch(error){el('chat-disclosure').textContent=String(error)+'。仍可编辑或复制已有文字。'}
+    controls()
+  }
+  function render(raw){
+    const area=el('chat-results');area.replaceChildren()
+    let data
+    try{data=parseDraft(raw)}catch(error){
+      area.append(node('p',String(error),'muted-banner'))
+      const field=document.createElement('textarea');field.value=String(raw||'').slice(0,32000);field.rows=10
+      field.setAttribute('aria-label','未解析的原始草稿');area.append(field)
+      area.append(copyButton(field));return
+    }
+    area.append(node('h3',data.judgment))
+    for(const [key,label] of [['facts','事实'],['hypotheses','推测'],['unknowns','未知 / 待澄清']]){
+      area.append(node('h4',label))
+      const list=document.createElement('ul')
+      for(const text of data[key])list.append(node('li',text))
+      if(!data[key].length)list.append(node('li','未提供'))
+      area.append(list)
+    }
+    for(const candidate of data.candidates){
+      const card=node('article','', 'panel chat-draft'),label=node('label',candidate.label,'field')
+      const field=document.createElement('textarea');field.value=candidate.text;field.rows=3
+      field.setAttribute('aria-label',candidate.label+'草稿');label.append(field)
+      card.append(label,copyButton(field));area.append(card)
+    }
+    area.append(node('p','注意：'+data.avoid,'muted-banner'))
+    const buttons=node('div','','actions')
+    for(const value of FEEDBACK){
+      const button=node('button',value,'button secondary');button.type='button'
+      button.addEventListener('click',()=>{
+        feedback=value
+        for(const child of buttons.children)child.setAttribute('aria-pressed',String(child===button))
+        say('本轮反馈：'+value+'。下次生成时使用；清除或关闭页面后移除。')
+      });buttons.append(button)
+    }
+    area.append(node('p','这些建议像你吗？'),buttons)
+  }
+  function copyButton(field){
+    const button=node('button','复制文字','button secondary');button.type='button'
+    button.addEventListener('click',async()=>{
+      try{await copyDraft(field.value,clipboard);say('已复制修改后的文字，请回原应用自行发送。')}
+      catch{field.focus();field.select();say('复制失败，已选中文字，请手动复制。')}
+    });return button
+  }
+  async function read(){
+    if(taskId===null||busy)return
+    busy=true;controls();say('正在等待 '+selection.agent+' 的本轮结果…')
+    try{
+      const result=await readUntilDone(call,taskId)
+      render(result.result);taskId=null;say('Agent 已完成。请核对事实、修改草稿，再复制。')
+      await call('desktop_chat_clear') // UI retains the visible drafts only.
+    }catch(error){
+      say(String(error))
+      // A failed/unknown transport is never a reason to submit another task.
+      try{const state=await call('desktop_chat_read',{id:taskId});if(state.status==='failed')taskId=null}catch{}
+    }finally{busy=false;controls()}
+  }
+  el('chat-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(busy||!selection||taskId!==null)return
+    taskId=globalThis.crypto.randomUUID()
+    busy=true;controls();el('chat-results').replaceChildren();say('正在提交本轮片段…')
+    try{
+      const result=await call('desktop_chat_run',{input:{...selection,client_key:taskId,mode:el('chat-mode').value,text:el('chat-text').value,
+        intent:el('chat-intent').value,voice:el('chat-voice').value,constraints:el('chat-constraints').value,feedback}})
+      taskId=result.task_id
+    }catch(error){say(String(error)+'。可读取本轮结果，或清除后重试。');busy=false;controls();return}
+    finally{busy=false;controls()}
+    if(taskId!==null)await read()
+  })
+  el('chat-clear').addEventListener('click',async()=>{
+    try{
+      await call('desktop_chat_clear');taskId=null;feedback='';el('chat-form').reset();el('chat-results').replaceChildren()
+      say('本轮输入、草稿和反馈已清除。剪贴板由系统管理。');controls()
+    }catch(error){say(String(error))}
+  })
+  el('chat-no-reply').addEventListener('click',()=>say('本轮选择不回复。不会发送消息；需要时可清除本轮内容。'))
+  el('chat-read').addEventListener('click',()=>void read())
+  el('chat-refresh-agent').addEventListener('click',()=>void refresh())
+  return {refresh}
+}

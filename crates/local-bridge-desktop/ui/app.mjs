@@ -1,10 +1,11 @@
+import {mountChat} from './chat-copilot.mjs'
 import {AGENTS,AGENT_LABELS,THINK_OPTIONS,defaults,shiftPriority,normalizePreferenceDraft} from './preferences.mjs'
 import {SETTINGS,generalPreferences,connectionState} from './settings.mjs'
 import {agentHealthView,createAgentCheckQueue} from './agent-health.mjs'
 
 const invoke=globalThis.__TAURI__?.core?.invoke
 const el=id=>document.getElementById(id)
-const pageLabels={overview:'概览',tasks:'任务中心',settings:'设置'}
+const pageLabels={overview:'概览',chat:'帮我聊',tasks:'任务中心',settings:'设置'}
 const state={prefs:defaults(),tasks:null,settings:null,setting:'general',probes:{},providerPaths:{},busy:new Set(),agents:[],agentChecks:{},checkingAgent:null,queuedAgents:[]}
 const generalKey='local-bridge-desktop-general-v1'
 let general=generalPreferences(null)
@@ -262,6 +263,7 @@ function setPage(page){
     else button.removeAttribute('aria-current')
   }
   notice('')
+  if(page==='chat')void chat.refresh()
   if(page==='overview')void loadOverview()
   if(page==='tasks')void loadTasks()
   if(page==='settings'){void loadSettings();if(!state.agents.length)void loadAgentInventory();if(state.setting==='agent')void loadPreferences();if(state.setting==='ecosystem')void loadEcosystem()}
@@ -480,6 +482,7 @@ el('reset-preferences').addEventListener('click',()=>{
   putPreferences(defaults())
   notice('已恢复表单默认值。点击“保存到本机”后才会生效。')
 })
+const chat=mountChat({call,document,clipboard:navigator.clipboard})
 setPage(general.startPage)
 // Run once per desktop startup; page changes and refreshes never enqueue again.
 void Promise.all(AGENTS.map(checkAgent))

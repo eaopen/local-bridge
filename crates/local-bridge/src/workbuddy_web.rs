@@ -542,3 +542,85 @@ mod tests {
         assert!(!valid_origin("https://example.org/path"));
     }
 }
+
+/// Existing ACP worker, but its private chat events travel over stdout only.
+/// No Bridge task directory, metadata or conversation transcript is created.
+#[cfg(target_os = "macos")]
+pub(crate) fn run_text(prompt: &str, dir: &Path) -> Result<Value> {
+    use std::io::Read;
+    use std::time::{Duration, Instant};
+    assets(dir)?;
+    let mut child = Command::new(node_path()?)
+        .arg("--experimental-strip-types")
+        .arg(dir.join("worker.mjs"))
+        .current_dir(dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .context("WorkBuddy worker unavailable")?;
+    let stdout = child.stdout.take().context("missing WorkBuddy output")?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        stdout.take(512_001).read_to_end(&mut bytes).map(|_| bytes)
+    });
+    let sent = child
+        .stdin
+        .take()
+        .context("missing WorkBuddy input")?
+        .write_all(&serde_json::to_vec(
+            &json!({"dir":dir,"prompt":prompt,"output":"stdout"}),
+        )?);
+    let deadline = Instant::now() + Duration::from_secs(180);
+    let success = loop {
+        if sent.is_err() || Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            break false;
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status.success(),
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break false;
+            }
+        }
+    };
+    let bytes = reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("WorkBuddy reader failed"))??;
+    if !success || bytes.len() > 512_000 {
+        bail!("WorkBuddy did not complete");
+    }
+    let rows: Vec<Value> = std::str::from_utf8(&bytes)?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<std::result::Result<_, _>>()?;
+    if !rows
+        .last()
+        .is_some_and(|row| row["type"] == "task.completed")
+    {
+        bail!("WorkBuddy did not confirm completion");
+    }
+    let mut answer = String::new();
+    let mut last_id = Value::Null;
+    for row in rows.iter().filter(|row| row["type"] == "message.delta") {
+        if row["message_id"] != last_id {
+            answer.clear();
+            last_id = row["message_id"].clone();
+        }
+        if let Some(text) = row["text"].as_str() {
+            answer.push_str(text);
+        }
+    }
+    if answer.trim().is_empty() {
+        bail!("WorkBuddy returned no text");
+    }
+    Ok(json!({"status":"completed","result":answer,"persisted_by_bridge":false}))
+}
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn run_text(_prompt: &str, _dir: &Path) -> Result<Value> {
+    bail!("WorkBuddy adapter unsupported on this platform")
+}

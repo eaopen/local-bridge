@@ -25,3 +25,18 @@ main{padding:25px 34px 45px;min-width:0;max-width:1280px;width:100%;margin:0 aut
 .settings-nav{display:flex;gap:6px;padding:5px;background:#e9edf5;border-radius:11px;margin-bottom:24px;flex-wrap:wrap}.settings-nav button{border:0;background:transparent;border-radius:8px;padding:9px 20px;color:inherit;font-size:13px}.settings-nav button.selected{background:#fff;color:#3457c4;box-shadow:0 1px 5px #20325215;font-weight:700}.provider-description{font-size:12px;color:inherit;opacity:.8;margin:12px 0 20px;overflow-wrap:anywhere}.item-sub{overflow-wrap:anywhere}.settings-nav button:focus-visible,.button:focus-visible{outline:2px solid #8ca4f3;outline-offset:2px}:root[data-theme="dark"] .settings-nav{background:#283244}:root[data-theme="dark"] .settings-nav button.selected{background:#344157;color:#c4d3ff}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .settings-nav{background:#283244}:root:not([data-theme="light"]) .settings-nav button.selected{background:#344157;color:#c4d3ff}}@media(prefers-reduced-motion:reduce){.page{animation:none}}
 .ecosystem-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.ecosystem-actions>.button{white-space:nowrap}
 .agent-check-row{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid #e3e8f0}.agent-check-row:last-child{border-bottom:0}.agent-check-body{flex:1;min-width:0}.agent-check-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.agent-check-body p{line-height:1.65;margin:7px 0 0}.agent-check-row>.button{flex-shrink:0}.two-col .agent-check-row{flex-wrap:wrap}
+
+.chat-inputs{border:0;padding:0;margin:0;min-width:0}
+#page-chat textarea{display:block;width:100%;box-sizing:border-box;font:inherit;line-height:1.6;resize:vertical;padding:12px;border:1px solid var(--border,#b9c1cd);border-radius:8px;background:var(--surface,#fff);color:inherit}
+.chat-draft{margin:16px 0}.chat-draft button{margin-top:8px}
+#chat-results:empty{display:none}
+#chat-results .actions{flex-wrap:wrap}
+#chat-results button[aria-pressed="true"]{outline:2px solid #4669d8}
+
+#chat-inputs>.field{margin-bottom:20px}#chat-disclosure{margin-top:20px}
+#page-chat .actions{flex-wrap:wrap}
+:root[data-theme="dark"] #page-chat textarea{background:#283244;color:#d1dcee;border-color:#414c60}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) #page-chat textarea{background:#283244;color:#d1dcee;border-color:#414c60}}
+
+:root[data-theme="dark"] #page-chat .field{color:#b6c2d5}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) #page-chat .field{color:#b6c2d5}}

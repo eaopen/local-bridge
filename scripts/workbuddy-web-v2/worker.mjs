@@ -26,7 +26,8 @@ function emit(type,body={}){
  const row=JSON.stringify({seq:++seq,type,at:Date.now(),...body})+'\n';
  size+=Buffer.byteLength(row);
  if(seq>250||size>512000)throw Error('event_limit');
- fs.appendFileSync(events,row,{flag:'a',mode:0o600});
+ if(args.output==='stdout')process.stdout.write(row);
+ else fs.appendFileSync(events,row,{flag:'a',mode:0o600});
 }
 function closeMessage(){if(msgId){emit('message.final',{message_id:msgId});msgId=null;current='';}}
 function update(u){
