@@ -1,9 +1,11 @@
 // Explicit local-user reads only. No inference, sends, auto polling or persistence.
-export function selectedContext(data,indexes){
+export function selectedContext(data,indexes,displayName){
  if(!['local_index','desktop_ui','structured_db'].includes(data?.source)||typeof data.chat_id!=='string'||!Array.isArray(data.messages))throw new Error('来源无效')
  const text=indexes.map(i=>{const m=data.messages[i];if(!m||typeof m.text!=='string')throw new Error('片段无效');return `${m.sender||'发言人未知'}：${m.text}`}).join('\n')
  if(!text.trim()||new TextEncoder().encode(text).length>7800)throw new Error('请选择少量片段，总长度需小于 7800 字节。')
- return {text,context_source:'wechat_'+data.source,thread_label:data.chat_id}
+ const label=typeof displayName==='string'&&displayName.trim()&&displayName.length<=200?
+  displayName.trim():data.chat_id
+ return {text,context_source:'wechat_'+data.source,thread_label:label}
 }
 export function mountChatSource({document,call,onBusy,onUse}){
  const el=id=>document.getElementById(id)
@@ -41,8 +43,10 @@ export function mountChatSource({document,call,onBusy,onUse}){
   if(!loaded){await check();if(!loaded)return}
   reset();el('chat-source-id').value='';pending=true;onBusy(true);controls()
   try{
-   const seen=new Set();const deadline=Date.now()+120000
-   while(cursor&&Date.now()<deadline&&seen.size<50){
+   // A slow data source must not trigger a full-history enumeration from a keystroke.
+   // Search at most five extra pages per explicit action; the user can continue.
+   const seen=new Set();const deadline=Date.now()+30000
+   while(cursor&&Date.now()<deadline&&seen.size<5){
     if(seen.has(cursor))throw Error('repeated cursor')
     seen.add(cursor);note(`正在查找聊天…已检查 ${chats.length} 个`)
     await loadChats(true)
@@ -101,7 +105,12 @@ export function mountChatSource({document,call,onBusy,onUse}){
     text.textContent=m.text;body.append(meta,text);label.append(checkbox,body);el('chat-source-messages').append(label)
    }
    if(!data.messages.length)data=null
-  }catch{reset();note('片段读取未完成。实时功能可能受限或 Provider 需要升级；可改选已有索引或手动粘贴。未自动重试。')}
+  }catch(error){
+   reset()
+   const reason=String(error)
+   note(reason.includes('微信数据源访问被 macOS 拒绝')?
+    reason.slice(0,650):'片段读取未完成。实时功能可能受限或 Provider 需要升级；可改选已有索引或手动粘贴。未自动重试。')
+  }
   finally{pending=false;onBusy(false);controls()}
  }
  el('chat-source-check').addEventListener('click',()=>void check())
@@ -110,7 +119,8 @@ export function mountChatSource({document,call,onBusy,onUse}){
   if(pending||blocked||!data)return
   try{
    const indexes=[...el('chat-source-messages').querySelectorAll('input:checked')].map(c=>Number(c.value))
-   onUse(selectedContext(data,indexes));note('所选片段已放入本轮输入。核对后点击“生成建议”才会交给 Agent。')
+   const name=chats.find(c=>c.chat_id===data.chat_id)?.title
+   onUse(selectedContext(data,indexes,name));note('所选片段已放入本轮输入。核对后点击“生成建议”才会交给 Agent。')
   }catch(error){note(String(error))}
  })
  el('chat-source-search').addEventListener('input',()=>{reset();el('chat-source-id').value='';controls();renderChats();clearTimeout(searchTimer);searchTimer=setTimeout(()=>void searchChats(),400)})
