@@ -6,7 +6,7 @@
 
 **最高产品原则：让用户更方便协作。** 将本机原本割裂的平台连接起来，解决复制粘贴、重复登录、导入导出、工具切换和任务难以追踪等实际困扰，而不是让用户维护新的复杂系统。
 
-[个人/企业/混合使用场景](docs/PRODUCT_POSITIONING_AND_USE_CASES.md) · [混合 Profile 与 SSO](docs/PROFILE_AUTH_AND_COLLABORATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Security](docs/SECURITY.md)
+[生态自动发现与一键集成](docs/ECOSYSTEM_INTEGRATION_V1.md) · [个人/企业/混合使用场景](docs/PRODUCT_POSITIONING_AND_USE_CASES.md) · [混合 Profile 与 SSO](docs/PROFILE_AUTH_AND_COLLABORATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Security](docs/SECURITY.md)
 
 > **当前实现：0.1.0 核心及后续最小接线。** 已有只读 MCP Server、离线 Profile 校验、本机显式 Codex CLI run、Chrome Native Host/手动网页收件箱，以及用户注册的 MCP Client（已与独立 WeChat Provider 完成不涉及账号的协议联动）。**尚未交付**真实 Chrome/微信桌面实机验收、可信企业 SSO/Web 动作、PersonalProfile 运行时、双向通讯自动订阅、通用 BridgeTask 运行时或 CloudFile 文件编辑接管。现有文件编辑仍由 [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2) 负责。
 
@@ -15,6 +15,12 @@
 Local Bridge 的 **CLI/Native Host/MCP 仍然独立运行**，可选的 [Local Bridge Desktop](crates/local-bridge-desktop/README.md) 使用独立 Tauri 工程提供一个窗口中的概览、只读任务中心与 Agent 设置。它直接调用已有 Rust 模块，不新建 HTTP 管理接口、Web 任务权限或第二份任务数据库。默认 Agent/Model/ThinkMode/优先顺序使用统一的 `agent-preferences-v1.json`，Web SDK 未明确指定的参数才由 Bridge 默认设置决定。
 
 当前是**开发预览版**，尚无签名安装包、托盘自动启动或真实 Windows/macOS GUI 验收。桌面工程不进入核心 Cargo 工作区，独立 CI 检查；旧 CloudFile Agent2/Tauri、两套 Chrome Host 和原文件 Journal 均不改变。
+
+## 现有生态接入（V1，可选）
+
+`local-bridge ecosystem discover` 只读发现 Codex / Pi / WorkBuddy 与部分已安装的 uTools、Raycast、Quicker、PowerToys、macOS Shortcuts；不把安装当作已登录、已开启 MCP 或模型可用。现有 Agent 无须额外注册即可按原 `runAgent/readAgent` 使用。
+
+需要修改其他软件时，用户可主动在 Desktop「设置 → 生态接入」或 CLI 执行 `ecosystem connect codex`（使用 Codex 官方 MCP CLI，已有不同配置不覆盖）、`ecosystem install pi`（已有 Node.js 22.19+ 时用 npm 显式安装）。uTools 的 MCP 插件能力值得复用，但 `utools.ai()` 仅供 uTools 插件调用，尚未作为 Bridge Agent 备选交付。详见 [生态接入 V1](docs/ECOSYSTEM_INTEGRATION_V1.md)。
 
 ## Native Host lifecycle (user-level, optional)
 
