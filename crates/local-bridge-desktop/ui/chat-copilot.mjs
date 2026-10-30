@@ -155,7 +155,7 @@ export function mountChat({call,document,clipboard}){
   })
   el('chat-clear').addEventListener('click',async()=>{
     try{
-      await call('desktop_chat_clear');taskId=null;feedback='';sourceContext={};sourceView.reset();el('chat-context-source').textContent='手动粘贴';el('chat-form').reset();el('chat-results').replaceChildren()
+      await call('desktop_chat_clear');taskId=null;feedback='';sourceContext={};sourceView.reset();el('chat-context-source').textContent='手动粘贴';el('chat-form').reset();refreshRelationshipHint();el('chat-results').replaceChildren()
       say('本轮输入、草稿和反馈已清除。剪贴板由系统管理。');controls()
     }catch(error){say(String(error))}
   })
