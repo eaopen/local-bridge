@@ -254,7 +254,9 @@ mod tests {
     #[test]
     fn permission_denial_has_actionable_message() {
         let error = payload(json!({"ok":false,"result":{"content":[{"type":"text","text":"source_access_denied"}]}})).unwrap_err();
-        assert!(error.to_string().contains("Local Bridge 不应持有完全磁盘访问权限"));
+        assert!(error
+            .to_string()
+            .contains("Local Bridge 不应持有完全磁盘访问权限"));
         assert!(!error.to_string().contains("允许 Local Bridge Desktop Dev"));
     }
     #[test]
