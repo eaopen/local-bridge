@@ -60,6 +60,7 @@
         <div class="settings-nav" aria-label="设置分类">
           <button type="button" class="selected" data-setting="general" aria-current="page">通用</button>
           <button type="button" data-setting="agent">Agent</button>
+          <button type="button" data-setting="ecosystem">生态接入</button>
           <button type="button" data-setting="cloudfile">CloudFile</button>
           <button type="button" data-setting="wechat">微信</button>
         </div>
@@ -105,6 +106,12 @@
           <code>local-bridge web-v2 grant-agent https://your-app.example codex</code>
           <p>账号登录、模型 API、额度与费用由各 Agent 或企业服务负责，Local Bridge 不保存这些凭据。</p>
         </article>
+        </section>
+        <section id="settings-ecosystem" hidden>
+          <div class="section-heading"><div><h2>复用已有平台</h2><p>自动发现已安装的工具；安装与修改其他软件配置只在主动点击后执行。</p></div>
+            <button type="button" class="button secondary" id="refresh-ecosystem">重新检测</button></div>
+          <div class="panel" id="ecosystem-list"><p class="item-sub">正在发现已安装的工具…</p></div>
+          <p class="footnote">已安装不代表账号、模型或 MCP 已可用。uTools AI 需要插件内调用；网页 AI 只能沿用人工交接，不冒充 API。</p>
         </section>
         <section id="settings-cloudfile" hidden>
           <div class="section-heading"><div><h2>CloudFile 设置</h2><p>连接已有 Agent2，由它管理文件、账号与原有工作目录。</p></div></div>

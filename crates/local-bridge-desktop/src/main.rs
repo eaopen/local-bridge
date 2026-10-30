@@ -1,7 +1,7 @@
 //! Optional OS-user-only Tauri management window. No HTTP admin endpoint,
 //! second task database, Web Agent grants, CloudFile file writes or tray daemon.
 use local_bridge::{
-    agent_health, agent_options, agent_preferences, diagnostics, mcp_provider,
+    agent_health, agent_options, agent_preferences, diagnostics, ecosystem, mcp_provider,
     native_host_registration, task_center,
 };
 use serde_json::{json, Value};
@@ -59,6 +59,23 @@ fn desktop_preferences_save(preferences: Value) -> Result<Value, String> {
     agent_preferences::save_value(preferences).map_err(|error| error.to_string())
 }
 
+
+#[tauri::command]
+fn desktop_ecosystem_discover() -> Value {
+    ecosystem::discover()
+}
+
+#[tauri::command]
+async fn desktop_ecosystem_action(action: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || match action.as_str() {
+        "pi_install" => ecosystem::install_pi().map_err(|e| e.to_string()),
+        "codex_connect" => ecosystem::connect_codex().map_err(|e| e.to_string()),
+        _ => Err("unsupported ecosystem action".to_owned()),
+    })
+    .await
+    .map_err(|_| "ecosystem action cancelled".to_owned())?
+}
+
 #[tauri::command]
 fn desktop_settings() -> Result<Value, String> {
     Ok(json!({
@@ -107,6 +124,8 @@ fn main() {
             desktop_preferences_get,
             desktop_preferences_save,
             desktop_settings,
+            desktop_ecosystem_discover,
+            desktop_ecosystem_action,
             desktop_provider_add,
             desktop_provider_remove,
             desktop_provider_tools,

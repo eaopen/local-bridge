@@ -264,12 +264,83 @@ function setPage(page){
   notice('')
   if(page==='overview')void loadOverview()
   if(page==='tasks')void loadTasks()
-  if(page==='settings'){void loadSettings();if(!state.agents.length)void loadAgentInventory();if(state.setting==='agent')void loadPreferences()}
+  if(page==='settings'){void loadSettings();if(!state.agents.length)void loadAgentInventory();if(state.setting==='agent')void loadPreferences();if(state.setting==='ecosystem')void loadEcosystem()}
 }
 
 async function loadAgentInventory(){
   try{const data=await call('desktop_overview');state.agents=data.agents||[];renderAgentChecks()}
   catch(error){notice('Agent 状态读取失败：'+error)}
+}
+
+
+const ecosystemNames={
+  workbuddy:'WorkBuddy',codex:'Codex',pi:'Pi',
+  utools:'uTools',raycast:'Raycast',quicker:'Quicker',
+  powertoys:'PowerToys',shortcuts:'macOS 快捷指令'
+}
+const ecosystemNotes={
+  workbuddy:'复用现有桌面客户端；已安装不代表已登录或 API 可用。',
+  codex:'已安装的 Codex CLI 可直接成为 Agent；另可将 Bridge MCP 一键注册给 Codex。',
+  pi:'安装后仍需已有 Pi 账号/模型，或可信企业应用的临时模型授权。',
+  utools:'插件与 MCP 工具生态；utools.ai() 仅在 uTools 插件内可用，暂不等同于 Bridge Agent。',
+  raycast:'利用 Raycast 内置的 MCP Server 安装界面接入 Bridge，无需重复开发 Agent。',
+  quicker:'复用原有动作与 MCP；不修改 Quicker 的私人配置。',
+  powertoys:'系统级启动器候选，按需兼容 Command Palette。',
+  shortcuts:'通过系统的快捷指令/服务复用本地文本入口。'
+}
+async function ecosystemAction(action,caption){
+  if(!globalThis.confirm('确认执行 '+caption+'？此操作可能安装软件或修改目标工具的 MCP 配置。'))return
+  const refresh=el('refresh-ecosystem');refresh.disabled=true
+  try{
+    const result=await call('desktop_ecosystem_action',{action})
+    await loadEcosystem()
+    if(action==='pi_install'){
+      const overview=await call('desktop_overview')
+      state.agents=overview.agents||[];state.agentChecks={};renderAgentChecks()
+    }
+    notice(caption+'：'+(result.state||'操作已完成')+'。账号与模型可用性仍需独立确认。',true)
+  }catch(error){notice(caption+'失败：'+error)}
+  finally{refresh.disabled=false}
+}
+async function loadEcosystem(){
+  const target=el('ecosystem-list')
+  target.replaceChildren(node('p','正在检测本机已安装软件…','item-sub'))
+  try{
+    const data=await call('desktop_ecosystem_discover')
+    const agents=Array.isArray(data.agents)?data.agents:[]
+    const items=[...agents.map(x=>({id:x.agent,installed:x.installed})),
+      ...(Array.isArray(data.platforms)?data.platforms:[])]
+    const group=node('div',null,'stack')
+    for(const item of items){
+      const row=node('div',null,'item-row')
+      const left=document.createElement('div')
+      left.append(node('div',ecosystemNames[item.id]||item.id,'item-title'),
+        node('div',ecosystemNotes[item.id]||item.note||'','item-sub'))
+      const status=node('span',item.installed?'已发现 · 未验证':'未发现',
+        'pill '+(item.installed?'warn':''))
+      const actionArea=node('div',null,'ecosystem-actions')
+      if(item.id==='pi'&&!item.installed&&data.actions?.pi_install){
+        const install=node('button','一键安装 Pi','button primary')
+        install.type='button'
+        install.addEventListener('click',()=>void ecosystemAction('pi_install','安装 Pi'))
+        actionArea.append(install)
+      }
+      if(item.id==='codex'&&item.installed&&data.actions?.codex_connect){
+        const connect=node('button','一键接入 Bridge MCP','button secondary')
+        connect.type='button'
+        connect.addEventListener('click',()=>void ecosystemAction('codex_connect','注册 Codex MCP'))
+        actionArea.append(connect)
+      }
+      actionArea.append(status)
+      row.append(left,actionArea)
+      group.append(row)
+    }
+    target.replaceChildren(group)
+    if(data.fallback?.pi==='requires_node_22_19')
+      target.append(node('p','Pi 一键安装需要本机 Node.js ≥22.19 和 npm；不会自动安装基础运行时。','item-sub'))
+  }catch(error){
+    target.replaceChildren(node('p','生态检测失败：'+error,'item-sub'))
+  }
 }
 
 const providerDetails={
@@ -376,6 +447,7 @@ function setSetting(name){
     else button.removeAttribute('aria-current')
   }
   if(name==='agent')void loadPreferences()
+  if(name==='ecosystem')void loadEcosystem()
 }
 for(const button of document.querySelectorAll('[data-setting]'))
   button.addEventListener('click',()=>setSetting(button.dataset.setting))
@@ -390,6 +462,7 @@ el('general-form').addEventListener('submit',event=>{
     notice('通用设置已保存。',true)
   }catch(error){notice('保存失败：'+error)}
 })
+el('refresh-ecosystem').addEventListener('click',()=>void loadEcosystem())
 el('refresh-settings').addEventListener('click',()=>{state.probes={};void loadSettings()})
 for(const button of document.querySelectorAll('[data-page]')){
   button.addEventListener('click',()=>setPage(button.dataset.page))
