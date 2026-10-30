@@ -55,8 +55,9 @@ export function mountChat({call,document,clipboard}){
     try{
       selection=await call('desktop_chat_selection')
       const compatibility=selection.agent==='codex'?'此入口暂不支持 Codex 自定义服务配置。':selection.agent==='pi'?'此入口暂不支持 Pi 扩展模型。':''
+      el('chat-agent').textContent=`${selection.agent} · ${selection.model} · ${selection.think_mode}`
       el('chat-disclosure').textContent=`${compatibility}本次使用 ${selection.agent} · 模型 ${selection.model} · 思考 ${selection.think_mode}。点击生成会将选定片段、意图、风格与本轮反馈交给该 Agent，可能发送至其远端模型。Bridge 不保存聊天原文；Agent 服务的数据处理遵循其自身规则。`
-    }catch(error){el('chat-disclosure').textContent=String(error)+'。仍可编辑或复制已有文字。'}
+    }catch(error){el('chat-agent').textContent='Agent 暂不可用';el('chat-disclosure').textContent=String(error)+'。仍可编辑或复制已有文字。'}
     controls()
   }
   function render(raw){
@@ -68,23 +69,29 @@ export function mountChat({call,document,clipboard}){
       field.setAttribute('aria-label','未解析的原始草稿');area.append(field)
       area.append(copyButton(field));return
     }
-    area.append(node('h3',data.judgment))
+    area.append(node('p',data.judgment,'chat-judgment'))
+    for(const [index,candidate] of data.candidates.entries()){
+      const card=node('article','', 'chat-draft'),heading=node('div','','chat-draft-heading')
+      const label=node('label',candidate.label);label.htmlFor='chat-draft-'+index
+      const field=document.createElement('textarea');field.value=candidate.text;field.rows=2;field.id=label.htmlFor
+      field.setAttribute('aria-label',candidate.label+'草稿')
+      heading.append(label,copyButton(field));card.append(heading,field);area.append(card)
+    }
+    const analysis=node('details','','chat-analysis')
+    analysis.append(node('summary','查看依据 · 事实 / 推测 / 未知'))
+    const columns=node('div','','chat-analysis-grid')
     for(const [key,label] of [['facts','事实'],['hypotheses','推测'],['unknowns','未知 / 待澄清']]){
-      area.append(node('h4',label))
+      const group=node('section','');group.append(node('h4',label))
       const list=document.createElement('ul')
       for(const text of data[key])list.append(node('li',text))
       if(!data[key].length)list.append(node('li','未提供'))
-      area.append(list)
+      group.append(list);columns.append(group)
     }
-    for(const candidate of data.candidates){
-      const card=node('article','', 'panel chat-draft'),label=node('label',candidate.label,'field')
-      const field=document.createElement('textarea');field.value=candidate.text;field.rows=3
-      field.setAttribute('aria-label',candidate.label+'草稿');label.append(field)
-      card.append(label,copyButton(field));area.append(card)
-    }
+    analysis.append(columns);area.append(analysis)
     area.append(node('p','注意：'+data.avoid,'muted-banner'))
     if(data.commentary)area.append(node('p','补充：'+data.commentary,'muted-banner'))
-    const buttons=node('div','','actions')
+    const buttons=node('div','','actions chat-feedback')
+    buttons.append(node('span','像你吗？','chat-muted'))
     for(const value of FEEDBACK){
       const button=node('button',value,'button secondary');button.type='button'
       button.addEventListener('click',()=>{
@@ -93,7 +100,7 @@ export function mountChat({call,document,clipboard}){
         say('本轮反馈：'+value+'。下次生成时使用；清除或关闭页面后移除。')
       });buttons.append(button)
     }
-    area.append(node('p','这些建议像你吗？'),buttons)
+    area.append(buttons)
   }
   function copyButton(field){
     const button=node('button','复制文字','button secondary');button.type='button'
