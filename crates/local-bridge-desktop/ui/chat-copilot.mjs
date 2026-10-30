@@ -149,7 +149,7 @@ export function mountChat({call,document,clipboard}){
   sourceView=mountChatSource({document,call,onBusy(value){sourceBusy=value;controls()},onUse(context){
     sourceContext={context_source:context.context_source,thread_label:context.thread_label}
     el('chat-text').value=context.text
-    el('chat-context-source').textContent=context.context_source==='wechat_local_index'?'微信索引 · 非实时':'微信可见片段'
+    el('chat-context-source').textContent=context.context_source==='wechat_local_index'?'微信索引 · 非实时':context.context_source==='wechat_structured_db'?'微信本地结构化库':'微信可见片段'
     say('已载入 '+context.thread_label+' 的所选片段；尚未发送给 Agent。')
   }})
   el('chat-text').addEventListener('input',()=>{sourceContext={};el('chat-context-source').textContent='手动编辑'})
