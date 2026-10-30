@@ -47,8 +47,16 @@ impl Input {
             bail!("聊天片段为空、过长或含无效字符；请缩短片段和补充信息后重试");
         }
         let relationship = self.relationship.as_deref().unwrap_or("general");
-        if !["general", "friends", "work", "family", "new_connection", "partner", "group"]
-            .contains(&relationship)
+        if ![
+            "general",
+            "friends",
+            "work",
+            "family",
+            "new_connection",
+            "partner",
+            "group",
+        ]
+        .contains(&relationship)
         {
             bail!("无效的关系场景");
         }
@@ -208,9 +216,8 @@ mod tests {
         assert!(request.prompt().unwrap().contains("wechat_structured_db"));
         request.relationship = Some("work".into());
         let prompt = request.prompt().unwrap();
-        let data: Value = serde_json::from_str(
-            prompt.split("本轮不完整的用户数据：\n").nth(1).unwrap(),
-        ).unwrap();
+        let data: Value =
+            serde_json::from_str(prompt.split("本轮不完整的用户数据：\n").nth(1).unwrap()).unwrap();
         assert_eq!(data["relationship"], "work");
         request.relationship = Some("invented_stage".into());
         assert!(request.prompt().is_err());
