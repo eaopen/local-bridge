@@ -1,3 +1,4 @@
+import {mountChatSource} from './chat-source.mjs'
 // No storage, telemetry, HTML interpolation or connector calls in this module.
 export const FEEDBACK=['自然','太油','太冷','不像我','越界']
 const bounded=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max
@@ -36,21 +37,23 @@ export async function readUntilDone(call,id,{delay=()=>new Promise(r=>setTimeout
 
 export function mountChat({call,document,clipboard}){
   const el=id=>document.getElementById(id)
-  let selection=null,busy=false,taskId=null,feedback=''
+  let selection=null,busy=false,sourceBusy=false,taskId=null,feedback='',sourceContext={}
+  let sourceView
   const say=text=>{el('chat-status').textContent=text}
   const node=(tag,text,cls='')=>{
     const element=document.createElement(tag);element.textContent=text; if(cls)element.className=cls;return element
   }
   function controls(){
-    el('chat-generate').disabled=busy||!selection||taskId!==null
-    el('chat-clear').disabled=busy
+    el('chat-generate').disabled=busy||sourceBusy||!selection||taskId!==null
+    el('chat-clear').disabled=busy||sourceBusy
     el('chat-read').hidden=taskId===null
     el('chat-read').disabled=busy
-    el('chat-refresh-agent').disabled=busy||taskId!==null
-    el('chat-inputs').disabled=busy||taskId!==null
+    el('chat-refresh-agent').disabled=busy||sourceBusy||taskId!==null
+    el('chat-inputs').disabled=busy||sourceBusy||taskId!==null
+    sourceView?.setBlocked(busy||taskId!==null)
   }
   async function refresh(){
-    if(busy||taskId!==null)return
+    if(busy||sourceBusy||taskId!==null)return
     selection=null;controls()
     try{
       selection=await call('desktop_chat_selection')
@@ -123,11 +126,11 @@ export function mountChat({call,document,clipboard}){
     }finally{busy=false;controls()}
   }
   el('chat-form').addEventListener('submit',async event=>{
-    event.preventDefault();if(busy||!selection||taskId!==null)return
+    event.preventDefault();if(busy||sourceBusy||!selection||taskId!==null)return
     taskId=globalThis.crypto.randomUUID()
     busy=true;controls();el('chat-results').replaceChildren();say('正在提交本轮片段…')
     try{
-      const result=await call('desktop_chat_run',{input:{...selection,client_key:taskId,mode:el('chat-mode').value,text:el('chat-text').value,
+      const result=await call('desktop_chat_run',{input:{...selection,...sourceContext,client_key:taskId,mode:el('chat-mode').value,text:el('chat-text').value,
         intent:el('chat-intent').value,voice:el('chat-voice').value,constraints:el('chat-constraints').value,feedback}})
       taskId=result.task_id
     }catch(error){say(String(error)+'。可读取本轮结果，或清除后重试。');busy=false;controls();return}
@@ -136,12 +139,19 @@ export function mountChat({call,document,clipboard}){
   })
   el('chat-clear').addEventListener('click',async()=>{
     try{
-      await call('desktop_chat_clear');taskId=null;feedback='';el('chat-form').reset();el('chat-results').replaceChildren()
+      await call('desktop_chat_clear');taskId=null;feedback='';sourceContext={};sourceView.reset();el('chat-context-source').textContent='手动粘贴';el('chat-form').reset();el('chat-results').replaceChildren()
       say('本轮输入、草稿和反馈已清除。剪贴板由系统管理。');controls()
     }catch(error){say(String(error))}
   })
   el('chat-no-reply').addEventListener('click',()=>say('本轮选择不回复。不会发送消息；需要时可清除本轮内容。'))
   el('chat-read').addEventListener('click',()=>void read())
   el('chat-refresh-agent').addEventListener('click',()=>void refresh())
+  sourceView=mountChatSource({document,call,onBusy(value){sourceBusy=value;controls()},onUse(context){
+    sourceContext={context_source:context.context_source,thread_label:context.thread_label}
+    el('chat-text').value=context.text
+    el('chat-context-source').textContent=context.context_source==='wechat_local_index'?'微信索引 · 非实时':'微信可见片段'
+    say('已载入 '+context.thread_label+' 的所选片段；尚未发送给 Agent。')
+  }})
+  el('chat-text').addEventListener('input',()=>{sourceContext={};el('chat-context-source').textContent='手动编辑'})
   return {refresh}
 }
