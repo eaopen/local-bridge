@@ -7,6 +7,7 @@ pub mod agent_options;
 pub mod agent_preferences;
 pub mod agent_task;
 pub mod diagnostics;
+pub mod ecosystem;
 pub mod inbox;
 pub mod local_http;
 pub mod mcp_provider;
