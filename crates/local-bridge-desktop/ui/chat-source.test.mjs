@@ -12,6 +12,8 @@ test('only selected messages enter AI input and retain non-live source',()=>{
 test('structured DB source must be explicit and preserves stable source',()=>{
  const structured={source:'structured_db',chat_id:'wxid_synthetic',id_kind:'stable_conversation_id',source_identity:'sha256:synthetic',messages:[{text:'测试片段',sender:'甲'}]}
  assert.deepEqual(selectedContext(structured,[0]),{text:'甲：测试片段',context_source:'wechat_structured_db',thread_label:'wxid_synthetic'})
+ assert.equal(selectedContext(structured,[0],'团队讨论群').thread_label,'团队讨论群')
+ assert.equal(selectedContext(structured,[0],''.padEnd(201,'a')).thread_label,'wxid_synthetic')
 })
 
 test('picker defaults to configured records and uses stable ID for same-name chats',async()=>{
