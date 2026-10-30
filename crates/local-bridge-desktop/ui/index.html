@@ -87,8 +87,14 @@
               <label class="field"><span>对话片段 <small>可标明我 / 对方</small></span>
                 <textarea id="chat-text" rows="4" required maxlength="8000" placeholder="朋友：明天又要出差，有点累。" autocomplete="off"></textarea></label>
               <div class="chat-options">
+                <label class="field chat-wide"><span>关系场景</span><select id="chat-relationship">
+                  <option value="general">日常 / 不确定</option><option value="friends">朋友 / 同学</option>
+                  <option value="work">同事 / 客户</option><option value="family">家人 / 亲友</option>
+                  <option value="new_connection">刚认识 / 互相了解</option><option value="partner">伴侣 / 亲密关系</option>
+                  <option value="group">多人群聊</option>
+                </select><small id="chat-relationship-hint">仅根据聊天判断，不假设双方关系。</small></label>
                 <label class="field"><span>这次需要</span><select id="chat-mode"><option value="reply">帮我回应</option><option value="understand">帮我理解</option><option value="reflect">帮我理清自己</option></select></label>
-                <label class="field"><span>沟通意图</span><select id="chat-intent"><option>自然回应</option><option>安慰</option><option>澄清</option><option>礼貌拒绝</option><option>关系修复</option><option>降温 / 留边界</option></select></label>
+                <label class="field"><span>沟通意图</span><select id="chat-intent"><option>自然回应</option><option>安慰</option><option>继续话题</option><option>澄清</option><option>礼貌拒绝</option><option>关系修复</option><option>降温 / 留边界</option><option>适度表达好感</option><option>群聊要点</option></select></label>
                 <label class="field chat-wide"><span>表达风格</span><select id="chat-voice"><option>自然、简短、不油腻</option><option>温和、真诚</option><option>轻松、克制</option><option>直接、礼貌</option></select></label>
                 <label class="field chat-wide"><span>目标或边界 <small>可选</small></span><input id="chat-constraints" maxlength="160" autocomplete="off" placeholder="不用约见，不承诺加班"></label>
               </div>
