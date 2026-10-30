@@ -1,4 +1,4 @@
-export const SETTINGS = ['general','agent','cloudfile','wechat']
+export const SETTINGS = ['general','agent','ecosystem','cloudfile','wechat']
 export function generalDefaults(){return {theme:'system',startPage:'overview'}}
 export function generalPreferences(value){
   const result=generalDefaults()
