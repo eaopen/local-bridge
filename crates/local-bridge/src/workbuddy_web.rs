@@ -252,6 +252,10 @@ pub(crate) fn assets(dir: &Path) -> Result<()> {
         include_str!("../../../scripts/workbuddy-web-v2/worker.mjs").as_bytes(),
     )?;
     private_write(
+        &dir.join("message-stream.mjs"),
+        include_str!("../../../scripts/workbuddy-web-v2/message-stream.mjs").as_bytes(),
+    )?;
+    private_write(
         &dir.join("workbuddyBroker.ts"),
         include_str!("../../../scripts/workbuddy-native-validation/workbuddyBroker.ts").as_bytes(),
     )?;
@@ -478,6 +482,25 @@ pub fn poll(origin: &str, task_id: &str, cursor: u64) -> Result<Value> {
         "has_more":last>next,"terminal":matches!(state,"completed"|"failed"|"unknown")}),
     )
 }
+#[derive(Debug)]
+pub(crate) struct TextRunFailure(pub &'static str);
+impl std::fmt::Display for TextRunFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+impl std::error::Error for TextRunFailure {}
+#[cfg(any(target_os = "macos", test))]
+fn text_failure(code: &str) -> TextRunFailure {
+    TextRunFailure(match code {
+        "upstream_refusal" => "WorkBuddy 上游未接受本次请求；原账号短检查成功不保证本次聊天完成。",
+        "event_limit" => "WorkBuddy 回复超过本轮输出限制，请缩短片段后再试。",
+        "acp_timeout" | "task_timeout" => "WorkBuddy 本次调用超时；未自动重试。",
+        "permission_not_available" => "WorkBuddy 请求了未开放的工具权限；聊天模式未授予该权限。",
+        _ => "WorkBuddy 本次调用未完成，请在原客户端检查账号、模型与网络。",
+    })
+}
+
 /// Existing ACP worker, but its private chat events travel over stdout only.
 /// No Bridge task directory, metadata or conversation transcript is created.
 #[cfg(target_os = "macos")]
@@ -526,13 +549,19 @@ pub(crate) fn run_text(prompt: &str, dir: &Path) -> Result<Value> {
     let bytes = reader
         .join()
         .map_err(|_| anyhow::anyhow!("WorkBuddy reader failed"))??;
-    if !success || bytes.len() > 512_000 {
+    if bytes.len() > 512_000 {
         bail!("WorkBuddy did not complete");
     }
     let rows: Vec<Value> = std::str::from_utf8(&bytes)?
         .lines()
         .map(serde_json::from_str)
         .collect::<std::result::Result<_, _>>()?;
+    if let Some(row) = rows.iter().rev().find(|row| row["type"] == "task.failed") {
+        return Err(text_failure(row["code"].as_str().unwrap_or("")).into());
+    }
+    if !success {
+        return Err(text_failure("").into());
+    }
     if !rows
         .last()
         .is_some_and(|row| row["type"] == "task.completed")
@@ -563,6 +592,15 @@ pub(crate) fn run_text(_prompt: &str, _dir: &Path) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn private_failure_hints_never_echo_external_error_text() {
+        assert!(text_failure("upstream_refusal").0.contains("上游"));
+        assert!(text_failure("event_limit").0.contains("输出限制"));
+        assert!(!text_failure("private message / token / URL")
+            .0
+            .contains("token"));
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn concurrent_submission_is_rejected_until_original_start_releases_lock() {

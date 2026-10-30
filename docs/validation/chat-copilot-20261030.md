@@ -59,3 +59,12 @@ node --test crates/local-bridge-desktop/ui/*.test.mjs
 - WorkBuddy 固定短任务检查成功，但本次真实聊天调用失败；页面如实显示未完成，未自动切换。具体失败原因未定位，不视为 WorkBuddy 聊天验收通过。Pi 固定短任务未通过。
 - PR 初次核心 CI 因 `items_after_test_module` 失败；调整两个文件的函数位置后，本地严格 Clippy、62 项核心单测通过，修正提交 `d2b295f` 的三系统核心 CI 均成功。
 - 此次补齐 macOS 原生窗口→真实 Codex→编辑→系统剪贴板闭环；Windows 实机和 WorkBuddy/Pi 聊天可用性仍待验收。微信未操作。
+
+## WorkBuddy 失败排查与局部修复
+
+- 已修复可离线复现的 worker 缺陷：原先每个 token 小片段占一个事件，251 个片段就超限；现在合并至约 1024 字符，保持快照/消息边界与 Unicode 完整。新增四个 Node 回归，并接入三系统 CI。
+- 保留原事件与输出字节上限、不增加自动重试。私聊 worker 的 `task.failed` 现在可返回白名单安全提示，区分上游未接受、超时、输出超限；不回显原始错误或私聊。
+- 实际完整聊天失败另有上游原因：捕获到原账号 Broker 的 `E_UPSTREAM`，CLI 随后返回 502 / `stopReason=refusal`，没有聊天文本。安装的 WorkBuddy `wb.request/http.fetch` 实现缓冲完整响应，并固定 50 秒 abort；完整样本约 51.7 秒失败，与该限制相符。没有读取或导出账号凭据。
+- 一次较短的虚构结构化请求真实完成，但完整 Chat Copilot 样本仍未通过。低 effort、临时关闭额外思考及压缩提示/输出的试验仍约 52 秒失败，已撤回这些无效参数与提示改动；不能把短请求成功声称为聊天已修复。
+- 当前仍需 WorkBuddy 提供适合长响应的已授权接口，或在原客户端解决本次模型/网络延迟。Bridge 未改动 WorkBuddy 安装、代理超时或登录，不绕过其通道限制。
+- 严格 Clippy、63 项 Rust 单测、四项流式回归与桌面构建通过；本地默认 Agent 恢复 Codex。WorkBuddy 完整聊天验收仍未通过。

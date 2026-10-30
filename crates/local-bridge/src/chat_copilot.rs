@@ -101,13 +101,15 @@ impl Session {
         let spawned = std::thread::Builder::new().name("chat-copilot".into()).spawn(move || {
             // Never propagate provider output/errors into logs or task metadata.
             let outcome = agent_options::run_local(request);
+            let failure_hint = outcome.as_ref().err().and_then(|error|
+                error.downcast_ref::<crate::workbuddy_web::TextRunFailure>()).map(|failure| failure.0);
             if let Ok(mut state) = shared.lock() {
                 if let Some(value) = state.value.as_mut() {
                     match outcome {
                         Ok(result) if result["status"] == "completed" => {
                             value["status"] = json!("completed"); value["result"] = result["result"].clone();
                         }
-                        _ => { value["status"] = json!("failed"); value["error"] = json!("Agent 未完成。请检查原 Agent 的登录、模型、额度与兼容版本；未自动重试或切换 Agent。"); }
+                        _ => { value["status"] = json!("failed"); value["error"] = json!(failure_hint.unwrap_or("Agent 未完成。请检查原 Agent 的登录、模型、额度与兼容版本；未自动重试或切换 Agent。")); }
                     }
                 }
             }

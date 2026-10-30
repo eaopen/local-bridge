@@ -6,6 +6,7 @@ import http from 'node:http';
 import {spawn} from 'node:child_process';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
 import readline from 'node:readline';
+import {createMessageStream} from './message-stream.mjs';
 import {connectWorkbuddyBroker} from './workbuddyBroker.ts';
 import {loadWorkbuddyModelConfig} from './workbuddyModels.ts';
 
@@ -21,7 +22,7 @@ const stat=fs.lstatSync(dir);
 if(!stat.isDirectory()||stat.isSymbolicLink()||
    (process.getuid&&stat.uid!==process.getuid())||(stat.mode&0o077)!==0)process.exit(2);
 const events=path.join(dir,'events.jsonl');
-let seq=0,size=0,current='',msgId=null,messages=0,denied=false;
+let seq=0,size=0,denied=false;
 function emit(type,body={}){
  const row=JSON.stringify({seq:++seq,type,at:Date.now(),...body})+'\n';
  size+=Buffer.byteLength(row);
@@ -29,29 +30,9 @@ function emit(type,body={}){
  if(args.output==='stdout')process.stdout.write(row);
  else fs.appendFileSync(events,row,{flag:'a',mode:0o600});
 }
-function closeMessage(){if(msgId){emit('message.final',{message_id:msgId});msgId=null;current='';}}
-function update(u){
- if(!u||typeof u!=='object')return;
- if(u.sessionUpdate==='agent_message_chunk'&&u.content?.type==='text'){
-  const delta=u.content.text;
-  if(typeof delta!=='string'||!delta)return;
-  if(!msgId)msgId='msg-'+(++messages);
-  for(let i=0;i<delta.length;i+=1024){
-   const chunk=delta.slice(i,i+1024);
-   current+=chunk;emit('message.delta',{message_id:msgId,text:chunk});
-  }
- }else if(u.sessionUpdate==='agent_message'&&u.content?.type==='text'){
-  const full=String(u.content.text||'');
-  if(full!==current&&full){
-   closeMessage();msgId='msg-'+(++messages);
-   // A snapshot is never appended to previous chunks; it replaces its own message only.
-   for(let i=0;i<full.length;i+=1024)emit('message.delta',{message_id:msgId,text:full.slice(i,i+1024)});
-  }
-  closeMessage();
- }else if(['tool_call','tool_call_update'].includes(u.sessionUpdate)){
-  closeMessage();emit('tool.update',{state:String(u.status||'unknown').slice(0,24)});
- }
-}
+const messageStream=createMessageStream(emit);
+const closeMessage=()=>messageStream.close();
+const update=u=>messageStream.update(u);
 let broker,server,proc,pending=new Map(),counter=0,runtimeFailure;
 async function task(){
  emit('task.started',{agent:'workbuddy'});
@@ -146,7 +127,9 @@ async function task(){
  const response=await rpc('session/prompt',{sessionId:session.sessionId,
    prompt:[{type:'text',text:prompt}]});
  closeMessage();
- if(runtimeFailure||denied||response?.stopReason!=='end_turn'||!messages)
+ if(response?.stopReason==='refusal')throw Error('upstream_refusal');
+ if(runtimeFailure)throw runtimeFailure;
+ if(denied||response?.stopReason!=='end_turn'||!messageStream.count)
   throw Error(denied?'permission_not_available':'acp_not_completed');
  emit('task.completed',{stop_reason:'end_turn'});
 }
