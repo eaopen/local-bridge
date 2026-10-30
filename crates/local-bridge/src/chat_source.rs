@@ -15,7 +15,7 @@ fn payload(envelope: Value) -> Result<Value> {
                 })
             })
         {
-            bail!("macOS 拒绝读取微信数据。请在系统设置 → 隐私与安全性 → 完全磁盘访问权限中允许 Local Bridge Desktop Dev，重启本应用后重试。无需重新取钥或登录微信。");
+            bail!("微信数据源访问被 macOS 拒绝。Local Bridge 不应持有完全磁盘访问权限；请使用已授权的独立 WeChat Provider 读取服务，或改用已授权快照、已有索引与手动粘贴。当前 Provider 若由 Bridge 直接启动，macOS 仍可能把权限归属 Bridge；需由 Provider 独立运行后再验收。不要反复给开发版 Bridge 授权或重启微信。");
         }
         bail!("微信 Provider 调用失败；未自动重试");
     }
@@ -254,7 +254,8 @@ mod tests {
     #[test]
     fn permission_denial_has_actionable_message() {
         let error = payload(json!({"ok":false,"result":{"content":[{"type":"text","text":"source_access_denied"}]}})).unwrap_err();
-        assert!(error.to_string().contains("完全磁盘访问权限"));
+        assert!(error.to_string().contains("Local Bridge 不应持有完全磁盘访问权限"));
+        assert!(!error.to_string().contains("允许 Local Bridge Desktop Dev"));
     }
     #[test]
     fn mcp_error_is_not_an_empty_chat() {
