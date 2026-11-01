@@ -7,34 +7,6 @@ use local_bridge::{
 use serde_json::{json, Value};
 
 #[tauri::command]
-fn desktop_chat_selection() -> Result<Value, String> {
-    agent_options::local_selection().map_err(|_| "没有兼容的已安装 Agent，请检查 Agent 设置".into())
-}
-#[tauri::command]
-fn desktop_chat_run(
-    session: tauri::State<'_, local_bridge::chat_copilot::Session>,
-    input: local_bridge::chat_copilot::Input,
-) -> Result<Value, String> {
-    Ok(match session.run(input) {
-        Ok(receipt) => receipt,
-        Err(error) => json!({"status":"rejected","error":error.to_string()}),
-    })
-}
-#[tauri::command]
-fn desktop_chat_read(
-    session: tauri::State<'_, local_bridge::chat_copilot::Session>,
-    id: String,
-) -> Result<Value, String> {
-    session.read(&id).map_err(|e| e.to_string())
-}
-#[tauri::command]
-fn desktop_chat_clear(
-    session: tauri::State<'_, local_bridge::chat_copilot::Session>,
-) -> Result<(), String> {
-    session.clear().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 fn desktop_overview() -> Value {
     let providers =
         mcp_provider::list().unwrap_or_else(|_| json!({"providers":[],"state":"unavailable"}));
@@ -142,30 +114,9 @@ async fn desktop_provider_tools(id: String) -> Result<Value, String> {
     .map_err(|_| "连接检查失败".to_string())?
 }
 
-#[tauri::command]
-async fn desktop_chat_source_status() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| local_bridge::chat_source::status().map_err(|e| e.to_string()))
-        .await.map_err(|_| "连接检查未完成".to_string())?
-}
-#[tauri::command]
-async fn desktop_chat_source_conversations(source: String, cursor: Option<String>) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::conversations(&source, cursor).map_err(|e| e.to_string()))
-        .await.map_err(|_| "会话列表加载失败".to_string())?
-}
-#[tauri::command]
-async fn desktop_chat_source_read(chat_id: String, source: String, limit: u32) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::read(&chat_id, &source, limit).map_err(|e| e.to_string()))
-        .await.map_err(|_| "读取未完成；未自动重试".to_string())?
-}
-
 fn main() {
     tauri::Builder::default()
-        .manage(local_bridge::chat_copilot::Session::default())
         .invoke_handler(tauri::generate_handler![
-            desktop_chat_selection,
-            desktop_chat_run,
-            desktop_chat_read,
-            desktop_chat_clear,
             desktop_overview,
             desktop_agent_check,
             desktop_tasks,
@@ -177,9 +128,6 @@ fn main() {
             desktop_provider_add,
             desktop_provider_remove,
             desktop_provider_tools,
-            desktop_chat_source_status,
-            desktop_chat_source_read,
-            desktop_chat_source_conversations,
         ])
         .run(tauri::generate_context!())
         .expect("unable to start Local Bridge Desktop");

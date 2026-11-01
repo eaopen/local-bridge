@@ -37,6 +37,13 @@ local-bridge native-host uninstall             # only removes this Bridge Host
 
 These operations use **`com.eaopen.browser_bridge` only**. The original CloudFile Chrome Host, Agent2 file data/Journal/Guard and Tauri remain untouched. `self-test` reports optional/unconfigured items without treating them as broken and does **not** verify a real Chrome GUI, Agent login or CloudFile file edit. See [Native Host lifecycle and next common-capability slices](docs/LOCAL_FOUNDATION_MIGRATION.md).
 
+## 独立个人应用
+
+个人沟通助手现由 [CoBeing Companion](https://github.com/CoBeing/companion) 独立维护。
+Bridge 仅提供通用 Agent / MCP / Provider 能力，不再提供专用聊天页面、关系提示词或聊天历史管理。
+拆分前实现及尚未提交的多来源改动已保存于
+[2026-11-01 归档分支](https://github.com/eaopen/local-bridge/tree/archive/chat-copilot-before-extraction-20261101)。
+
 ## 为什么需要 Local Bridge
 
 同一台电脑上，企业 Web、个人微信等通讯、CloudFile、Office/CAD 和已有 Codex/WorkBuddy/Pi 往往各自工作，用户要反复复制消息、下载文件、切窗口和重新登录。
