@@ -501,6 +501,7 @@ pub fn poll(origin: &str, task_id: &str, cursor: u64) -> Result<Value> {
     )
 }
 #[cfg(any(target_os = "macos", test))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // Only constructed by macOS native worker; tested elsewhere.
 #[derive(Debug)]
 pub(crate) struct TextRunFailure(pub &'static str);
 #[cfg(any(target_os = "macos", test))]
