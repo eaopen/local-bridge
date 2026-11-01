@@ -500,13 +500,17 @@ pub fn poll(origin: &str, task_id: &str, cursor: u64) -> Result<Value> {
         "has_more":last>next,"terminal":matches!(state,"completed"|"failed"|"unknown")}),
     )
 }
+#[cfg(any(target_os = "macos", test))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // Only constructed by macOS native worker; tested elsewhere.
 #[derive(Debug)]
 pub(crate) struct TextRunFailure(pub &'static str);
+#[cfg(any(target_os = "macos", test))]
 impl std::fmt::Display for TextRunFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.0)
     }
 }
+#[cfg(any(target_os = "macos", test))]
 impl std::error::Error for TextRunFailure {}
 #[cfg(any(target_os = "macos", test))]
 fn text_failure(code: &str) -> TextRunFailure {
@@ -525,7 +529,7 @@ fn text_failure(code: &str) -> TextRunFailure {
     })
 }
 
-/// Existing ACP worker, but its private chat events travel over stdout only.
+/// Existing ACP worker for an explicit native text-only Agent request.
 /// No Bridge task directory, metadata or conversation transcript is created.
 #[cfg(target_os = "macos")]
 pub(crate) fn run_text(prompt: &str, model: &str, think: &str, dir: &Path) -> Result<Value> {
