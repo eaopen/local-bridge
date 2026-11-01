@@ -12,6 +12,18 @@ export const RELATIONSHIP_HINTS=Object.freeze({
   group:'多人群聊：把观点与发言人分开，不推断群成员的心理。'
 })
 export function relationshipHint(value){return RELATIONSHIP_HINTS[value]||RELATIONSHIP_HINTS.general}
+const WEB_PAGE_SUFFIX='_web_page'
+const WEB_PAGE_LABELS={soul:'Soul 网页 · 用户可见会话',cobeing:'共生网络 · 用户可见范围'}
+export function sourceLabel(source){
+  if(source==='wechat_local_index')return '微信索引 · 非实时'
+  if(source==='wechat_structured_db')return '微信本地结构化库'
+  if(source==='wechat_desktop_ui')return '微信可见片段'
+  if(typeof source==='string'&&source.endsWith(WEB_PAGE_SUFFIX)){
+    const provider=source.slice(0,-WEB_PAGE_SUFFIX.length)
+    return WEB_PAGE_LABELS[provider]||provider+' · 用户可见范围'
+  }
+  return '手动粘贴'
+}
 const bounded=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max
 export function parseDraft(raw){
   if(typeof raw!=='string'||raw.length>32000)throw new Error('结果为空或超出显示限制')
@@ -165,7 +177,7 @@ export function mountChat({call,document,clipboard}){
   sourceView=mountChatSource({document,call,onBusy(value){sourceBusy=value;controls()},onUse(context){
     sourceContext={context_source:context.context_source,thread_label:context.thread_label}
     el('chat-text').value=context.text
-    el('chat-context-source').textContent=context.context_source==='wechat_local_index'?'微信索引 · 非实时':context.context_source==='wechat_structured_db'?'微信本地结构化库':'微信可见片段'
+    el('chat-context-source').textContent=sourceLabel(context.context_source)
     say('已载入 '+context.thread_label+' 的所选片段；尚未发送给 Agent。')
   }})
   el('chat-text').addEventListener('input',()=>{sourceContext={};el('chat-context-source').textContent='手动编辑'})

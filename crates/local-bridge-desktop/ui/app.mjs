@@ -350,7 +350,10 @@ const providerDetails={
     ownership:'账号、服务器、文件目录、Guard 与 Journal 继续在原 CloudFile Agent2 中管理。'},
   wechat:{name:'微信',placeholder:'/absolute/path/to/wechat-provider',args:'serve',
     help:'安装独立 WeChat Provider 后，选择其虚拟环境中的 wechat-provider 可执行文件。',
-    ownership:'账号与索引由 WeChat Provider 管理。Mac 实时读写尚未验收；本页检查只发现 MCP 工具，不操作微信。'}
+    ownership:'账号与索引由 WeChat Provider 管理。Mac 实时读写尚未验收；本页检查只发现 MCP 工具，不操作微信。'},
+  soul:{name:'Soul 网页',placeholder:'/absolute/path/to/web-chat-provider',args:'serve',
+    help:'实验入口：仅用于接入你自行安装/授权、且声明 web_page_read 的独立网页会话 Provider。当前没有随 Bridge 发布的合规 Soul Provider；未安装时不可读取，请使用手动粘贴。',
+    ownership:'Soul 网页登录、会话数据与平台规则由该 Provider 及其浏览器会话管理；Bridge 只接收用户显式选择的可见片段，不自动发送。共生网络计划接入，暂无 Connector。'}
 }
 function renderProvider(id){
   const target=el('provider-'+id),detail=providerDetails[id]

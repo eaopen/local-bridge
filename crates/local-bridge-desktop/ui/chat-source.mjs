@@ -1,18 +1,50 @@
 // Explicit local-user reads only. No inference, sends, auto polling or persistence.
-export function selectedContext(data,indexes,displayName){
- if(!['local_index','desktop_ui','structured_db'].includes(data?.source)||typeof data.chat_id!=='string'||!Array.isArray(data.messages))throw new Error('来源无效')
+// A provider is user-installed; Bridge never hardcodes one vendor's message logic.
+const PROVIDERS={
+ wechat:{sources:['local_index','desktop_ui','structured_db'],preference:['structured_db','local_index','desktop_ui']},
+ soul:{sources:['web_page'],preference:['web_page']}
+}
+const SOURCE_LABELS={
+ local_index:'已有索引 · 非实时',
+ desktop_ui:'聊天界面 · 可见范围',
+ structured_db:'本机结构化库 · 按需读取',
+ web_page:'网页会话 · 用户可见范围'
+}
+export function providerSources(provider){
+ const config=PROVIDERS[provider]
+ if(!config)throw new Error('未知的聊天来源')
+ return config.sources
+}
+export function selectedContext(data,indexes,displayName,provider='wechat'){
+ const allowed=providerSources(provider)
+ if(!allowed.includes(data?.source)||typeof data.chat_id!=='string'||!Array.isArray(data.messages))throw new Error('来源无效')
+ if(typeof data.provider==='string'&&data.provider!==provider)throw new Error('来源无效')
+ if(data.source==='web_page'&&(data.live_read!==true||data.session_visible_only!==true))throw new Error('来源无效')
  const text=indexes.map(i=>{const m=data.messages[i];if(!m||typeof m.text!=='string')throw new Error('片段无效');return `${m.sender||'发言人未知'}：${m.text}`}).join('\n')
  if(!text.trim()||new TextEncoder().encode(text).length>7800)throw new Error('请选择少量片段，总长度需小于 7800 字节。')
  const label=typeof displayName==='string'&&displayName.trim()&&displayName.length<=200?
   displayName.trim():data.chat_id
- return {text,context_source:'wechat_'+data.source,thread_label:label}
+ return {text,context_source:`${provider}_${data.source}`,thread_label:label}
 }
 export function mountChatSource({document,call,onBusy,onUse}){
  const el=id=>document.getElementById(id)
- let pending=false,blocked=false,data=null,chats=[],cursor=null,searchTimer=null,loaded=false
+ let pending=false,blocked=false,data=null,chats=[],cursor=null,searchTimer=null,loaded=false,readable=false,dataProvider=null
  const note=text=>{el('chat-source-status').textContent=text}
- function controls(){el('chat-source-read').disabled=pending||blocked||!el('chat-source-id').value.trim();el('chat-source-fields').disabled=pending||blocked;el('chat-source-apply').disabled=pending||blocked||!data}
- function reset(){data=null;el('chat-source-messages').replaceChildren();controls()}
+ const providerOf=()=>el('chat-source-provider')?.value||'wechat'
+ const modeOf=()=>el('chat-source-mode').value
+ const configFor=provider=>PROVIDERS[provider]||PROVIDERS.wechat
+ const isWebPage=()=>modeOf()==='web_page'
+ function controls(){
+  el('chat-source-provider').disabled=pending||blocked
+  el('chat-source-read').disabled=pending||blocked||!readable||!el('chat-source-id').value.trim()
+  el('chat-source-fields').disabled=pending||blocked
+  el('chat-source-apply').disabled=pending||blocked||!data
+ }
+ function reset(){data=null;dataProvider=null;el('chat-source-messages').replaceChildren();controls()}
+ function syncListFields(){
+  const list=el('chat-source-list-fields')
+  if(list)list.hidden=isWebPage()||!readable
+ }
  function renderChats(){
   const select=el('chat-source-conversation'),selected=el('chat-source-id').value
   const search=el('chat-source-search').value.trim().toLocaleLowerCase()
@@ -27,10 +59,11 @@ export function mountChatSource({document,call,onBusy,onUse}){
   select.value=selected
   el('chat-source-more').hidden=!cursor
  }
- async function loadChats(more=false){
-  const source=el('chat-source-mode').value
-  if(source==='desktop_ui'){note('微信界面读取需在更多选项中指定会话。');return}
-  const result=await call('desktop_chat_source_conversations',{source,cursor:more?cursor:null})
+ async function loadChats(more=false,owner=providerOf()){
+  const source=modeOf()
+  if(source==='desktop_ui'){note('界面读取需在更多选项中指定会话。');return}
+  const result=await call('desktop_chat_source_conversations',{provider:owner,source,cursor:more?cursor:null})
+  if(owner!==providerOf())return
   if(!Array.isArray(result.chats))throw Error('invalid')
   const combined=more?[...chats,...result.chats]:result.chats
   chats=[...new Map(combined.map(c=>[c.chat_id,c])).values()];cursor=result.has_more?result.next_cursor:null
@@ -59,43 +92,71 @@ export function mountChatSource({document,call,onBusy,onUse}){
    }else note(matches.length?`找到 ${matches.length} 个聊天，请从列表选择。${cursor?'仍有会话未检查，点击继续查找。':''}`:
     cursor?'暂未找到，仍有会话未检查。点击继续查找。':'当前数据来源中未找到该聊天，请尝试名称中的几个字。')
    el('chat-source-more').textContent=cursor?'继续查找':'加载更多聊天'
-  }catch{note('查找未完成，请点击“选择微信聊天”重试。')}
+  }catch{note('查找未完成，请重新检查聊天来源。')}
   finally{pending=false;onBusy(false);controls()}
  }
  async function refresh(more=false){
   if(pending||blocked)return
+  const owner=providerOf()
   reset();pending=true;onBusy(true);controls();note('正在加载聊天…')
-  try{await loadChats(more)}catch{note('聊天列表加载失败，请重试；仍可手动粘贴。')}
+  try{await loadChats(more,owner)}catch{note('聊天列表加载失败，请重试；仍可手动粘贴。')}
   finally{pending=false;onBusy(false);controls()}
  }
  async function check(){
   if(pending||blocked)return
-  reset();chats=[];cursor=null;el('chat-source-id').value='';renderChats()
+  const requested=providerOf()
+  const sources=configFor(requested).sources
+  reset();chats=[];cursor=null;loaded=false;readable=false;el('chat-source-id').value='';renderChats()
   pending=true;onBusy(true);controls()
   try{
-   const state=await call('desktop_chat_source_status')
-   const live=state.read_contract_supported&&state.live_read_available
-   const structured=state.read_contract_supported&&state.structured_db_read
-   el('chat-source-mode').querySelector('[value=desktop_ui]').disabled=!live
-   el('chat-source-mode').querySelector('[value=structured_db]').disabled=!structured
-   if((!live&&el('chat-source-mode').value==='desktop_ui')||
-      (!structured&&el('chat-source-mode').value==='structured_db'))el('chat-source-mode').value='local_index'
-   if(structured)el('chat-source-mode').value='structured_db'
-   if(state.read_contract_supported){await loadChats()}
-   else note(!state.registered?'请到设置 → 微信连接已安装的 Provider。':'请升级 Provider 后再选择聊天。')
-  }catch(error){note('聊天列表加载失败：'+String(error).slice(0,240))}
+   const state=await call('desktop_chat_source_status',{provider:requested})
+   if(providerOf()!==requested)return
+   const contract=state.read_contract_supported===true
+   const capability={
+    local_index:contract&&state.local_index_read===true,
+    desktop_ui:contract&&state.live_read_available===true,
+    structured_db:contract&&state.structured_db_read===true,
+    web_page:contract&&state.web_page_read===true
+   }
+   const select=el('chat-source-mode')
+   for(const value of ['local_index','structured_db','desktop_ui','web_page']){
+    const option=select.querySelector('[value='+value+']')
+    if(option)option.disabled=!sources.includes(value)||!capability[value]
+   }
+   const usable=sources.filter(value=>capability[value])
+   readable=usable.length>0
+   if(usable.length){
+    const preferred=configFor(requested).preference.find(value=>usable.includes(value))
+    if(preferred)select.value=preferred
+   }
+   syncListFields()
+   if(!contract){
+    note(state.registered===false?'尚未安装或注册该聊天来源 Provider；仍可手动粘贴。':'该 Provider 需要升级后再选择聊天；仍可手动粘贴。')
+   }else if(!usable.length){
+    note('该 Provider 未声明当前来源的读取能力；可改用手动粘贴。')
+   }else if(isWebPage()){
+    note('请填写你在网页中可见的会话名称，再读取片段；不会自动翻页、监听或发送。')
+   }else{
+    await loadChats(false,requested)
+   }
+  }catch(error){note('聊天来源检查失败：'+String(error).slice(0,240))}
   finally{pending=false;onBusy(false);controls()}
  }
  async function read(){
   if(pending||blocked)return
-  const chatId=el('chat-source-id').value.trim();if(!chatId){note('请先从列表选择聊天。');return}
+  if(!readable){note('当前来源不可读取；请先检查聊天来源，或改用手动粘贴。');return}
+  const requested=providerOf()
+  const chatId=el('chat-source-id').value.trim();if(!chatId){note('请先选择或填写会话名称。');return}
+  const source=modeOf()
   reset();pending=true;onBusy(true);controls();note('正在读取指定会话片段…')
   try{
-   data=await call('desktop_chat_source_read',{chatId,source:el('chat-source-mode').value,limit:10})
+   data=await call('desktop_chat_source_read',{provider:requested,chatId,source,limit:10})
+   if(providerOf()!==requested)return
    if(!Array.isArray(data.messages))throw Error('invalid')
-   const sourceLabel=data.source==='local_index'?'已有索引 · 非实时':
-    data.source==='structured_db'?'本机结构化库 · 按需读取':'微信界面 · 可见范围'
-   const identityNote=data.id_kind==='stable_conversation_id'?'请核对片段后使用。':'显示名不是稳定身份，请核对内容。'
+   dataProvider=typeof data.provider==='string'?data.provider:requested
+   const sourceLabel=SOURCE_LABELS[data.source]||'来源未标注'
+   const identityNote=data.id_kind==='stable_conversation_id'?'请核对片段后使用。':
+    data.source==='web_page'?'仅当前可见内容，可能有遗漏；请核对后使用。':'显示名不是稳定身份，请核对内容。'
    note(`${sourceLabel} · ${chats.find(c=>c.chat_id===data.chat_id)?.title||data.chat_id} · ${data.messages.length} 条 · 不完整${data.cached_fallback?'；实时读取失败，返回的是旧索引':''}${data.skipped_non_text?'；跳过非文本 '+data.skipped_non_text+' 条':''}。 ${identityNote}`)
    for(const [i,m] of data.messages.entries()){
     const label=document.createElement('label');label.className='chat-source-message'
@@ -109,7 +170,7 @@ export function mountChatSource({document,call,onBusy,onUse}){
    reset()
    const reason=String(error)
    note(reason.includes('微信数据源访问被 macOS 拒绝')?
-    reason.slice(0,650):'片段读取未完成。实时功能可能受限或 Provider 需要升级；可改选已有索引或手动粘贴。未自动重试。')
+    reason.slice(0,650):'片段读取未完成。可能未登录、能力未声明或 Provider 需要升级；可改用手动粘贴。未自动重试。')
   }
   finally{pending=false;onBusy(false);controls()}
  }
@@ -120,14 +181,16 @@ export function mountChatSource({document,call,onBusy,onUse}){
   try{
    const indexes=[...el('chat-source-messages').querySelectorAll('input:checked')].map(c=>Number(c.value))
    const name=chats.find(c=>c.chat_id===data.chat_id)?.title
-   onUse(selectedContext(data,indexes,name));note('所选片段已放入本轮输入。核对后点击“生成建议”才会交给 Agent。')
+   const owner=typeof data.provider==='string'?data.provider:(dataProvider||providerOf())
+   onUse(selectedContext(data,indexes,name,owner));note('所选片段已放入本轮输入。核对后点击“生成建议”才会交给 Agent。')
   }catch(error){note(String(error))}
  })
  el('chat-source-search').addEventListener('input',()=>{reset();el('chat-source-id').value='';controls();renderChats();clearTimeout(searchTimer);searchTimer=setTimeout(()=>void searchChats(),400)})
  el('chat-source-conversation').addEventListener('change',()=>{reset();el('chat-source-id').value=el('chat-source-conversation').value;controls()})
  el('chat-source-more').addEventListener('click',()=>void (el('chat-source-search').value.trim()?searchChats():refresh(true)))
  el('chat-source-id').addEventListener('input',()=>reset())
- el('chat-source-mode').addEventListener('change',()=>{chats=[];cursor=null;el('chat-source-id').value='';renderChats();void refresh()})
+ el('chat-source-mode').addEventListener('change',()=>{syncListFields();chats=[];cursor=null;el('chat-source-id').value='';renderChats();if(isWebPage())note('请填写你在网页中可见的会话名称，再读取片段；不会自动翻页、监听或发送。');else void refresh()})
+ el('chat-source-provider')?.addEventListener('change',()=>void check())
  controls()
  return {setBlocked(value){blocked=value;controls()},reset(){reset();note('本轮读取片段已清除；未读取新消息。')}}
 }

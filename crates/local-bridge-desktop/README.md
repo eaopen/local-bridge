@@ -39,6 +39,8 @@ No Agent2 Tauri source copy, CloudFile Journal/Guard/data clone, global Shell or
 
 左侧「帮我聊」粘贴短对话，选择理解、回应或理清自己，查看 Agent 提示后点击生成。候选可修改并复制，或选择不回复；反馈只在本页面内用于下一次生成。点击「清除本轮」移除页面内容与内存结果。无需微信或 Provider。
 
+片段面板支持**多个聊天来源**：微信（本机 Provider，沿用 `local_index / desktop_ui / structured_db`）与网页会话（实验，`web_page`，需独立 Provider 声明能力）。来源由用户显式选择，未注册或未声明能力时降级为手动粘贴。共生网络为计划接入来源，当前只有禁用占位，没有 Connector。详见 [多来源接入](../../docs/CHAT_SOURCE_MULTI_PROVIDER_V1.md) 与 [验收](../../docs/validation/chat-source-multi-provider-20261030.md)。
+
 沿用 Agent 设置；本次聊天失败不自动换 Agent。Codex 需要支持临时/忽略配置参数的版本，聊天调用不载入自定义 provider/profile；Pi 扩展模型不在当前受限模式支持范围。原 Web Agent 授权与任务行为不变。
 
 验收范围见 [Chat Copilot 本地报告](../../docs/validation/chat-copilot-20261030.md)。

@@ -7,11 +7,13 @@ use local_bridge::{
 use serde_json::json;
 use std::time::{Duration, Instant};
 fn main() -> anyhow::Result<()> {
-    let source = chat_source::read("BRIDGE_SYNTHETIC_FIXTURE", "local_index", 10)?;
+    let source = chat_source::read("wechat", "BRIDGE_SYNTHETIC_FIXTURE", "local_index", 10)?;
     anyhow::ensure!(source["source"] == "local_index" && source["live_read"] == false);
     anyhow::ensure!(source["messages"].as_array().is_some_and(|m| m.len() == 1));
     #[cfg(target_os = "macos")]
-    anyhow::ensure!(chat_source::read("BRIDGE_SYNTHETIC_FIXTURE", "desktop_ui", 1).is_err());
+    anyhow::ensure!(
+        chat_source::read("wechat", "BRIDGE_SYNTHETIC_FIXTURE", "desktop_ui", 1).is_err()
+    );
     let text = source["messages"][0]["text"].as_str().unwrap();
     let input: Input = serde_json::from_value(
         json!({"client_key":"source-fixture","mode":"reply","text":text,

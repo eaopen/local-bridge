@@ -6,7 +6,7 @@
 
 **最高产品原则：让用户更方便协作。** 将本机原本割裂的平台连接起来，解决复制粘贴、重复登录、导入导出、工具切换和任务难以追踪等实际困扰，而不是让用户维护新的复杂系统。
 
-[生态自动发现与一键集成](docs/ECOSYSTEM_INTEGRATION_V1.md) · [个人/企业/混合使用场景](docs/PRODUCT_POSITIONING_AND_USE_CASES.md) · [混合 Profile 与 SSO](docs/PROFILE_AUTH_AND_COLLABORATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Security](docs/SECURITY.md)
+[生态自动发现与一键集成](docs/ECOSYSTEM_INTEGRATION_V1.md) · [个人/企业/混合使用场景](docs/PRODUCT_POSITIONING_AND_USE_CASES.md) · [混合 Profile 与 SSO](docs/PROFILE_AUTH_AND_COLLABORATION.md) · [多聊天来源](docs/CHAT_SOURCE_MULTI_PROVIDER_V1.md) · [Soul 接入评估](docs/SOUL_CHAT_INTEGRATION_V1.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Security](docs/SECURITY.md)
 
 > **当前实现：0.1.0 核心及后续最小接线。** 已有只读 MCP Server、离线 Profile 校验、本机显式 Codex CLI run、Chrome Native Host/手动网页收件箱，以及用户注册的 MCP Client（已与独立 WeChat Provider 完成不涉及账号的协议联动）。**尚未交付**真实 Chrome/微信桌面实机验收、可信企业 SSO/Web 动作、PersonalProfile 运行时、双向通讯自动订阅、通用 BridgeTask 运行时或 CloudFile 文件编辑接管。现有文件编辑仍由 [CloudFile Agent2](https://github.com/eaopen/cloudfile-local-agent2) 负责。
 

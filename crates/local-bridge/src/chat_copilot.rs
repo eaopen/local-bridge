@@ -26,6 +26,29 @@ pub struct Input {
     #[serde(default)]
     pub thread_label: Option<String>,
 }
+const CONTEXT_SOURCE_KINDS: [&str; 4] = ["local_index", "desktop_ui", "structured_db", "web_page"];
+
+/// Accept `manual` and `<provider>_<kind>` labels. The provider id is bounded and
+/// printable; the kind is one of the Bridge-known read-source semantics. This is
+/// a data label sent to the model, never an instruction or capability grant.
+fn valid_context_source(source: &str) -> bool {
+    if source == "manual" {
+        return true;
+    }
+    CONTEXT_SOURCE_KINDS.iter().any(|kind| {
+        source
+            .strip_suffix(kind)
+            .and_then(|prefix| prefix.strip_suffix('_'))
+            .is_some_and(|provider| {
+                !provider.is_empty()
+                    && provider.len() <= 64
+                    && provider
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
+            })
+    })
+}
+
 impl Input {
     fn prompt(&self) -> Result<String> {
         if !["understand", "reply", "reflect"].contains(&self.mode.as_str())
@@ -62,16 +85,7 @@ impl Input {
         }
         let source = self.context_source.as_deref().unwrap_or("manual");
         let label = self.thread_label.as_deref().unwrap_or("");
-        if ![
-            "manual",
-            "wechat_local_index",
-            "wechat_desktop_ui",
-            "wechat_structured_db",
-        ]
-        .contains(&source)
-            || label.chars().count() > 200
-            || label.contains('\0')
-        {
+        if !valid_context_source(source) || label.chars().count() > 200 || label.contains('\0') {
             bail!("无效的上下文来源");
         }
         let data = json!({"mode":self.mode,"relationship":relationship,"context":{"source":source,"thread_label":label,"completeness":"partial","text":self.text},
@@ -243,5 +257,32 @@ mod tests {
         assert_eq!(session.read("test-key").unwrap()["result"], "private");
         session.clear().unwrap();
         assert!(session.read("test-key").is_err());
+    }
+    #[test]
+    fn multi_provider_context_sources_are_bounded_labels() {
+        for source in [
+            "manual",
+            "wechat_local_index",
+            "wechat_desktop_ui",
+            "wechat_structured_db",
+            "soul_web_page",
+            "cobeing_web_page",
+        ] {
+            let mut request = input("synthetic");
+            request.context_source = Some(source.into());
+            assert!(request.prompt().is_ok(), "{source}");
+        }
+        for source in [
+            "web_page",
+            "soul_unknown",
+            "soul_",
+            "_web_page",
+            "soul web_page",
+            "bad!",
+        ] {
+            let mut request = input("synthetic");
+            request.context_source = Some(source.into());
+            assert!(request.prompt().is_err(), "{source}");
+        }
     }
 }

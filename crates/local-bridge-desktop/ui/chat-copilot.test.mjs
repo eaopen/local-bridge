@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {parseDraft,copyDraft,readUntilDone,FEEDBACK,relationshipHint,RELATIONSHIP_HINTS} from './chat-copilot.mjs'
+import {parseDraft,copyDraft,readUntilDone,FEEDBACK,relationshipHint,RELATIONSHIP_HINTS,sourceLabel} from './chat-copilot.mjs'
 const draft={judgment:'原因未知',facts:['两天未回复'],hypotheses:['可能忙，未经证实'],unknowns:['原因'],
   candidates:[{label:'稳',text:'先不下结论'},{label:'留边界',text:'这次不回复'}],avoid:'不推断感情'}
 test('relationship labels guide context without automatic profiling',()=>{
@@ -37,6 +37,16 @@ test('polling reads the same invocation; failure and unknown never rerun an Agen
   for(const status of ['failed','unknown','submitted'])
     await assert.rejects(readUntilDone(async()=>({status}),'one',{delay:async()=>{}}))
   await assert.rejects(readUntilDone(async()=>({status:'running'}),'one',{delay:async()=>{},limit:2}),/等待超时/)
+})
+
+test('source labels distinguish multiple chat providers without claiming delivery',()=>{
+  assert.equal(sourceLabel('wechat_local_index'),'微信索引 · 非实时')
+  assert.equal(sourceLabel('wechat_structured_db'),'微信本地结构化库')
+  assert.equal(sourceLabel('wechat_desktop_ui'),'微信可见片段')
+  assert.equal(sourceLabel('soul_web_page'),'Soul 网页 · 用户可见会话')
+  assert.equal(sourceLabel('cobeing_web_page'),'共生网络 · 用户可见范围')
+  assert.equal(sourceLabel('manual'),'手动粘贴')
+  assert.equal(sourceLabel('unknown'),'手动粘贴')
 })
 
 test('WorkBuddy fenced JSON with a trailing explanation renders without discarding the explanation',()=>{

@@ -31,7 +31,7 @@ struct ProviderConfig {
     args: Vec<String>,
 }
 
-fn identifier(id: &str) -> bool {
+pub(crate) fn identifier(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id

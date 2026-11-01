@@ -115,9 +115,17 @@ fn desktop_settings() -> Result<Value, String> {
 fn provider_args(id: &str) -> Result<Vec<String>, String> {
     match id {
         "wechat" => Ok(vec!["serve".into()]),
+        "soul" => Ok(vec!["serve".into()]),
         "cloudfile" => Ok(vec!["--bridge-provider".into()]),
-        _ => Err("当前设置页仅支持 CloudFile 和微信连接".into()),
+        _ => Err("当前设置页仅支持 CloudFile、微信和网页会话连接".into()),
     }
+}
+
+fn chat_provider(provider: Option<String>) -> String {
+    provider
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "wechat".into())
 }
 
 #[tauri::command]
@@ -143,18 +151,24 @@ async fn desktop_provider_tools(id: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn desktop_chat_source_status() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(|| local_bridge::chat_source::status().map_err(|e| e.to_string()))
-        .await.map_err(|_| "连接检查未完成".to_string())?
+async fn desktop_chat_source_status(provider: Option<String>) -> Result<Value, String> {
+    let provider = chat_provider(provider);
+    tauri::async_runtime::spawn_blocking(move || {
+        local_bridge::chat_source::status(&provider).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|_| "连接检查未完成".to_string())?
 }
 #[tauri::command]
-async fn desktop_chat_source_conversations(source: String, cursor: Option<String>) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::conversations(&source, cursor).map_err(|e| e.to_string()))
+async fn desktop_chat_source_conversations(provider: Option<String>, source: String, cursor: Option<String>) -> Result<Value, String> {
+    let provider = chat_provider(provider);
+    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::conversations(&provider, &source, cursor).map_err(|e| e.to_string()))
         .await.map_err(|_| "会话列表加载失败".to_string())?
 }
 #[tauri::command]
-async fn desktop_chat_source_read(chat_id: String, source: String, limit: u32) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::read(&chat_id, &source, limit).map_err(|e| e.to_string()))
+async fn desktop_chat_source_read(provider: Option<String>, chat_id: String, source: String, limit: u32) -> Result<Value, String> {
+    let provider = chat_provider(provider);
+    tauri::async_runtime::spawn_blocking(move || local_bridge::chat_source::read(&provider, &chat_id, &source, limit).map_err(|e| e.to_string()))
         .await.map_err(|_| "读取未完成；未自动重试".to_string())?
 }
 
@@ -187,17 +201,27 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::provider_args;
+    use super::{chat_provider, provider_args};
 
     #[test]
     fn settings_connections_only_use_known_fixed_entrypoints() {
         assert_eq!(provider_args("wechat").unwrap(), vec!["serve"]);
+        assert_eq!(provider_args("soul").unwrap(), vec!["serve"]);
         assert_eq!(
             provider_args("cloudfile").unwrap(),
             vec!["--bridge-provider"]
         );
-        for id in ["other", "../wechat", "wechat serve", ""] {
+        for id in ["other", "../wechat", "wechat serve", "", "cobeing"] {
             assert!(provider_args(id).is_err());
         }
+    }
+
+    #[test]
+    fn chat_source_provider_defaults_to_wechat_only_when_absent() {
+        assert_eq!(chat_provider(None), "wechat");
+        assert_eq!(chat_provider(Some("".into())), "wechat");
+        assert_eq!(chat_provider(Some("  ".into())), "wechat");
+        assert_eq!(chat_provider(Some("soul".into())), "soul");
+        assert_eq!(chat_provider(Some(" soul ".into())), "soul");
     }
 }

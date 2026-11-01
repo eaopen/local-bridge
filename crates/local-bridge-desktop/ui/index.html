@@ -66,22 +66,29 @@
           <form id="chat-form" class="panel chat-context">
             <div class="chat-card-heading"><h2>对话上下文</h2><span class="pill" id="chat-context-source">手动粘贴</span></div>
             <details class="chat-connector">
-              <summary>微信片段 <span class="chat-muted">按需读取 · 不自动发送</span></summary>
+              <summary>聊天片段 <span class="chat-muted">按需读取 · 不自动发送</span></summary>
+              <label class="field">聊天来源<select id="chat-source-provider">
+                <option value="wechat">微信（本机 Provider）</option>
+                <option value="soul">Soul 网页会话（实验）</option>
+                <option value="cobeing" disabled>共生网络（计划中，暂无 Connector）</option>
+              </select></label>
               <fieldset id="chat-source-fields" class="chat-inputs">
-                <div class="actions chat-source-actions"><button type="button" id="chat-source-check" class="button secondary">选择微信聊天</button></div>
-                <p id="chat-source-status" role="status">选择聊天后读取片段；不会自动发送或交给 AI。</p>
-                <label class="field">查找聊天<input id="chat-source-search" placeholder="输入好友或群名称" autocomplete="off"></label>
-                <label class="field">选择聊天<select id="chat-source-conversation"><option value="">先点击“选择微信聊天”</option></select></label>
-                <button type="button" id="chat-source-more" class="button secondary" hidden>加载更多聊天</button>
+                <div class="actions chat-source-actions"><button type="button" id="chat-source-check" class="button secondary">检查聊天来源</button></div>
+                <p id="chat-source-status" role="status">选择来源后读取片段；不会自动发送或交给 AI。</p>
+                <div id="chat-source-list-fields">
+                  <label class="field">查找聊天<input id="chat-source-search" placeholder="输入好友或群名称" autocomplete="off"></label>
+                  <label class="field">选择聊天<select id="chat-source-conversation"><option value="">先点击“检查聊天来源”</option></select></label>
+                  <button type="button" id="chat-source-more" class="button secondary" hidden>加载更多聊天</button>
+                </div>
+                <label class="field">手动指定会话（高级）<input id="chat-source-id" maxlength="200" autocomplete="off" placeholder="会话显示名；网页来源请填写浏览器中可见的会话名称"></label>
                 <details><summary>更多读取选项</summary>
-                <label class="field">读取来源<select id="chat-source-mode"><option value="local_index">已有索引（非实时）</option><option value="structured_db" disabled>本机微信记录</option><option value="desktop_ui" disabled>微信界面（需实机验收）</option></select></label>
-                <label class="field">手动指定会话（高级）<input id="chat-source-id" maxlength="200" autocomplete="off" placeholder="联系人/群聊显示名，或结构化库稳定会话 ID"></label>
+                <label class="field">读取来源<select id="chat-source-mode"><option value="local_index">已有索引（非实时）</option><option value="structured_db" disabled>本机结构化记录</option><option value="desktop_ui" disabled>聊天界面（可见范围）</option><option value="web_page" disabled>网页会话（用户可见范围）</option></select></label>
                 </details>
                 <button type="button" id="chat-source-read" class="button secondary">读取最近 10 条片段</button>
                 <div id="chat-source-messages" aria-label="读取的片段，勾选后使用"></div>
                 <button type="button" id="chat-source-apply" class="button secondary" disabled>使用勾选片段</button>
               </fieldset>
-              <p class="chat-muted">只读取你选择的聊天。勾选片段后用于本轮建议，不会自动发送。</p>
+              <p class="chat-muted">只读取你选择的会话；网页来源只取当前可见范围，不自动翻页或监听。勾选片段后用于本轮建议，不会自动发送。共生网络为计划接入来源，尚未提供 Connector，当前不可读取。</p>
             </details>
             <fieldset id="chat-inputs" class="chat-inputs">
               <label class="field"><span>对话片段 <small>可标明我 / 对方</small></span>
@@ -122,6 +129,7 @@
           <button type="button" data-setting="ecosystem">生态接入</button>
           <button type="button" data-setting="cloudfile">CloudFile</button>
           <button type="button" data-setting="wechat">微信</button>
+          <button type="button" data-setting="soul">Soul 网页</button>
         </div>
         <section id="settings-general">
           <div class="section-heading"><div><h2>通用设置</h2><p>管理桌面外观、启动页面与本机连接。</p></div></div>
@@ -179,6 +187,11 @@
         <section id="settings-wechat" hidden>
           <div class="section-heading"><div><h2>微信设置</h2><p>连接独立的 WeChat Provider，复用其本机配置与索引。</p></div></div>
           <div id="provider-wechat"></div>
+        </section>
+        <section id="settings-soul" hidden>
+          <div class="section-heading"><div><h2>Soul 网页设置（实验）</h2><p>仅接入你自行安装/授权、且声明 web_page_read 的独立网页会话 Provider。</p></div></div>
+          <div id="provider-soul"></div>
+          <p class="footnote">当前没有随 Bridge 发布的合规 Soul Provider；未安装时不可读取，请使用手动粘贴。Local Bridge 不提取 Cookie/Token、不模拟登录、不自动发送。共生网络为计划接入来源，暂无 Connector。</p>
         </section>
       </section>
     </main>
