@@ -375,9 +375,12 @@ pub fn local_selection() -> Result<Value> {
     Ok(json!({"agent":chosen,"model":prefs.model,"think_mode":prefs.think_mode}))
 }
 
-/// Terminal, non-persisting mode of the same Agent adapter dispatch. Selection
-/// is pinned to what the native UI displayed; there is no post-start fallback.
-pub(crate) fn run_local(request: RunAgentRequest) -> Result<Value> {
+/// OS-user-native, non-persisting text Agent adapter for independently
+/// installed applications. Never expose this directly to a web origin, MCP
+/// client or Native Host: the owning application must authenticate its own
+/// UI/IPC caller and obtain the user's explicit text-run action.
+/// Selection is pinned before running; no fallback or tool escalation.
+pub fn run_local(request: RunAgentRequest) -> Result<Value> {
     request.check()?;
     if request.agent_mode != "require"
         || !options_supported(&request.agent, &request.model, &request.think_mode)
