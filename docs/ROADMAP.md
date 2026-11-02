@@ -76,6 +76,13 @@ Rust 核心 0.1.0 + 后续小切片：只读 MCP Server、用户显式注册的 
 - 用户显式注册已安装 MCP stdio Provider，Bridge 作为 Client 通过 CLI 完成 `initialize/tools/list/tools/call`，第一个接入示例为独立 WeChat Provider。此注册**不会**把写入/发送工具自动开放给网页和 AI。
 - 原 Provider 继续管理账号、SQLite、发送结果与幂等；Bridge 不重建聊天系统，也不声称其 UI 兼容已通过真实微信验证。先在用户主动操作的受控聊天完成真实读写验收。
 
+## 2026-11-02 — 微信「合并转发 → Companion」ZIP 导入（P0，Bridge 零代码）
+
+- 用户从微信主动导出/合并转发聊天 ZIP，在 Companion 里选择文件 → 独立 WeChat Provider 解析 → Companion 预览、选择片段 → 用户点击后才调用本机 Agent；不复制粘贴、不配置复杂 MCP、不自动保存或发送。
+- Bridge 只作为通用 MCP stdio Client（`mcp_provider::call`）转发小 JSON；字节不经过 MCP，Provider 工具只接收 Companion 原生进程生成的**一次性授权令牌**，因此没有把任意本地文件读取开放给网页或 Agent。**本轮不改 Bridge 代码、不加依赖、不加常驻服务。**
+- 边界：文件解析在 Provider，聊天交互与提示词在 Companion，Bridge 不保存聊天历史、不做发送账本、不重建 Chat Copilot；不触碰微信登录、数据库或系统权限。
+- 状态：P0 已交付代码与合成 ZIP 端到端验证；**真实微信实机分享未验证**。P1 为 Companion 打包的 macOS Share Extension（原子批次 + 一次性 intent，无证书时明确提示不可用，不改变微信环境），P1.5 为场景/分批收集/Markdown 归档。详见 [微信原生分享 Bridge 边界与 P1 交接](WECHAT_NATIVE_SHARE_V1.md)。
+
 ## M3 — 通讯双向连接 + 企业 Web AI 增强
 
 - 使用一种**确实可用且获用户许可**的第三方/官方通讯 Connector，完成指定聊天消息读取/新消息订阅 → Agent → 草稿或授权发送 → 发送状态查询。微信、Soul 是场景，不预设其官方个人聊天 API。
