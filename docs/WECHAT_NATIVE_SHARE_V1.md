@@ -1,7 +1,7 @@
 # 微信原生分享 / ZIP 导入 — Bridge 侧边界与 P1 交接设计（2026-11-02）
 
 关联：`eaopen/wechat-provider` `feat/native-share-import`、`CoBeing/companion` `feat/native-share-import`。
-跨仓契约（v1）：见 Companion 仓库 `NATIVE_SHARE_CONTRACT_2026-11-02.md` 的落地版本与 Provider `docs/NATIVE_EXPORT_IMPORT.md`。
+跨仓契约（v1）：Companion 仓库 [`docs/NATIVE_SHARE_CONTRACT_V1.md`](https://github.com/CoBeing/companion/blob/main/docs/NATIVE_SHARE_CONTRACT_V1.md)；P1 分享收件箱契约在 Companion `docs/SHARE_INBOX_CONTRACT_V1.md`；Provider 侧见 [`docs/NATIVE_EXPORT_IMPORT.md`](https://github.com/eaopen/wechat-provider/blob/dev/docs/NATIVE_EXPORT_IMPORT.md)。
 
 ## 结论（本轮 P0）
 
