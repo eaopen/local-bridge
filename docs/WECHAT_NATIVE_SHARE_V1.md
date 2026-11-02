@@ -44,6 +44,16 @@
 
 若未来 P1 需要 Bridge 参与（例如跨应用通用批次投递），只增加「用户已选择文件的通用暂存 + 一次性批次查询」两个通用接口，仍不出现微信字段、解析逻辑或聊天记录存储。
 
+## P1 实现状态（2026-11-02，Companion 侧最小切片）
+
+P1 最小切片已落在 Companion 仓库（`feat/share-extension-p1`），**Local Bridge 仍然零代码**：
+
+- Companion 定义并实现本机 Share Inbox 协议：`Staging/<batch>.partial` → 原子 rename → `Ready/<batch>`（manifest + 一次性 intent，TTL 600s，过期不执行），消费后移到 `Consumed/`。
+- Swift 侧：Share Extension 核心（Inbox/Manifest/Intent/BatchStaging/ShareImport）+ `com.apple.share-services` `ShareViewController` 源码、Info.plist、App Group entitlements、XcodeGen 工程描述；staging/发布/校验逻辑有可执行 Swift 测试。
+- Rust 侧：Companion 启动时扫描 `Ready/`，严格校验后由用户点击才 `take` 到现有 P0 staging 并打开预览；未点击生成不会调用模型，也不保存/发送。合成批次可真实跑通（无签名环境用 `COMPANION_SHARE_INBOX` 覆盖目录或 `~/Library/Application Support/CoBeing/ShareInbox` 回退）。
+- **未验证**：`.appex` 在系统分享菜单中的加载与微信「合并转发给第三方应用」→ Companion 的真实链路。本机无 Xcode/证书，`com.apple.share-services` 在无签名条件下无法可靠注册；因此不承诺分享入口可用，**P0 文件选择入口仍是受支持路径**。证书不是使用该功能的前置条件，也不修改微信环境。
+- Bridge 不参与该批次交接：文件只在 Companion app 与扩展的共享目录内闭环，Bridge 仍只做通用 MCP 传输。
+
 ## 明确不做
 
 - 不重建 Chat Copilot，不在 Bridge 保存/索引微信聊天，不新增发送账本、任务系统、认证系统或第二套 MCP 网关。
