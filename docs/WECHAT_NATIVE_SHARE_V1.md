@@ -17,7 +17,7 @@
 ## 已验证 / 未验证（不夸大）
 
 - 已验证：Bridge 的 `mcp_provider::call` 可作为 Companion → Provider 的传输层，调用新的 `wechat_native_export_preview` / `wechat_native_export_save`（合成 ZIP、真实 Provider 进程、MCP stdio 协议；见 Companion `scripts/e2e-native-share.py` 与两个仓库的测试）。
-- 未验证：真实微信「合并转发 → 文件」实机操作、macOS Share Extension（P1，尚未实现）、Windows 分享入口、真实微信登录/数据库读取（本轮完全未触碰）。
+- 未验证：真实微信「合并转发 → 文件」实机操作、Windows 分享入口、真实微信登录/数据库读取（本轮完全未触碰）。macOS Share Extension 已实现，并已用系统分享服务 + 合成 ZIP 在本机 ad-hoc 安装下完成「列出 → 执行 → 原子批次 → Companion 预览」实测（详见 P1 实现状态）。
 
 ## 安全边界
 
@@ -50,8 +50,9 @@ P1 最小切片已落在 Companion 仓库（`feat/share-extension-p1`），**Loc
 
 - Companion 定义并实现本机 Share Inbox 协议：`Staging/<batch>.partial` → 原子 rename → `Ready/<batch>`（manifest + 一次性 intent，TTL 600s，过期不执行），消费后移到 `Consumed/`。
 - Swift 侧：Share Extension 核心（Inbox/Manifest/Intent/BatchStaging/ShareImport）+ `com.apple.share-services` `ShareViewController` 源码、Info.plist、App Group entitlements、XcodeGen 工程描述；staging/发布/校验逻辑有可执行 Swift 测试。
-- Rust 侧：Companion 启动时扫描 `Ready/`，严格校验后由用户点击才 `take` 到现有 P0 staging 并打开预览；未点击生成不会调用模型，也不保存/发送。合成批次可真实跑通（无签名环境用 `COMPANION_SHARE_INBOX` 覆盖目录或 `~/Library/Application Support/CoBeing/ShareInbox` 回退）。
-- **未验证**：`.appex` 在系统分享菜单中的加载与微信「合并转发给第三方应用」→ Companion 的真实链路。本机无有效 Apple 开发者账号/签名身份（`security find-identity` 为 0）且无 Xcode，`com.apple.share-services` 在无签名条件下无法可靠注册；因此不承诺分享入口可用，**P0 文件选择入口仍是受支持路径**。证书不是使用该功能的前置条件，也不修改微信环境。
+- Rust 侧：Companion 启动时扫描 `Ready/`；分享扩展发布后 best-effort 激活 Companion，已打开的窗口在聚焦/重新可见时再检查一次（无轮询）。严格校验后由用户点击才 `take` 到现有 P0 staging 并打开预览；未点击生成不会调用模型，也不保存/发送。合成批次与真实系统分享服务调用均可跑通（无签名环境用 `COMPANION_SHARE_INBOX` 覆盖目录或 `~/Library/Application Support/CoBeing/ShareInbox` 回退）。
+- **已实测（Companion 侧，2026-11-02）**：无开发者账号时可用 ad-hoc 本地安装（`macos/share-extension/install-local.sh`）把 `.appex` 注册进系统分享服务；`NSSharingService` 对合成 ZIP 列出「分享到 Companion」，真实调用后扩展执行并原子发布批次，Companion 默认解析顺序找到该批次并预览（未调用模型/未保存）。ad-hoc 下 App Group 容器不可写，两侧都回退到 `~/Library/Application Support/CoBeing/ShareInbox`。
+- **仍未验证**：微信「合并转发给第三方应用」→ Companion 的真实链路（本机未操作微信），以及正式签名/公证/可分发安装包。本机无有效 Apple 开发者账号/签名身份（`security find-identity` 为 0）且无 Xcode；本机 ad-hoc 安装已验证分享入口可用，但不可分发；**P0 文件选择入口始终是受支持路径**。证书不是本机使用该功能的前置条件，也不修改微信环境。
 - Bridge 不参与该批次交接：文件只在 Companion app 与扩展的共享目录内闭环，Bridge 仍只做通用 MCP 传输。
 
 ## 明确不做
